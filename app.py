@@ -837,7 +837,6 @@ def sales():
           SELECT p.id, p.name,p.sell_price_default_uzs AS sell_default,COALESCE(p.stock_qty,0) AS qty
             FROM products p
             WHERE p.is_active=1 AND p.category_id=?
-            GROUP BY p.id, p.name, p.sell_price_default_uzs, p.stock_qty
           ORDER BY p.name
         """, (cat_id,))
 

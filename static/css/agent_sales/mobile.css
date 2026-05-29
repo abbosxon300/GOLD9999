@@ -340,43 +340,37 @@
   }
 }
 
-/* === AGENT MOBILE CATEGORY PILLS POLISH === */
-@media (max-width: 768px){
+/* === AGENT MOBILE CATEGORY COMPACT FIX === */
+@media (max-width:768px){
   .agentm-cat-bar{
-    gap:10px;
-    padding:2px 2px 8px;
-    margin:0 -2px;
-    scrollbar-width:none;
-  }
-
-  .agentm-cat-bar::-webkit-scrollbar{
-    display:none;
+    gap:8px;
+    padding:0 0 6px;
+    margin:0;
   }
 
   .agentm-cat-pill{
-    flex:0 0 auto;
-    min-height:40px;
-    padding:10px 16px;
-    border-radius:999px;
-    border:1px solid rgba(37,99,235,.16);
-    background:#fff;
-    color:#111827;
-    font-size:15px;
+    min-height:34px;
+    padding:7px 12px;
+    border-radius:14px;
+    font-size:13px;
     font-weight:800;
-    text-decoration:none;
-    box-shadow:0 8px 20px rgba(15,23,42,.06);
-    white-space:nowrap;
+    box-shadow:none;
   }
 
   .agentm-cat-pill.active{
-    background:#2563eb;
-    color:#fff;
-    border-color:#2563eb;
-    box-shadow:0 12px 26px rgba(37,99,235,.28);
+    box-shadow:none;
   }
 
   .agentm-cat-pill.active::before{
-    content:"✓ ";
-    font-weight:900;
+    content:"";
+  }
+
+  .agentm-page-head{
+    margin-top:0;
+  }
+
+  .agentm-page-head h1{
+    font-size:28px;
+    line-height:1.15;
   }
 }
