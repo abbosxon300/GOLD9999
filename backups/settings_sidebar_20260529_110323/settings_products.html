@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set title = "Sozlamalar → Mahsulotlar" %}
+{% block content %}
+  <div class="card">
+    <b>Yangi mahsulot</b>
+    <form method="post" action="/settings/products/add" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
+      <input name="name" placeholder="Mahsulot nomi" required>
+      <select name="category_id" required>
+        <option value="">Kategoriya</option>
+        {% for c in cats %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <input name="sell_price_default_uzs" placeholder="Standart narx (so‘m)" required>
+      <button class="btn" type="submit">Qo‘shish</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <b>Ro‘yxat</b>
+    <table style="margin-top:10px">
+      <tr><th>ID</th><th>Nomi</th><th>Kategoriya</th><th>Standart narx</th><th>Holat</th><th></th></tr>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.category_name }}</td>
+        <td>{{ "%.0f"|format(r.sell_price_default_uzs or 0) }}</td>
+        <td>{{ "Faol" if r.is_active==1 else "Nofaol" }}</td>
+        <td>
+          <form method="post" action="/settings/products/toggle/{{ r.id }}">
+            <button class="btn" type="submit">Holatini o‘zgartirish</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="settings-menu">
+  <a href="/settings/agents">👤 Agentlar</a>
+  <a href="/settings/products">📦 Mahsulotlar</a>
+  <a href="/settings/categories">📂 Kategoriyalar</a>
+  <a href="/settings/backup">💾 Backup</a>
+</div>
+  </div>
+{% endblock %}

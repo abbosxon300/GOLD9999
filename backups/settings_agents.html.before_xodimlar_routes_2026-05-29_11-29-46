@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set title = "Sozlamalar → Xodimlar" %}
+{% block content %}
+
+<div class="card xodim-card">
+  <div class="xodim-head">
+    <div>
+      <h2>Xodimlar</h2>
+      <p>Tizimga kiradigan xodimlarni boshqarish</p>
+    </div>
+  </div>
+
+  <form method="post" action="/settings/agents/add" class="xodim-form">
+    <input name="username" placeholder="Login" required>
+    <input name="full_name" placeholder="F.I.Sh">
+    <input name="password" placeholder="Parol" required>
+    <button class="btn xodim-add-btn" type="submit">+ Xodim qo‘shish</button>
+  </form>
+</div>
+
+<div class="card xodim-card">
+  <div class="xodim-section-title">Xodimlar ro‘yxati</div>
+
+  <div class="xodim-table-wrap">
+    <table class="xodim-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Login</th>
+          <th>F.I.Sh</th>
+          <th>Lavozim</th>
+          <th>Holat</th>
+          <th>Amal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td><b>{{ r.username }}</b></td>
+          <td>{{ r.full_name or '—' }}</td>
+          <td>{{ "Admin" if r.role == "admin" else "Xodim" }}</td>
+          <td>
+            <span class="xodim-status {% if r.is_active==1 %}is-active{% else %}is-off{% endif %}">
+              {{ "Faol" if r.is_active==1 else "Nofaol" }}
+            </span>
+          </td>
+          <td>
+            <form method="post" action="/settings/agents/toggle/{{ r.id }}" style="margin:0;">
+              <button class="btn xodim-toggle {% if r.is_active==1 %}is-danger{% endif %}" type="submit">
+                {{ "O‘chirish" if r.is_active==1 else "Faollashtirish" }}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

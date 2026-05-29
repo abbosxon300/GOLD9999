@@ -1,0 +1,253 @@
+.agent-sales-mobile{
+  display:none;
+}
+
+@media (max-width: 768px){
+  .agent-sales-desktop{
+    display:none;
+  }
+  .agent-sales-mobile{
+    display:block;
+  }
+}
+
+/* ===== AGENT DESKTOP NAMESPACE CSS ===== */
+
+.agentd-page-head h1{
+  margin:8px 0 10px;
+  font-size:36px;
+}
+
+.agentd-kpi-bar{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+
+.agentd-kpi-pill{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:999px;
+  padding:8px 12px;
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+  font-size:13px;
+}
+
+.agentd-card{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:18px;
+  padding:14px;
+  box-shadow:0 12px 26px rgba(15,23,42,.06);
+  margin-bottom:14px;
+}
+
+.agentd-card-title{
+  font-weight:900;
+  font-size:18px;
+  margin-bottom:10px;
+}
+
+.agentd-card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.agentd-badge{
+  background:#f1f5f9;
+  border:1px solid #e2e8f0;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+}
+
+.agentd-grid-2{
+  display:grid;
+  grid-template-columns:1.25fr .75fr;
+  gap:14px;
+}
+
+.agentd-prod-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.agentd-prod-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid #e2e8f0;
+  border-radius:16px;
+  padding:10px;
+  background:#fff;
+}
+
+.agentd-prod-left{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  min-width:0;
+}
+
+.agentd-prod-ico{
+  width:44px;
+  height:44px;
+  flex:0 0 auto;
+}
+
+.agentd-prod-meta{
+  min-width:0;
+}
+
+.agentd-prod-name{
+  font-weight:900;
+}
+
+.agentd-prod-sub{
+  font-size:12px;
+  color:#64748b;
+  margin-top:2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:520px;
+}
+
+.agentd-prod-add{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.agentd-in{
+  height:40px;
+  border-radius:14px;
+  border:1px solid #e2e8f0;
+  padding:0 10px;
+  background:#fff;
+  width:96px;
+}
+
+.agentd-qty{
+  width:72px;
+}
+
+.agentd-plus{
+  width:44px;
+  padding:0;
+  font-size:18px;
+}
+
+.agentd-cart-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.agentd-cart-row{
+  border:1px solid #e2e8f0;
+  border-radius:16px;
+  padding:10px;
+}
+
+.agentd-cart-name{
+  font-weight:900;
+  margin-bottom:6px;
+}
+
+.agentd-cart-meta{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  font-size:13px;
+  color:#334155;
+}
+
+.agentd-cart-actions{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+}
+
+.agentd-cart-footer{
+  display:flex;
+  gap:10px;
+  margin-top:12px;
+}
+
+.agentd-muted{
+  color:#64748b;
+}
+
+.agentd-btn{
+  height:42px;
+  padding:0 14px;
+  border-radius:14px;
+  border:1px solid #e2e8f0;
+  background:#f8fafc;
+  font-weight:900;
+}
+
+.agentd-btn-primary{
+  background:#2563eb;
+  border-color:#2563eb;
+  color:#fff;
+}
+
+.agentd-btn-sm{
+  height:36px;
+  padding:0 10px;
+  border-radius:12px;
+}
+
+.agentd-btn-danger{
+  background:#fff1f2;
+  border-color:#fecdd3;
+  color:#be123c;
+}
+
+.agentd-plus{
+  width:44px;
+  padding:0;
+  font-size:18px;
+}
+
+/* === AGENT DESKTOP CATEGORY PILLS POLISH === */
+.agentd-cat-bar{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.agentd-cat-pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:38px;
+  padding:9px 16px;
+  border-radius:999px;
+  border:1px solid rgba(37,99,235,.16);
+  background:#fff;
+  color:#111827;
+  font-size:14px;
+  font-weight:800;
+  text-decoration:none;
+  box-shadow:0 8px 20px rgba(15,23,42,.06);
+}
+
+.agentd-cat-pill.active{
+  background:#2563eb;
+  color:#fff;
+  border-color:#2563eb;
+  box-shadow:0 12px 26px rgba(37,99,235,.24);
+}
+
+.agentd-cat-pill.active::before{
+  content:"✓ ";
+  font-weight:900;
+}

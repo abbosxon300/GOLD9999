@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page">
+  <div class="kpi-top">
+    <div>
+      <div class="kpi-h1">KPI</div>
+      <div class="kpi-h2">Kategoriyalar bo‘yicha qoldiq</div>
+    </div>
+    <a class="kpi-mini-btn" href="{{ url_for('kirim') }}">+ Kirim</a>
+  </div>
+
+  <div class="kpi-grid-2">
+    {% for c in cats %}
+      {% set v = (stock_map.get(c.id, 0) or 0) %}
+      <a class="kpi-card-2" href="{{ url_for('kpi_kirim', category_id=c.id) }}">
+        <div class="kpi-card-row">
+          <div class="kpi-card-title">{{ c.name }}</div>
+          <div class="kpi-pill">Batafsil</div>
+        </div>
+        <div class="kpi-card-value">{{ v | round(2) }}</div>
+        <div class="kpi-card-sub">Qoldiq</div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

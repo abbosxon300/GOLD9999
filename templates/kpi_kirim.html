@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card" style="padding:18px; margin-bottom:16px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div>
+      <div style="font-size:18px; font-weight:700;">Mahsulotlar ({{ category.name }})</div>
+      <div style="opacity:.8; margin-top:4px;">Ombordagi qoldiq va default narxlar. Kirim qo‘shish uchun pastdagi formadan mahsulotni tanlang.</div>
+    </div>
+    <a class="btn" href="/kpi/{{ category.id }}" style="white-space:nowrap;">⬅️ KPI ga qaytish</a>
+  </div>
+</div>
+
+<div class="card" style="padding:16px; margin-bottom:16px;">
+  <div style="font-weight:700; margin-bottom:10px;">Mahsulotlar ro‘yxati</div>
+
+  <div style="overflow:auto; border-radius:12px; border:1px solid rgba(255,255,255,.08);">
+    <table class="table" style="width:100%; min-width:780px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">ID</th>
+          <th style="text-align:left;">Nomi</th>
+          <th style="text-align:right;">Qoldiq</th>
+          <th style="text-align:right;">Default narx</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td style="opacity:.9;">{{ p.id }}</td>
+          <td style="font-weight:600;">{{ p.name }}</td>
+          <td style="text-align:right;">{{ "%.3f"|format(p.stock_qty or 0) }}</td>
+          <td style="text-align:right;">{{ p.sell_price_default_uzs or 0 }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" style="opacity:.8;">Bu kategoriyada mahsulot topilmadi.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="padding:16px;">
+  <div style="font-weight:700; margin-bottom:10px;">Kirim qo‘shish</div>
+
+  <form method="POST" style="display:grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap:12px; align-items:end;">
+    <div>
+      <label style="display:block; font-weight:600; margin-bottom:6px;">Mahsulot</label>
+      <select name="product_id" required
+              style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
+        <option value="" disabled selected>— Mahsulotni tanlang —</option>
+        {% for p in products %}
+          <option value="{{ p.id }}">{{ p.name }} (ID: {{ p.id }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label style="display:block; font-weight:600; margin-bottom:6px;">Miqdor</label>
+      <input name="qty" type="number" step="0.001" min="0" required
+             placeholder="Masalan: 10"
+             style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
+    </div>
+
+    <div>
+      <label style="display:block; font-weight:600; margin-bottom:6px;">Tannarx (so‘m)</label>
+      <input name="cost_uzs" type="number" step="1" min="0" required
+             placeholder="Masalan: 4500"
+             style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
+    </div>
+
+    <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center; justify-content:flex-start; margin-top:6px;">
+      <button class="btn" type="submit">✅ Saqlash</button>
+      <div style="opacity:.8;">Saqlangandan keyin qoldiq yangilanadi va KPI sahifada ko‘rinadi.</div>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

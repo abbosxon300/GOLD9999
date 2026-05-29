@@ -1,0 +1,164 @@
+/* Gold 9999 - Light Theme (soft, not heavy) */
+
+:root{
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --panel2: #f8fafc;
+  --border: rgba(15, 23, 42, .10);
+
+  --text: #0f172a;
+  --muted: #475569;
+
+  --primary: #2563eb;
+  --primary2:#1d4ed8;
+
+  --success:#16a34a;
+  --danger:#dc2626;
+  --warning:#f59e0b;
+
+  --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+  --radius: 16px;
+}
+
+/* Page */
+html, body { height:100%; }
+body{
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Layout helpers (works with most templates) */
+.container, .main, main { max-width: 1200px; }
+
+/* Sidebar */
+.sidebar, aside{
+  background: var(--panel) !important;
+  border-right: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+.sidebar a, aside a{
+  color: var(--text) !important;
+  text-decoration: none;
+}
+.sidebar a:hover, aside a:hover{
+  color: var(--primary) !important;
+}
+
+/* Cards / panels */
+.card, .panel, .box, .section{
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+}
+.card .title, .panel h2, .section h2 { color: var(--text) !important; }
+.small, .muted { color: var(--muted) !important; }
+
+/* Tables */
+table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+th, td{
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+th{
+  color: var(--muted);
+  font-weight: 700;
+  background: var(--panel2);
+}
+tr:hover td{
+  background: rgba(37, 99, 235, .04);
+}
+
+/* Inputs */
+input, select, textarea{
+  background: #fff !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  padding: 10px 12px !important;
+  outline: none !important;
+}
+input:focus, select:focus, textarea:focus{
+  border-color: rgba(37,99,235,.55) !important;
+  box-shadow: 0 0 0 4px rgba(37,99,235,.12) !important;
+}
+
+/* Buttons */
+button, .btn, a.btn{
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--panel2) !important;
+  color: var(--text) !important;
+  cursor: pointer;
+}
+button:hover, .btn:hover{ filter: brightness(0.98); }
+
+.btn-primary, .primary{
+  background: var(--primary) !important;
+  border-color: rgba(37,99,235,.35) !important;
+  color: #fff !important;
+}
+.btn-primary:hover{ background: var(--primary2) !important; }
+
+.btn-danger, .danger{
+  background: rgba(220,38,38,.10) !important;
+  border-color: rgba(220,38,38,.25) !important;
+  color: var(--danger) !important;
+}
+
+/* Alerts / flash */
+.alert, .flash{
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--shadow) !important;
+}
+.alert-success{ border-color: rgba(22,163,74,.25) !important; }
+.alert-danger{ border-color: rgba(220,38,38,.25) !important; }
+
+/* Make spacing nicer */
+.mt-1{ margin-top: .25rem }
+.mt-2{ margin-top: .5rem }
+.mt-3{ margin-top: 1rem }
+.mt-4{ margin-top: 1.5rem }
+
+/* Sales layout tweaks */
+.page-title h1{ margin:0 0 10px 0; font-size: 22px; }
+.flash-wrap{ margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap; }
+.flash{ padding:10px 12px; }
+.flash-success{ border-color: rgba(22,163,74,.25); }
+.flash-danger{ border-color: rgba(220,38,38,.25); }
+
+.top-bar{ display:flex; gap:12px; justify-content:space-between; align-items:center; padding:14px; }
+.top-left{ display:flex; gap:10px; flex-wrap:wrap; }
+.top-right{ display:flex; gap:10px; align-items:end; }
+.top-right .label{ font-size: 12px; color: var(--muted); margin-bottom: 6px; display:block; }
+.pill{ background: var(--panel2); border:1px solid var(--border); border-radius:999px; padding:8px 10px; font-size:12px; color: var(--muted); }
+.pill-strong{ color: var(--text); font-weight:700; }
+
+.grid-2{ display:grid; grid-template-columns: 1.7fr 1fr; gap:14px; margin-top:14px; }
+.card{ padding:0; overflow:hidden; }
+.card-head{ display:flex; align-items:baseline; justify-content:space-between; padding:14px; border-bottom:1px solid var(--border); }
+.table-wrap{ padding: 0 10px 10px; }
+
+.add-row{ display:flex; gap:8px; align-items:center; }
+.add-row .qty{ width:70px; text-align:center; }
+.add-row .price{ width:110px; text-align:right; }
+.add-row .plus{ width:44px; padding:10px 0 !important; }
+
+.cart-actions{ display:flex; gap:10px; padding:14px; border-top:1px solid var(--border); justify-content:space-between; }
+.cart-actions form{ flex:1; }
+.cart-actions button{ width:100%; }
+
+@media (max-width: 980px){
+  .grid-2{ grid-template-columns: 1fr; }
+  .top-bar{ flex-direction:column; align-items:stretch; }
+  .top-right{ align-items:stretch; }
+  .top-right select, .top-right button{ width:100%; }
+}

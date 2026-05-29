@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding:18px;">
+  <h2 style="margin:0 0 16px 0;">Bosh panel</h2>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;">
+
+      <div style="background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; color:#fff; cursor:pointer;" onclick="window.location.href='/kassa'">
+      <div style="font-size:13px; opacity:.75;">Kassa</div>
+      <div style="font-size:30px; font-weight:800; margin-top:8px; line-height:1.1;; position:relative; cursor:pointer;">
+{{ kassa_fmt }}
+          <div style="margin-top:8px;">
+            
+          </div>
+      </div>
+      <div style="font-size:12px; opacity:.6; margin-top:8px;"></div>
+    </div>
+
+    <div style="cursor:pointer; background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; color:#fff;" onclick="window.location.href='/sales/history';">
+      <div style="font-size:13px; opacity:.75;">Umumiy sotuv</div>
+      <div style="font-size:30px; font-weight:800; margin-top:8px; line-height:1.1;">
+        {{ sales_total_fmt }}
+      </div>
+      <div style="font-size:12px; opacity:.6; margin-top:8px;"></div>
+    </div>
+
+    <div style="background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; color:#fff;">
+      <div style="font-size:13px; opacity:.75;">Umumiy to‘lov</div>
+      <div style="font-size:30px; font-weight:800; margin-top:8px; line-height:1.1;">
+        {{ paid_total_fmt }}
+      </div>
+      <div style="font-size:12px; opacity:.6; margin-top:8px;"></div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:14px; font-size:12px; opacity:.65;">
+    
+  </div>
+</div>
+{% endblock %}

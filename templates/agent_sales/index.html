@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/agent_sales/desktop.css') }}?v=agent-sales-v1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/agent_sales/mobile.css') }}?v=agent-sales-v1">
+
+<div class="agent-sales-desktop">
+  {% include "agent_sales/desktop.html" %}
+</div>
+
+<div class="agent-sales-mobile">
+  {% include "agent_sales/mobile.html" %}
+</div>
+
+{% endblock %}

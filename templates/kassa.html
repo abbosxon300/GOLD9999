@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="padding:18px;">
+  <h2 style="margin:0 0 16px 0;">Kassa (IN / OUT)</h2>
+  <form method="get" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:0 0 14px 0;">
+    <div>
+      <div style="font-size:12px; opacity:.7; margin-bottom:4px;">From</div>
+      <input type="date" name="from" value="{{ from_date or '' }}" style="padding:10px; border:1px solid #e5e7eb; border-radius:10px;">
+    </div>
+    <div>
+      <div style="font-size:12px; opacity:.7; margin-bottom:4px;">To</div>
+      <input type="date" name="to" value="{{ to_date or '' }}" style="padding:10px; border:1px solid #e5e7eb; border-radius:10px;">
+    </div>
+    <button type="submit" class="btn" style="height:42px;">Filter</button>
+    <a href="{{ url_for('kassa') }}" class="btn" style="height:42px; display:inline-flex; align-items:center; text-decoration:none;">Reset</a>
+  </form>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:14px;">
+    <div style="background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; color:#fff;">
+      <div style="font-size:13px; opacity:.75;">Joriy balans</div>
+      <div style="font-size:30px; font-weight:800; margin-top:8px;">{{ kassa_fmt }}</div>
+      <div style="font-size:12px; opacity:.6; margin-top:8px;">cash_moves (IN - OUT)</div>
+    </div>
+
+    <div style="background:#0f172a; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; color:#fff;">
+      <div style="font-size:13px; opacity:.75; margin-bottom:10px;">Yangi harakat qo‘shish</div>
+
+      <form method="POST" style="display:grid; gap:10px;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <select name="direction" required style="flex:1; min-width:140px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;">
+            <option value="IN">IN (kirish)</option>
+            <option value="OUT">OUT (chiqish)</option>
+          </select>
+
+          <input name="amount_uzs" inputmode="numeric" placeholder="Summa (UZS)" required
+                 style="flex:2; min-width:180px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;" />
+        </div>
+
+        <input name="note" placeholder="Izoh (ixtiyoriy)"
+               style="padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;" />
+
+        <button type="submit"
+                style="padding:10px 12px; border-radius:12px; border:0; background:#2563eb; color:#fff; font-weight:700; cursor:pointer;">
+          Saqlash
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div style="background:#ffffff; border:1px solid rgba(15,23,42,.12); border-radius:14px; overflow:hidden;">
+    <div style="padding:12px 14px; font-weight:700;">Oxirgi harakatlar</div>
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f1f5f9; text-align:left;">
+            <th style="padding:10px; font-size:12px; color:#334155;">Sana</th>
+            <th style="padding:10px; font-size:12px; color:#334155;">Turi</th>
+            <th style="padding:10px; font-size:12px; color:#334155;">Summa</th>
+            <th style="padding:10px; font-size:12px; color:#334155;">Izoh</th>
+          <th style="padding:10px; text-align:left; font-size:13px; color:#94a3b8;">Amallar</th>
+</tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr style="border-top:1px solid rgba(15,23,42,.08);">
+            <td style="padding:10px; font-size:13px;">{{ r.move_date }}</td>
+            <td style="padding:10px; font-size:13px; font-weight:700;">
+              {% if r.direction == 'IN' %}
+                <span style="color:#16a34a;">IN</span>
+              {% else %}
+                <span style="color:#dc2626;">OUT</span>
+              {% endif %}
+            </td>
+            <td style="padding:10px; font-size:13px;">{{ '{:,.0f}'.format(r.amount_uzs or 0).replace(',', ' ') }}</td>
+            <td style="padding:10px; font-size:13px; color:#334155;">{{ r.note }}</td>
+          
+            <td style="padding:10px; font-size:13px;">
+              <div style="display:flex; gap:8px; align-items:center;">
+                <a href="{{ url_for('kassa_edit', move_id=r.id) }}"
+                   style="text-decoration:none; padding:6px 10px; border-radius:10px; background:#0b1220; border:1px solid rgba(255,255,255,.12); color:#fff;">
+                  ✏️
+                </a>
+
+                {% if not r.sale_id %}
+                  <form method="POST" action="{{ url_for('kassa_delete', move_id=r.id) }}" onsubmit="return confirm('O‘chirasizmi?');" style="margin:0;">
+                    <button type="submit"
+                            style="padding:6px 10px; border-radius:10px; background:rgba(239,68,68,.18); border:1px solid rgba(239,68,68,.35); color:#fff; cursor:pointer;">
+                      🗑
+                    </button>
+                  </form>
+                {% else %}
+                  <span title="Auto sale: o‘chirish taqiqlangan" style="opacity:.5;">🗑</span>
+                {% endif %}
+              </div>
+            </td>
+</tr>
+          {% endfor %}
+          {% if rows|length == 0 %}
+          <tr><td colspan="4" style="padding:12px; color:#64748b;">Hali kassa harakati yo‘q.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

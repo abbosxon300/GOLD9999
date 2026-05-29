@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page">
+  <div class="kpi-top">
+    <div>
+      <div class="kpi-h1">{{ cat.name }}</div>
+      <div class="kpi-h2">Mahsulotlar bo‘yicha qoldiq</div>
+    </div>
+    <a class="kpi-mini-btn" href="{{ url_for('kpi') }}">Orqaga</a>
+  </div>
+
+  <div class="card kpi-card-box">
+    <div class="table-wrap">
+      <table class="table kpi-table">
+        <thead>
+          <tr>
+            <th>Mahsulot</th>
+            <th class="tr">Qoldiq</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in prod_rows %}
+          <tr>
+            <td>{{ r.product_name }}</td>
+            <td class="tr">{{ (r.stock_qty or 0) | round(2) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:12px"></div>
+  <a class="btn" href="{{ url_for('kirim') }}">Kirim</a>
+</div>
+{% endblock %}

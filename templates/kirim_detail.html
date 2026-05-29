@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set title = "Kirim: " ~ category["name"] %}
+{% block content %}
+  <div class="card">
+    <b>Mahsulotlar ({{ category["name"] }})</b>
+    <table style="margin-top:10px">
+      <tr><th>ID</th><th>Nomi</th><th>Qoldiq</th><th>Default narx</th></tr>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.product_id }}</td>
+          <td>{{ r.product_name }}</td>
+          <td>{{ "%.2f"|format(r.qty) }}</td>
+          <td>{{ "%.0f"|format(r.sell_default or 0) }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="card">
+    <b>Kirim qo‘shish</b>
+    <form method="post" action="/kirim/add" style="margin-top:10px">
+      <input type="hidden" name="category_id" value="{{ category['id'] }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div>
+          <div class="badge">Product ID</div><br>
+          <input name="product_id" required>
+        </div>
+        <div>
+          <div class="badge">Miqdor</div><br>
+          <input name="qty" required>
+        </div>
+        <div>
+          <div class="badge">Tannarx (so‘m)</div><br>
+          <input name="unit_cost_uzs" required>
+        </div>
+      </div>
+      <button class="btn" type="submit" style="margin-top:10px">Saqlash</button>
+    </form>
+  </div>
+{% endblock %}

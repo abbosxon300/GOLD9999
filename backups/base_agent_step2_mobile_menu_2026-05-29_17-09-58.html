@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260216_174420">
+    <meta charset="UTF-8">
+    <title>Gold 9999</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* --- Logout bottom --- */
+.bn-logout{margin-top:auto;}
+
+/* --- Sidebar logout to bottom --- */
+.sidebar{display:flex;flex-direction:column;}
+
+/* --- Bottom nav: mobile only --- */
+.bottom-nav{display:none;}
+@media (max-width: 768px){
+  .bottom-nav{display:flex;}
+}
+
+/* --- Active menu --- */
+.sidebar a.active{
+  background:#1f2a44;
+  border-radius:8px;
+}
+
+
+
+  /* --- Bottom nav '...' (More) dropdown --- */
+  .bn-more-wrap{ position:relative; }
+  .bn-more-toggle{ display:none; }
+
+  .bn-more-btn{
+    display:flex; align-items:center; justify-content:center;
+    width:44px; height:44px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.04);
+    font-size:26px; line-height:1;
+    user-select:none;
+  }
+
+  .bn-more-menu{
+    position:absolute;
+    right:0;
+    bottom:54px;
+    min-width:190px;
+    padding:10px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.12);
+    background:#0f1626;
+    box-shadow: 0 18px 40px rgba(0,0,0,.45);
+    display:none;
+    z-index:9999;
+  }
+
+  .bn-more-link{
+    display:block;
+    padding:10px 12px;
+    border-radius:10px;
+    text-decoration:none;
+    color:#e9eefc;
+  }
+  .bn-more-link:hover{ background:rgba(255,255,255,.06); }
+
+  .bn-more-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9998;
+  }
+
+  /* Checkbox checked bo'lsa menu + overlay ochiladi */
+  #bnMoreToggle:checked ~ .bn-more-menu{ display:block; }
+  #bnMoreToggle:checked ~ .bn-more-overlay{ display:block; }
+
+</style>
+
+</head>
+<body class="app-body">
+
+<div class="layout">
+
+    <div class="sidebar">
+        <div class="logo">Gold 9999
+</div>
+          <button type="button" class="sb-toggle" id="sidebarToggle" title="Menyu (mini-mode)">☰</button>
+        {% if session.get("role") == "admin" %}
+        <a href="{{ url_for("home") }}" class="{% if request.path == '/' or request.path.startswith('/home') %}active{% endif %}" title="Bosh panel"><span class="sb-ico">🏠</span><span class="sb-lbl">Bosh panel</span></a>
+        {% endif %}
+        <a href="{{ url_for("sales") }}" class="{% if request.path.startswith('/sales') %}active{% endif %}" title="Sotuv"><span class="sb-ico">🛒</span><span class="sb-lbl">Sotuv</span></a>
+        {% if session.get("role") == "admin" %}
+        <a href="{{ url_for("kpi") }}" class="{% if request.path.startswith('/kpi') or request.path.startswith('/kirim') %}active{% endif %}" title="Kirim"><span class="sb-ico">📦</span><span class="sb-lbl">Kirim</span></a>
+<details class="sb-group" {% if request.path.startswith('/settings') %}open{% endif %}>
+  <summary class="sb-group-title {% if request.path.startswith('/settings') %}active{% endif %}" title="Sozlamalar">
+    <span class="sb-ico">⚙️</span><span class="sb-lbl">Sozlamalar</span>
+  </summary>
+  <div class="sb-submenu">
+    <a href="{{ "/settings/xodimlar" }}" class="{% if request.path.startswith('/settings/xodimlar') %}active{% endif %}"><span class="sb-ico">👤</span><span class="sb-lbl">Xodimlar</span></a>
+    <a href="{{ url_for("settings_products") }}" class="{% if request.path.startswith('/settings/products') %}active{% endif %}"><span class="sb-ico">📦</span><span class="sb-lbl">Mahsulotlar</span></a>
+    <a href="{{ url_for("settings_categories") }}" class="{% if request.path.startswith('/settings/categories') %}active{% endif %}"><span class="sb-ico">📂</span><span class="sb-lbl">Kategoriyalar</span></a>
+    <a href="{{ url_for("settings_backup") }}" class="{% if request.path.startswith('/settings/backup') %}active{% endif %}"><span class="sb-ico">💾</span><span class="sb-lbl">Backup</span></a>
+  </div>
+</details>
+{% endif %}
+    <a class="nav-link danger" href="{{ url_for('logout') }}" title="Chiqish"><span class="sb-ico">🚪</span><span class="sb-lbl">Chiqish</span></a>
+    </div>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+</div>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="bottom-nav">
+  {% if session.get("role") == "admin" %}
+  <a class="bn-item" href="{{ url_for('home') }}"><span class="bn-ico">🏠</span><span>Bosh</span></a>
+  <a class="bn-item" href="{{ url_for('sales') }}"><span class="bn-ico">🛒</span><span>Sotuv</span></a>
+  {% if session.get("role") == "admin" %}
+  <a class="bn-item" href="{{ url_for('kpi') }}"><span class="bn-ico">📦</span><span>Kirim</span></a>
+
+  <div class="bn-item bn-more-wrap">
+    <input id="bnMoreToggle" class="bn-more-toggle" type="checkbox" />
+    <label class="bn-more-btn" for="bnMoreToggle">⋯</label>
+
+    <div class="bn-more-menu">
+      <a class="bn-more-link" href="{{ '/settings/xodimlar' }}">👤 Xodimlar</a>
+      <a class="bn-more-link" href="{{ url_for('settings_products') }}">📦 Mahsulotlar</a>
+      <a class="bn-more-link" href="{{ url_for('settings_categories') }}">📂 Kategoriyalar</a>
+      <a class="bn-more-link" href="{{ url_for('settings_backup') }}">💾 Backup</a>
+      <a class="bn-more-link danger" href="{{ url_for('logout') }}">🚪 Chiqish</a>
+    </div>
+
+    <label class="bn-more-overlay" for="bnMoreToggle"></label>
+{% endif %}
+  </div>
+</nav>
+
+
+<!-- iOS Action Sheet -->
+<div id="iosSheetOverlay" class="ios-sheet-overlay"></div>
+
+<div id="iosSheet" class="ios-sheet">
+  <div class="ios-sheet-card">
+    <a class="ios-sheet-item" href="{{ '/settings/xodimlar' }}">
+      <span>👤 Xodimlar</span>
+    </a>
+    <a class="ios-sheet-item" href="{{ url_for('settings_products') }}">
+      <span>📦 Mahsulotlar</span>
+    </a>
+    <a class="ios-sheet-item" href="{{ url_for('settings_categories') }}">
+      <span>📂 Kategoriyalar</span>
+    </a>
+    <a class="ios-sheet-item" href="{{ url_for('settings_backup') }}">
+      <span>💾 Backup</span>
+    </a>
+    <div class="ios-sheet-sep"></div>
+    <a class="ios-sheet-item danger" href="{{ url_for('logout') }}">
+      <span>🚪 Chiqish</span>
+    </a>
+  </div>
+  <button class="ios-sheet-cancel" id="iosSheetCancel">Bekor qilish</button>
+</div>
+
+<script>
+const overlay=document.getElementById('iosSheetOverlay');
+const sheet=document.getElementById('iosSheet');
+const cancel=document.getElementById('iosSheetCancel');
+
+function openSheet(){
+   document.body.classList.add('ios-sheet-lock');
+overlay.classList.add('show');
+ sheet.classList.add('show');
+}
+function closeSheet(){
+   document.body.classList.remove('ios-sheet-lock');
+overlay.classList.remove('show');
+ sheet.classList.remove('show');
+}
+
+document.querySelectorAll('.bn-more,.bn-more-toggle').forEach(b=>{
+ b.onclick=e=>{e.preventDefault();openSheet();}
+});
+overlay.onclick=closeSheet;
+cancel.onclick=closeSheet;
+
+
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSheet(); });
+</script>
+
+
+  <!-- SB-MINI JS -->
+  <script>
+  (function(){
+    var sidebar = document.querySelector('.sidebar');
+    var btn = document.getElementById('sidebarToggle');
+    if (!sidebar || !btn) return;
+
+    // Restore
+    try{
+      var v = localStorage.getItem('sb_collapsed');
+      if (v === '1') sidebar.classList.add('collapsed');
+    }catch(e){}
+
+    btn.addEventListener('click', function(){
+      sidebar.classList.toggle('collapsed');
+      try{
+        localStorage.setItem('sb_collapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
+      }catch(e){}
+    });
+  })();
+  </script>
+
+</body>
+</html>

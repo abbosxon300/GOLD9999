@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% set title = "Sozlamalar → Backup" %}
+{% block content %}
+  <div class="card">
+    <b>Backup</b>
+    <form method="post" action="/settings/backup/create" style="margin-top:10px">
+      <button class="btn" type="submit">Backup yaratish</button>
+    </form>
+    <div style="margin-top:10px;color:var(--muted);font-size:12px">
+      Restore qilgandan keyin PythonAnywhere Web -> Reload bosiladi.
+    </div>
+  </div>
+
+  <div class="card">
+    <b>Mavjud backup’lar</b>
+    {% if backups and backups|length>0 %}
+      <table style="margin-top:10px">
+        <tr><th>Fayl</th><th>Download</th><th>Restore</th></tr>
+        {% for f in backups %}
+          <tr>
+            <td>{{ f }}</td>
+            <td><a class="badge" href="/settings/backup/download/{{ f }}">Yuklab olish</a></td>
+            <td>
+              <form method="post" action="/settings/backup/restore" style="display:inline">
+                <input type="hidden" name="filename" value="{{ f }}">
+                <button class="btn danger" type="submit">Restore</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% else %}
+      <div style="margin-top:10px;color:var(--muted)">Hali backup yo‘q.</div>
+    {% endif %}
+    <div style="margin-top:10px">
+      <a class="badge" href="/settings/categories">Kategoriya</a>
+      <a class="badge" href="/settings/products">Mahsulot</a>
+      <a class="badge" href="/settings/agents">Agent</a>
+    </div>
+  </div>
+{% endblock %}
