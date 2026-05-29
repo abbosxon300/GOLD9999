@@ -26,33 +26,7 @@
   <div class="agentd-card">
     <div class="agentd-card-title">Mahsulotlar</div>
 
-    <div class="agentd-prod-grid">
-      {% for p in products %}
-        {% set icon = 'brand/tshirt.svg' %}
-        {% if 'shim' in p.name|lower %}{% set icon = 'brand/pants.svg' %}{% endif %}
-        {% if 'kepka' in p.name|lower %}{% set icon = 'brand/cap.svg' %}{% endif %}
-
-        <div class="agentd-prod-card">
-          <div class="agentd-prod-left">
-            <img class="agentd-prod-ico" src="{{ url_for('static', filename=icon) }}" alt="">
-            <div class="agentd-prod-meta">
-              <div class="agentd-prod-name">{{ p.name }}</div>
-              <div class="agentd-prod-sub">ID: {{ p.id }} · Qoldiq: {{ (p.qty or 0)|int }} · Default: {{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}</div>
-            </div>
-          </div>
-
-          <form class="agentd-prod-add" method="post" action="{{ url_for('sales_add') }}">
-            <input type="hidden" name="category_id" value="{{ selected_cat_id }}">
-            <input type="hidden" name="product_id" value="{{ p.id }}">
-
-            <input class="agentd-in agentd-qty" name="qty" inputmode="numeric" placeholder="qty" required>
-            <input class="agentd-in agentd-price" name="price_uzs" inputmode="numeric" value="{{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}" required>
-
-            <button class="agentd-btn agentd-plus" type="submit">+</button>
-          </form>
-        </div>
-      {% endfor %}
-    </div>
+      {% include "agent_sales/products_desktop.html" %}
   </div>
 
   <div class="agentd-card">
