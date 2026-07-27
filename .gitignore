@@ -3,3 +3,13 @@ __pycache__/
 *.bak*
 *.tar.gz
 _archive_*/
+
+# Local backup artifacts
+backups/
+*.bak
+*.bak_*
+*.old
+*.orig
+*~
+*.zip
+*.py[cod]
