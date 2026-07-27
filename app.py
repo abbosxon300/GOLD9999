@@ -365,12 +365,18 @@ def init_db() -> None:
       qty REAL NOT NULL,
       unit_cost_uzs REAL NOT NULL DEFAULT 0,
       note TEXT,
+      source_type TEXT,
+      source_id INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE RESTRICT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_inv_moves_prod_date ON inventory_moves(product_id, move_date);
-    CREATE INDEX IF NOT EXISTS idx_inv_moves_type_date ON inventory_moves(move_type, move_date);
+    CREATE INDEX IF NOT EXISTS idx_inv_moves_prod_date
+      ON inventory_moves(product_id, move_date);
+
+    CREATE INDEX IF NOT EXISTS idx_inv_moves_type_date
+      ON inventory_moves(move_type, move_date);
+
 
     """)
 
@@ -393,11 +399,42 @@ def init_db() -> None:
 
     # Ensure products.stock_qty exists for older DBs
     try:
-        db.execute("ALTER TABLE products ADD COLUMN stock_qty REAL NOT NULL DEFAULT 0")
+        db.execute(
+            "ALTER TABLE products "
+            "ADD COLUMN stock_qty REAL NOT NULL DEFAULT 0"
+        )
         db.commit()
     except Exception:
         # column already exists (or older sqlite limitations)
         pass
+
+    # inventory_moves source identity migration
+    inventory_move_columns = {
+        row[1]
+        for row in db.execute(
+            "PRAGMA table_info(inventory_moves)"
+        ).fetchall()
+    }
+
+    if "source_type" not in inventory_move_columns:
+        db.execute(
+            "ALTER TABLE inventory_moves "
+            "ADD COLUMN source_type TEXT"
+        )
+
+    if "source_id" not in inventory_move_columns:
+        db.execute(
+            "ALTER TABLE inventory_moves "
+            "ADD COLUMN source_id INTEGER"
+        )
+
+    db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_inv_moves_source
+        ON inventory_moves(source_type, source_id)
+        WHERE source_type IS NOT NULL
+          AND source_id IS NOT NULL
+    """)
+    db.commit()
 
     # default admin
     admin = q1("SELECT id FROM users WHERE username='admin'")
@@ -788,29 +825,107 @@ WHERE p.category_id=? AND p.is_active=1
 @admin_required
 def kirim_add():
     init_db()
-    category_id = parse_int(request.form.get("category_id") or "0")
-    product_id = parse_int(request.form.get("product_id") or "0")
+
+    category_id = parse_int(
+        request.form.get("category_id") or "0"
+    )
+    product_id = parse_int(
+        request.form.get("product_id") or "0"
+    )
     qty = parse_float(request.form.get("qty") or "")
-    unit_cost = parse_float(request.form.get("unit_cost_uzs") or "")
+    unit_cost = parse_float(
+        request.form.get("unit_cost_uzs") or ""
+    )
 
     if product_id <= 0:
         flash("Mahsulot tanlanmadi", "danger")
-        return redirect(url_for("kirim_detail", category_id=category_id))
+        return redirect(
+            url_for(
+                "kirim_detail",
+                category_id=category_id,
+            )
+        )
+
     if qty is None or qty <= 0:
         flash("Miqdor noto‘g‘ri", "danger")
-        return redirect(url_for("kirim_detail", category_id=category_id))
+        return redirect(
+            url_for(
+                "kirim_detail",
+                category_id=category_id,
+            )
+        )
+
     if unit_cost is None or unit_cost <= 0:
         flash("Tannarx noto‘g‘ri", "danger")
-        return redirect(url_for("kirim_detail", category_id=category_id))
+        return redirect(
+            url_for(
+                "kirim_detail",
+                category_id=category_id,
+            )
+        )
 
-    p = q1("SELECT id FROM products WHERE id=? AND is_active=1", (product_id,))
-    if not p:
-        flash("Mahsulot topilmadi yoki nofaol", "danger")
-        return redirect(url_for("kirim_detail", category_id=category_id))
-    exec_sql("UPDATE products SET stock_qty = COALESCE(stock_qty,0) + ? WHERE id=?", (float(qty), int(product_id)))
+    db = get_db()
 
-    flash("Kirim saqlandi ✅", "success")
-    return redirect(url_for("kirim_detail", category_id=category_id))
+    try:
+        db.execute("BEGIN")
+
+        product = db.execute("""
+            SELECT id
+            FROM products
+            WHERE id=?
+              AND is_active=1
+        """, (product_id,)).fetchone()
+
+        if not product:
+            raise ValueError(
+                "Mahsulot topilmadi yoki nofaol"
+            )
+
+        move_date = date.today().isoformat()
+
+        db.execute("""
+            INSERT INTO inventory_moves(
+                move_date,
+                move_type,
+                product_id,
+                qty,
+                unit_cost_uzs,
+                note,
+                source_type,
+                source_id
+            )
+            VALUES(?,?,?,?,?,?,NULL,NULL)
+        """, (
+            move_date,
+            "IN",
+            int(product_id),
+            float(qty),
+            float(unit_cost),
+            "Oddiy kirim",
+        ))
+
+        db.execute("""
+            UPDATE products
+            SET stock_qty=COALESCE(stock_qty, 0) + ?
+            WHERE id=?
+        """, (
+            float(qty),
+            int(product_id),
+        ))
+
+        db.commit()
+        flash("Kirim saqlandi ✅", "success")
+
+    except Exception as exc:
+        db.rollback()
+        flash(str(exc), "danger")
+
+    return redirect(
+        url_for(
+            "kirim_detail",
+            category_id=category_id,
+        )
+    )
 
 
 # ---- Sotuv ----
@@ -886,6 +1001,26 @@ def sales():
         sum_cost=s_cost,
         sum_profit=s_profit,
     )
+
+
+@app.route("/sales/products", methods=["GET"])
+@login_required
+def sales_products():
+    init_db()
+    if session.get("role") != "agent":
+        return redirect(url_for("sales"))
+    cat_id = parse_int(request.args.get("category_id") or "0")
+    products = []
+    if cat_id > 0:
+        products = q("""
+          SELECT p.id, p.name,p.sell_price_default_uzs AS sell_default,COALESCE(p.stock_qty,0) AS qty
+            FROM products p
+            WHERE p.is_active=1 AND p.category_id=?
+          ORDER BY p.name
+        """, (cat_id,))
+    view = (request.args.get("view") or "mobile").strip()
+    tpl = "agent_sales/products_desktop.html" if view == "desktop" else "agent_sales/products_mobile.html"
+    return render_template(tpl, products=products, selected_cat_id=cat_id)
 
 @app.route("/sales/add", methods=["POST"])
 @login_required
@@ -996,11 +1131,57 @@ def sales_checkout():
             total_profit += profit
 
             item_id = db.execute("""
-              INSERT INTO sale_items(sale_id, product_id, qty, sell_price_uzs, sell_total_uzs, cost_total_uzs, profit_uzs)
-              VALUES(?,?,?,?,?,?,?)
-            """, (sale_id, pid, qty, price, sell_total, cost_total, profit)).lastrowid
-            # Decrease stock (simple model)
-            db.execute("UPDATE products SET stock_qty = COALESCE(stock_qty,0) - ? WHERE id=?", (float(qty), int(pid)))
+                INSERT INTO sale_items(
+                    sale_id,
+                    product_id,
+                    qty,
+                    sell_price_uzs,
+                    sell_total_uzs,
+                    cost_total_uzs,
+                    profit_uzs
+                )
+                VALUES(?,?,?,?,?,?,?)
+            """, (
+                sale_id,
+                pid,
+                qty,
+                price,
+                sell_total,
+                cost_total,
+                profit,
+            )).lastrowid
+
+            db.execute("""
+                INSERT INTO inventory_moves(
+                    move_date,
+                    move_type,
+                    product_id,
+                    qty,
+                    unit_cost_uzs,
+                    note,
+                    source_type,
+                    source_id
+                )
+                VALUES(?,?,?,?,?,?,?,?)
+            """, (
+                d,
+                "OUT",
+                int(pid),
+                float(qty),
+                float(unit_cost),
+                f"Sotuv #{sale_id}",
+                "sale_item",
+                int(item_id),
+            ))
+
+            db.execute("""
+                UPDATE products
+                SET stock_qty=COALESCE(stock_qty, 0) - ?
+                WHERE id=?
+            """, (
+                float(qty),
+                int(pid),
+            ))
 
         # Update sale totals (sales jadvalida 0 qolib ketmasin)
         db.execute(
@@ -1484,29 +1665,63 @@ def kpi_kirim(category_id: int):
             return redirect(url_for("kpi_kirim", category_id=category_id))
 
 
-        # inventory_moves jadvaliga IN yozamiz (FIFO YO'Q)
+        db = get_db()
 
-        exec_sql("""
+        try:
+            db.execute("BEGIN")
 
-            INSERT INTO inventory_moves(move_date, move_type, product_id, qty, unit_cost_uzs, note)
+            product = db.execute("""
+                SELECT id
+                FROM products
+                WHERE id=?
+                  AND category_id=?
+                  AND is_active=1
+            """, (
+                int(product_id),
+                int(category_id),
+            )).fetchone()
 
-            VALUES(?,?,?,?,?,?)
+            if not product:
+                raise ValueError(
+                    "Mahsulot topilmadi yoki nofaol"
+                )
 
-        """, (move_date, "IN", product_id, qty, unit_cost_uzs, note))
+            db.execute("""
+                INSERT INTO inventory_moves(
+                    move_date,
+                    move_type,
+                    product_id,
+                    qty,
+                    unit_cost_uzs,
+                    note,
+                    source_type,
+                    source_id
+                )
+                VALUES(?,?,?,?,?,?,NULL,NULL)
+            """, (
+                move_date,
+                "IN",
+                int(product_id),
+                float(qty),
+                float(unit_cost_uzs),
+                note or "KPI kirim",
+            ))
 
+            db.execute("""
+                UPDATE products
+                SET stock_qty=COALESCE(stock_qty, 0) + ?
+                WHERE id=?
+            """, (
+                float(qty),
+                int(product_id),
+            ))
 
-        # products.stock_qty ni ham yangilaymiz (jadval va KPI bir xil bo‘lsin)
+            db.commit()
+            flash("Kirim qo‘shildi ✅", "success")
 
-        exec_sql(
-
-            "UPDATE products SET stock_qty = COALESCE(stock_qty,0) + ? WHERE id=?",
-
-            (float(qty), int(product_id))
-
-        )
-
-
-        flash("Kirim qo‘shildi ✅", "success")
+        except Exception as exc:
+            db.rollback()
+            flash(str(exc), "danger")
 
         return redirect(url_for("kpi"))
     return render_template("kpi_kirim.html", category=cat, products=products, app_name=APP_NAME)
