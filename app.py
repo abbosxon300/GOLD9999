@@ -46,6 +46,11 @@ except Exception:
     register_kirim_routes = None
 
 try:
+    from routes.kassa import register_kassa_routes
+except Exception:
+    register_kassa_routes = None
+
+try:
     from routes.sales import register_sales_routes
 except Exception:
     register_sales_routes = None
@@ -587,98 +592,20 @@ if register_auth_routes:
     )
 
 
-@app.route("/kassa", methods=["GET", "POST"])
-@login_required
-@admin_required
-def kassa():
-    init_db()
-    import sqlite3
-    conn = sqlite3.connect(_db_path())
-    conn.row_factory = sqlite3.Row
-    try:
-        if request.method == "POST":
-            direction = (request.form.get("direction") or "IN").strip().upper()
-            amount_raw = (request.form.get("amount_uzs") or "").replace(" ", "").replace(",", "").strip()
-            note = (request.form.get("note") or "").strip()
-
-            if direction not in ("IN", "OUT"):
-                flash("Direction xato (IN/OUT)", "danger")
-                return redirect(url_for("kassa"))
-
-            try:
-                amount = float(amount_raw)
-            except Exception:
-                amount = 0.0
-
-            if amount <= 0:
-                flash("Summa noto‘g‘ri", "danger")
-                return redirect(url_for("kassa"))
-
-            from datetime import date
 
 
 
-            move_date = date.today().isoformat()
 
 
-
-            conn.execute(
-
-
-                "INSERT INTO cash_moves(move_date, direction, amount_uzs, note) VALUES (?,?,?,?)",
-
-
-                (move_date, direction, amount, note)
-
-
-            )
-            conn.commit()
-            flash("Kassa harakati saqlandi ✅", "success")
-            return redirect(url_for("kassa"))
-        # filter (GET): from/to (YYYY-MM-DD)
-        from_date = (request.args.get("from") or "").strip()
-        to_date = (request.args.get("to") or "").strip()
-        where = ""
-        params = []
-        if from_date and to_date:
-            where = " WHERE move_date >= ? AND move_date <= ? "
-            params = [from_date, to_date]
-        elif from_date:
-            where = " WHERE move_date >= ? "
-            params = [from_date]
-        elif to_date:
-            where = " WHERE move_date <= ? "
-            params = [to_date]
-
-        # balans
-        bal = conn.execute(f"""
-              SELECT
-                COALESCE(SUM(CASE WHEN direction='IN' THEN amount_uzs ELSE 0 END),0)
-                -
-                COALESCE(SUM(CASE WHEN direction='OUT' THEN amount_uzs ELSE 0 END),0)
-              FROM cash_moves {where}
-          """, params).fetchone()[0] or 0
-
-        # rows (id + sale_id bilan)
-        try:
-            cols = [r[1] for r in conn.execute("PRAGMA table_info(cash_moves)").fetchall()]
-        except Exception:
-            cols = []
-        if "sale_id" in cols:
-            select_sql = f"SELECT id, move_date, direction, amount_uzs, note, sale_id FROM cash_moves {where} ORDER BY id DESC LIMIT 50"
-        else:
-            select_sql = f"SELECT id, move_date, direction, amount_uzs, note, NULL AS sale_id FROM cash_moves {where} ORDER BY id DESC LIMIT 50"
-
-        rows = conn.execute(select_sql, params).fetchall()
-
-    finally:
-        conn.close()
-
-    kassa_fmt = _fmt_uzs(bal)
-    return render_template("kassa.html", kassa_fmt=kassa_fmt, rows=rows, from_date=from_date, to_date=to_date)
-
-
-
+if register_kassa_routes:
+    register_kassa_routes(
+        app,
+        init_db=init_db,
+        get_db=get_db,
+        login_required=login_required,
+        admin_required=admin_required,
+        fmt_uzs=_fmt_uzs,
+    )
 
 
 if register_kirim_routes:
@@ -929,91 +856,8 @@ def backup_restore():
 # =========================
 # Kassa: Edit / Delete
 # =========================
-@app.route("/kassa/delete/<int:move_id>", methods=["POST"])
-@login_required
-def kassa_delete(move_id: int):
-    init_db()
-    import sqlite3
-    conn = sqlite3.connect(_db_path())
-    conn.row_factory = sqlite3.Row
-    try:
-        row = conn.execute("SELECT id, COALESCE(sale_id, NULL) AS sale_id FROM cash_moves WHERE id=?", (move_id,)).fetchone()
-        if not row:
-            flash("Topilmadi", "danger")
-            return redirect(url_for("kassa"))
-
-        # Auto sale yozuvlarini o'chirish taqiqlanadi
-        if row["sale_id"] is not None:
-            flash("Auto sale yozuvini o‘chirib bo‘lmaydi", "danger")
-            return redirect(url_for("kassa"))
-
-        conn.execute("DELETE FROM cash_moves WHERE id=?", (move_id,))
-        conn.commit()
-        flash("O‘chirildi ✅", "success")
-        return redirect(url_for("kassa"))
-    finally:
-        conn.close()
 
 
-@app.route("/kassa/edit/<int:move_id>", methods=["GET", "POST"])
-@login_required
-def kassa_edit(move_id: int):
-    init_db()
-    import sqlite3
-    conn = sqlite3.connect(_db_path())
-    conn.row_factory = sqlite3.Row
-    try:
-        row = conn.execute("""
-            SELECT id, move_date, direction, amount_uzs, note, COALESCE(sale_id, NULL) AS sale_id
-            FROM cash_moves WHERE id=?
-        """, (move_id,)).fetchone()
-
-        if not row:
-            flash("Topilmadi", "danger")
-            return redirect(url_for("kassa"))
-
-        is_auto_sale = (row["sale_id"] is not None)
-
-        if request.method == "POST":
-            note = (request.form.get("note") or "").strip()
-
-            # Auto sale bo'lsa: faqat note o'zgaradi
-            if is_auto_sale:
-                conn.execute("UPDATE cash_moves SET note=? WHERE id=?", (note, move_id))
-                conn.commit()
-                flash("Saqlanди ✅ (Auto sale: faqat izoh o‘zgardi)", "success")
-                return redirect(url_for("kassa"))
-
-            move_date = (request.form.get("move_date") or "").strip() or (row["move_date"] or "")
-            direction = (request.form.get("direction") or row["direction"] or "IN").strip().upper()
-            amount_raw = (request.form.get("amount_uzs") or "").replace(" ", "").replace(",", "").strip()
-
-            if direction not in ("IN", "OUT"):
-                flash("Direction xato (IN/OUT)", "danger")
-                return redirect(url_for("kassa_edit", move_id=move_id))
-
-            try:
-                amount = float(amount_raw)
-            except Exception:
-                amount = 0.0
-
-            if amount <= 0:
-                flash("Summa noto‘g‘ri", "danger")
-                return redirect(url_for("kassa_edit", move_id=move_id))
-
-            conn.execute("""
-                UPDATE cash_moves
-                SET move_date=?, direction=?, amount_uzs=?, note=?
-                WHERE id=?
-            """, (move_date, direction, amount, note, move_id))
-            conn.commit()
-            flash("Saqlanди ✅", "success")
-            return redirect(url_for("kassa"))
-
-        return render_template("kassa_edit.html", r=row, is_auto_sale=is_auto_sale)
-
-    finally:
-        conn.close()
 # =========================
 # /Kassa: Edit / Delete
 # =========================
