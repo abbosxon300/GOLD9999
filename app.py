@@ -38,6 +38,11 @@ try:
     from routes.sales_history import register_sales_history
 except Exception as e:
     register_sales_history = None
+
+try:
+    from routes.auth import register_auth_routes
+except Exception:
+    register_auth_routes = None
 # --- /routes registration ---
 DB_PATH = os.path.join(BASE_DIR, "data.db")
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
@@ -610,34 +615,7 @@ def _fmt_uzs(x):
         return f"{float(x or 0):,.0f}".replace(",", " ")
     except Exception:
         return str(x)
-@app.route("/login", methods=["GET","POST"], endpoint="login")
-
-def login():
-    init_db()
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip()
-        password = request.form.get("password") or ""
-        u = q1("SELECT * FROM users WHERE username=? AND is_active=1", (username,))
-        if not u or not check_password_hash(u["password_hash"], password):
-            flash("Login yoki parol xato", "danger")
-            return redirect(url_for("login"))
-
-        session["user_id"] = u["id"]
-        session["username"] = u["username"]
-        session["role"] = u["role"]
-        session["full_name"] = u["full_name"] or u["username"]
-        return redirect(url_for("home"))
-
-    return render_template("login.html", app_name=APP_NAME)
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-@app.route("/")
-@app.route("/home")
-@login_required
-def home():
+def build_home_context():
     if session.get("role") == "agent":
         return redirect(url_for("sales"))
     # Bosh panel: Kassa / Umumiy sotuv / Umumiy to‘lov
@@ -678,16 +656,20 @@ def home():
 
     paid_total_fmt = _fmt_uzs(payments_total_uzs)
 
-    return render_template(
+    return {
+        "kassa_fmt": kassa_fmt,
+        "sales_total_fmt": sales_total_fmt,
+        "paid_total_fmt": paid_total_fmt,
+    }
 
-        "home.html",
-
-        kassa_fmt=kassa_fmt,
-
-        sales_total_fmt=sales_total_fmt,
-
-        paid_total_fmt=paid_total_fmt,
-
+if register_auth_routes:
+    register_auth_routes(
+        app,
+        app_name=APP_NAME,
+        init_db=init_db,
+        q1=q1,
+        login_required=login_required,
+        build_home_context=build_home_context,
     )
 
 
