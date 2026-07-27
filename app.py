@@ -3,6 +3,10 @@ import sys
 
 # STARTUP_MARKER: 2026-02-22T19:32:14
 import os, sqlite3, zipfile, shutil
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 from datetime import datetime, date
 from functools import wraps
 from typing import Optional, Dict, Any, List, Tuple
@@ -24,9 +28,6 @@ from services.sales_helpers import (
 # =========================
 
 APP_NAME = "Gold 9999"
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
 
 # --- routes registration ---
 try:
