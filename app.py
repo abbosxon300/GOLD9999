@@ -9,24 +9,19 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from flask import Flask, g, render_template, request, redirect, url_for, flash, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
+from services.sales_helpers import (
+    cart_add,
+    cart_clear,
+    cart_get,
+    cart_remove,
+    cart_set,
+    cart_total,
+    product_avg_cost as _product_avg_cost,
+    product_qty as _product_qty,
+)
 # =========================
 # Inventory helpers
 # =========================
-def product_qty(product_id: int) -> float:
-    """
-    Current stock for product_id from products.stock_qty (simple model).
-    """
-    con = get_db() if "get_db" in globals() else db()
-
-    # products.stock_qty ustuni bo'lmasa ham (eski DB), 0 qaytaramiz
-    try:
-        cols = [r[1] for r in con.execute("PRAGMA table_info(products)").fetchall()]
-        if "stock_qty" not in cols:
-            return 0.0
-        row = con.execute("SELECT COALESCE(stock_qty,0) FROM products WHERE id=?", (product_id,)).fetchone()
-        return float(row[0] if row else 0.0)
-    except Exception:
-        return 0.0
 
 APP_NAME = "Gold 9999"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -466,6 +461,14 @@ def parse_int(val: str, default: int = 0) -> int:
         return default
 
 
+def product_qty(product_id: int) -> float:
+    return _product_qty(get_db, product_id)
+
+
+def product_avg_cost(product_id: int) -> float:
+    return _product_avg_cost(get_db, product_id)
+
+
 # ---------------- Auth ----------------
 def login_required(fn):
     @wraps(fn)
@@ -477,111 +480,11 @@ def login_required(fn):
 
 
 # === CART HELPERS ===
-def cart_get():
-    """Cart format: {'items': {pid_str: {'qty': float, 'price': float(optional)}}}. Stored in session."""
-    cart = session.get("cart")
-    if not isinstance(cart, dict):
-        cart = {"items": {}}
-        session["cart"] = cart
-        return cart
 
-    if "items" not in cart or not isinstance(cart.get("items"), dict):
-        # convert old format {pid: qty} -> {'items': {pid:{'qty':qty}}}
-        items = {}
-        for k, v in list(cart.items()):
-            if k == "items":
-                continue
-            try:
-                items[str(k)] = {"qty": float(v)}
-            except Exception:
-                pass
-        cart = {"items": items}
-        session["cart"] = cart
-        return cart
 
-    # normalize items
-    cleaned = {}
-    for pid, it in cart["items"].items():
-        pid = str(pid)
-        if isinstance(it, dict):
-            try:
-                qty = float(it.get("qty", 0))
-            except Exception:
-                qty = 0.0
-            if qty > 0:
-                cleaned[pid] = dict(it)
-                cleaned[pid]["qty"] = qty
-        else:
-            try:
-                qty = float(it)
-                if qty > 0:
-                    cleaned[pid] = {"qty": qty}
-            except Exception:
-                pass
 
-    cart["items"] = cleaned
-    session["cart"] = cart
-    return cart
 
-def cart_set(cart: dict):
-    if not isinstance(cart, dict):
-        cart = {"items": {}}
-    if "items" not in cart or not isinstance(cart.get("items"), dict):
-        cart = {"items": {}}
-    session["cart"] = cart
 
-def cart_clear():
-    session["cart"] = {"items": {}}
-
-def cart_add(product_id: int, qty: float = 1, price: float | None = None):
-    cart = cart_get()
-    pid = str(product_id)
-    it = cart["items"].get(pid, {"qty": 0})
-    try:
-        it_qty = float(it.get("qty", 0)) if isinstance(it, dict) else float(it)
-    except Exception:
-        it_qty = 0.0
-    it_qty += float(qty or 0)
-    new_it = dict(it) if isinstance(it, dict) else {}
-    new_it["qty"] = it_qty
-    if price is not None:
-        try:
-            new_it["price"] = float(price)
-        except Exception:
-            pass
-    if it_qty > 0:
-        cart["items"][pid] = new_it
-    else:
-        cart["items"].pop(pid, None)
-    cart_set(cart)
-    return cart
-
-def cart_remove(product_id: int):
-    cart = cart_get()
-    pid = str(product_id)
-    cart["items"].pop(pid, None)
-    cart_set(cart)
-    return cart
-
-def cart_total(cart: dict | None = None):
-    """Return numeric total (sum qty*price if price exists, else 0)."""
-    if cart is None:
-        cart = cart_get()
-    items = cart.get("items", {}) if isinstance(cart, dict) else {}
-    total = 0.0
-    for pid, it in items.items():
-        if not isinstance(it, dict):
-            continue
-        try:
-            qty = float(it.get("qty", 0))
-        except Exception:
-            qty = 0.0
-        try:
-            price = float(it.get("price", 0))
-        except Exception:
-            price = 0.0
-        total += qty * price
-    return total
 # === END CART HELPERS ===
 
 
@@ -1722,19 +1625,3 @@ def kpi_kirim(category_id: int):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001, host='0.0.0.0')
-
-def product_avg_cost(product_id: int) -> float:
-    db = get_db()
-    row = db.execute("""
-        SELECT
-            COALESCE(SUM(qty * unit_cost_uzs),0) AS total_cost,
-            COALESCE(SUM(qty),0) AS total_qty
-        FROM inventory_moves
-        WHERE product_id=?
-          AND move_type='IN'
-    """, (product_id,)).fetchone()
-
-    if not row or row["total_qty"] == 0:
-        return 0.0
-
-    return float(row["total_cost"] / row["total_qty"])
