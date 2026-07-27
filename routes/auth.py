@@ -89,7 +89,14 @@ def register_auth_routes(
     @app.route("/home")
     @login_required
     def home():
+        result = build_home_context()
+
+        # build_home_context admin uchun template context,
+        # agent uchun esa /sales redirect Response qaytaradi.
+        if not isinstance(result, dict):
+            return result
+
         return render_template(
             "home.html",
-            **build_home_context(),
+            **result,
         )
