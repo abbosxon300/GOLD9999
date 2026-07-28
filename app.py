@@ -21,6 +21,14 @@ from services.db import (
     q as _db_q,
     q1 as _db_q1,
 )
+from services.utils import (
+    _fmt_uzs,
+    admin_required,
+    fmt0_filter,
+    login_required,
+    parse_float,
+    parse_int,
+)
 from services.sales_helpers import (
     cart_add,
     cart_clear,
@@ -145,15 +153,9 @@ def _sum_in_out(conn, table, amount_cols=("amount","summa","amount_uzs","summa_u
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-@app.template_filter("fmt0")
-def fmt0_filter(v):
-    try:
-        return f"{float(v or 0):,.0f}".replace(",", " ")
-    except Exception:
-        return "0"
-
 # Register extra routes
 register_sales_history(app)
+app.add_template_filter(fmt0_filter, "fmt0")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "GOLD9999_CHANGE_ME_2026")
 
 
@@ -467,20 +469,7 @@ def init_db() -> None:
         )
 
 
-def parse_float(val: str) -> Optional[float]:
-    s = (val or "").strip().replace(" ", "").replace(",", ".")
-    if s == "":
-        return None
-    try:
-        return float(s)
-    except ValueError:
-        return None
 
-def parse_int(val: str, default: int = 0) -> int:
-    try:
-        return int((val or "").strip())
-    except Exception:
-        return default
 
 
 def product_qty(product_id: int) -> float:
@@ -492,13 +481,6 @@ def product_avg_cost(product_id: int) -> float:
 
 
 # ---------------- Auth ----------------
-def login_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get("user_id"):
-            return redirect(url_for("login"))
-        return fn(*args, **kwargs)
-    return wrapper
 
 
 # === CART HELPERS ===
@@ -510,14 +492,6 @@ def login_required(fn):
 # === END CART HELPERS ===
 
 
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if session.get("role") != "admin":
-            flash("Bu bo‘lim faqat admin uchun", "danger")
-            return redirect(url_for("home"))
-        return fn(*args, **kwargs)
-    return wrapper
 
 
 def cash_in(conn, amount_uzs, note=""):
@@ -535,11 +509,6 @@ def cash_in(conn, amount_uzs, note=""):
 
 
 
-def _fmt_uzs(x):
-    try:
-        return f"{float(x or 0):,.0f}".replace(",", " ")
-    except Exception:
-        return str(x)
 def build_home_context():
     if session.get("role") == "agent":
         return redirect(url_for("sales"))
