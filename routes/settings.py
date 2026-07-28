@@ -49,15 +49,35 @@ def register_settings_routes(
     def settings_categories_add():
         init_db()
         name = (request.form.get("name") or "").strip()
-        sort_order = parse_int(request.form.get("sort_order") or "100", 100)
+
         if not name:
             flash("Kategoriya nomi shart", "danger")
             return redirect(url_for("settings_categories"))
+
+        next_sort_row = q1(
+            """
+            SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort
+            FROM categories
+            """
+        )
+        sort_order = int(next_sort_row["next_sort"])
+
         try:
-            exec_sql("INSERT INTO categories(name, sort_order, is_active) VALUES(?,?,1)", (name, sort_order))
+            exec_sql(
+                """
+                INSERT INTO categories(
+                    name,
+                    sort_order,
+                    is_active
+                )
+                VALUES (?, ?, 1)
+                """,
+                (name, sort_order),
+            )
             flash("Kategoriya qo‘shildi ✅", "success")
         except sqlite3.IntegrityError:
             flash("Bu nomli kategoriya bor", "danger")
+
         return redirect(url_for("settings_categories"))
 
     @app.route("/settings/categories/toggle/<int:cat_id>", methods=["POST"])

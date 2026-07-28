@@ -8,7 +8,7 @@
     <div class="category-section-head">
       <div>
         <h2>Yangi kategoriya</h2>
-        <p>Kategoriya nomi va ko‘rinish tartibini kiriting</p>
+        <p>Yangi kategoriya nomini kiriting</p>
       </div>
     </div>
 
@@ -17,7 +17,7 @@
       action="{{ url_for('settings_categories_add') }}"
       class="category-create-form">
 
-      <div class="category-field category-name-field">
+      <div class="category-field">
         <label for="category-name">Kategoriya nomi</label>
         <input
           id="category-name"
@@ -28,20 +28,8 @@
           required>
       </div>
 
-      <div class="category-field category-sort-field">
-        <label for="category-sort">Tartib</label>
-        <input
-          id="category-sort"
-          name="sort_order"
-          type="number"
-          min="0"
-          step="1"
-          value="100"
-          required>
-      </div>
-
       <button class="btn category-add-btn" type="submit">
-        ＋ Qo‘shish
+        + Qo‘shish
       </button>
     </form>
   </section>
@@ -53,9 +41,7 @@
         <p>Nom, tartib va faol holatini boshqaring</p>
       </div>
 
-      <span class="category-count">
-        {{ rows|length }} ta
-      </span>
+      <span class="category-count">{{ rows|length }} ta</span>
     </div>
 
     {% if rows %}
@@ -63,9 +49,7 @@
         <table class="category-table">
           <thead>
             <tr>
-              <th class="category-id-col">ID</th>
               <th>Kategoriya nomi</th>
-              <th class="category-sort-col">Tartib</th>
               <th class="category-status-col">Holat</th>
               <th class="category-actions-col">Amallar</th>
             </tr>
@@ -74,19 +58,11 @@
           <tbody>
             {% for r in rows %}
               <tr>
-                <td class="category-id-cell" data-label="ID">
-                  {{ r.id }}
-                </td>
-
-                <td class="category-name-cell" data-label="Kategoriya">
+                <td data-label="Kategoriya">
                   <strong>{{ r.name }}</strong>
                 </td>
 
-                <td class="category-sort-cell" data-label="Tartib">
-                  {{ r.sort_order }}
-                </td>
-
-                <td class="category-status-cell" data-label="Holat">
+                <td data-label="Holat">
                   {% if r.is_active == 1 %}
                     <span class="category-status is-active">
                       <span class="category-status-dot"></span>
@@ -101,78 +77,31 @@
                 </td>
 
                 <td class="category-actions-cell" data-label="Amallar">
-                  <details class="category-edit-details">
-                    <summary class="btn category-edit-btn">
-                      ✏️ Tahrirlash
-                    </summary>
+                  <button
+                    type="button"
+                    class="category-action-btn category-edit-open"
+                    data-category-id="{{ r.id }}"
+                    data-category-name="{{ r.name|e }}"
+                    data-category-sort="{{ r.sort_order }}">
+                    ✏️ Tahrirlash
+                  </button>
 
-                    <div class="category-edit-panel">
-                      <form
-                        method="post"
-                        action="{{ url_for(
-                          'settings_categories_edit',
-                          cat_id=r.id
-                        ) }}"
-                        class="category-edit-form">
-
-                        <div class="category-field">
-                          <label for="edit-name-{{ r.id }}">
-                            Kategoriya nomi
-                          </label>
-                          <input
-                            id="edit-name-{{ r.id }}"
-                            name="name"
-                            type="text"
-                            value="{{ r.name }}"
-                            autocomplete="off"
-                            required>
-                        </div>
-
-                        <div class="category-field">
-                          <label for="edit-sort-{{ r.id }}">
-                            Tartib
-                          </label>
-                          <input
-                            id="edit-sort-{{ r.id }}"
-                            name="sort_order"
-                            type="number"
-                            min="0"
-                            step="1"
-                            value="{{ r.sort_order }}"
-                            required>
-                        </div>
-
-                        <button
-                          class="btn category-save-btn"
-                          type="submit">
-                          💾 Saqlash
-                        </button>
-                      </form>
-                    </div>
-                  </details>
-
-                  <form
-                    method="post"
-                    action="{{ url_for(
+                  <button
+                    type="button"
+                    class="category-action-btn category-toggle-open {% if r.is_active == 1 %}is-warning{% else %}is-success{% endif %}"
+                    data-category-toggle-url="{{ url_for(
                       'settings_categories_toggle',
                       cat_id=r.id
                     ) }}"
-                    class="category-toggle-form"
-                    onsubmit="return confirm(
-                      '{{ r.name|e }} kategoriyasi {% if r.is_active == 1 %}faolsizlantirilsinmi{% else %}faollashtirilsinmi{% endif %}?'
-                    )">
+                    data-category-toggle-name="{{ r.name|e }}"
+                    data-category-toggle-action="{% if r.is_active == 1 %}faolsizlantirish{% else %}faollashtirish{% endif %}">
 
-                    <button
-                      class="btn category-toggle-btn {% if r.is_active == 1 %}is-disable{% else %}is-enable{% endif %}"
-                      type="submit">
-
-                      {% if r.is_active == 1 %}
-                        ⏸ Faolsizlantirish
-                      {% else %}
-                        ▶ Faollashtirish
-                      {% endif %}
-                    </button>
-                  </form>
+                    {% if r.is_active == 1 %}
+                      ⏸ Faolsizlantirish
+                    {% else %}
+                      ▶ Faollashtirish
+                    {% endif %}
+                  </button>
                 </td>
               </tr>
             {% endfor %}
@@ -189,4 +118,269 @@
   </section>
 
 </div>
+
+<div
+  id="category-toggle-modal"
+  class="category-modal"
+  hidden>
+
+  <div
+    class="category-modal-backdrop"
+    data-category-toggle-close>
+  </div>
+
+  <div
+    class="category-modal-dialog category-confirm-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="category-toggle-title">
+
+    <div class="category-modal-head">
+      <div>
+        <h3 id="category-toggle-title">
+          Holatni o‘zgartirish
+        </h3>
+        <p id="category-toggle-message"></p>
+      </div>
+
+      <button
+        type="button"
+        class="category-modal-close"
+        data-category-toggle-close
+        aria-label="Yopish">
+        ×
+      </button>
+    </div>
+
+    <form
+      id="category-toggle-form"
+      method="post"
+      action="">
+
+      <div class="category-modal-actions category-confirm-actions">
+        <button
+          type="button"
+          class="btn category-cancel-btn"
+          data-category-toggle-close>
+          Bekor qilish
+        </button>
+
+        <button
+          type="submit"
+          class="btn category-confirm-btn">
+          Tasdiqlash
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div
+  id="category-edit-modal"
+  class="category-modal"
+  hidden>
+
+  <div
+    class="category-modal-backdrop"
+    data-category-modal-close>
+  </div>
+
+  <div
+    class="category-modal-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="category-edit-title">
+
+    <div class="category-modal-head">
+      <div>
+        <h3 id="category-edit-title">
+          Kategoriyani tahrirlash
+        </h3>
+        <p>Nom va tartib qiymatini yangilang</p>
+      </div>
+
+      <button
+        type="button"
+        class="category-modal-close"
+        data-category-modal-close
+        aria-label="Yopish">
+        ×
+      </button>
+    </div>
+
+    <form
+      id="category-edit-form"
+      method="post"
+      action=""
+      class="category-modal-form">
+
+      <div class="category-field">
+        <label for="category-edit-name">
+          Kategoriya nomi
+        </label>
+        <input
+          id="category-edit-name"
+          name="name"
+          type="text"
+          autocomplete="off"
+          required>
+      </div>
+
+      <div class="category-field">
+        <label for="category-edit-sort">
+          Tartib
+        </label>
+        <input
+          id="category-edit-sort"
+          name="sort_order"
+          type="number"
+          min="0"
+          step="1"
+          required>
+      </div>
+
+      <div class="category-modal-actions">
+        <button
+          type="button"
+          class="btn category-cancel-btn"
+          data-category-modal-close>
+          Bekor qilish
+        </button>
+
+        <button
+          type="submit"
+          class="btn category-save-btn">
+          Saqlash
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  const modal = document.getElementById("category-edit-modal");
+  const form = document.getElementById("category-edit-form");
+  const nameInput = document.getElementById("category-edit-name");
+  const sortInput = document.getElementById("category-edit-sort");
+
+  const toggleModal = document.getElementById(
+    "category-toggle-modal"
+  );
+  const toggleForm = document.getElementById(
+    "category-toggle-form"
+  );
+  const toggleMessage = document.getElementById(
+    "category-toggle-message"
+  );
+
+  if (
+    !modal ||
+    !form ||
+    !nameInput ||
+    !sortInput ||
+    !toggleModal ||
+    !toggleForm ||
+    !toggleMessage
+  ) {
+    return;
+  }
+
+  const closeMenus = () => {};
+
+  const openModal = (button) => {
+    const categoryId = button.dataset.categoryId;
+    const categoryName = button.dataset.categoryName || "";
+    const categorySort = button.dataset.categorySort || "100";
+
+    form.action =
+      `/settings/categories/edit/${encodeURIComponent(categoryId)}`;
+
+    nameInput.value = categoryName;
+    sortInput.value = categorySort;
+
+    closeMenus();
+    modal.hidden = false;
+    document.body.classList.add("category-modal-open");
+
+    requestAnimationFrame(() => {
+      nameInput.focus();
+      nameInput.select();
+    });
+  };
+
+  const closeModal = () => {
+    modal.hidden = true;
+    document.body.classList.remove("category-modal-open");
+    form.action = "";
+  };
+
+  const openToggleModal = (button) => {
+    const toggleUrl = button.dataset.categoryToggleUrl || "";
+    const categoryName =
+      button.dataset.categoryToggleName || "";
+    const toggleAction =
+      button.dataset.categoryToggleAction || "";
+
+    toggleForm.action = toggleUrl;
+    toggleMessage.textContent =
+      `${categoryName} kategoriyasi ${toggleAction} qilinsinmi?`;
+
+    closeMenus();
+    toggleModal.hidden = false;
+    document.body.classList.add("category-modal-open");
+  };
+
+  const closeToggleModal = () => {
+    toggleModal.hidden = true;
+    document.body.classList.remove("category-modal-open");
+    toggleForm.action = "";
+    toggleMessage.textContent = "";
+  };
+
+  document.addEventListener("click", (event) => {
+    const editButton = event.target.closest(
+      ".category-edit-open"
+    );
+
+    if (editButton) {
+      openModal(editButton);
+      return;
+    }
+
+    const toggleButton = event.target.closest(
+      ".category-toggle-open"
+    );
+
+    if (toggleButton) {
+      openToggleModal(toggleButton);
+      return;
+    }
+
+    if (event.target.closest("[data-category-modal-close]")) {
+      closeModal();
+      return;
+    }
+
+    if (event.target.closest("[data-category-toggle-close]")) {
+      closeToggleModal();
+      return;
+    }
+
+    closeMenus();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (!modal.hidden) {
+        closeModal();
+      } else if (!toggleModal.hidden) {
+        closeToggleModal();
+      } else {
+        closeMenus();
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}
