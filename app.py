@@ -443,6 +443,9 @@ if register_reports_routes:
     register_reports_routes(
         app,
         app_name=APP_NAME,
+        init_db=init_db,
+        get_db=get_db,
+        fmt_uzs=_fmt_uzs,
         login_required=login_required,
         admin_required=admin_required,
     )

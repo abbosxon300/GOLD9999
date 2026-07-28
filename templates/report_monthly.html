@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set title = "Oylik hisobot" %}
+
+{% block content %}
+<section class="kpi-entry-page">
+
+  <div class="kpi-entry-hero">
+    <div>
+      <div class="kpi-entry-kicker">HISOBOT</div>
+      <h1>📆 Oylik hisobot</h1>
+      <p>Oylar bo‘yicha sotuv va foyda natijalari</p>
+    </div>
+
+    <a class="kpi-entry-back" href="{{ url_for('reports') }}">
+      ← Hisobotlar
+    </a>
+  </div>
+
+  <section class="kpi-entry-panel">
+    <form method="get" class="kpi-entry-form">
+      <div class="kpi-entry-grid">
+        <label class="kpi-entry-field">
+          <span>Dan</span>
+          <input type="date" name="from" value="{{ from_date }}">
+        </label>
+
+        <label class="kpi-entry-field">
+          <span>Gacha</span>
+          <input type="date" name="to" value="{{ to_date }}">
+        </label>
+      </div>
+
+      <div class="kpi-entry-actions">
+        <button type="submit" class="btn primary">
+          Ko‘rsatish
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <div class="cards-grid">
+    <div class="kpi-card-2">
+      <h3>Sotuvlar soni</h3>
+      <strong>{{ sales_count }}</strong>
+    </div>
+
+    <div class="kpi-card-2">
+      <h3>Jami sotuv</h3>
+      <strong>{{ total_sell_fmt }}</strong>
+    </div>
+
+    <div class="kpi-card-2">
+      <h3>Jami tannarx</h3>
+      <strong>{{ total_cost_fmt }}</strong>
+    </div>
+
+    <div class="kpi-card-2">
+      <h3>Jami foyda</h3>
+      <strong>{{ total_profit_fmt }}</strong>
+    </div>
+  </div>
+
+  <section class="kpi-entry-panel">
+    <div class="kpi-entry-section-head">
+      <div>
+        <h2>Oylik natijalar</h2>
+        <p>{{ from_date }} — {{ to_date }}</p>
+      </div>
+    </div>
+
+    {% if rows %}
+      <div class="kpi-entry-table-wrap">
+        <table class="kpi-entry-table">
+          <thead>
+            <tr>
+              <th>Oy</th>
+              <th>Sotuvlar</th>
+              <th>Sotuv</th>
+              <th>Tannarx</th>
+              <th>Foyda</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td data-label="Oy">
+                  <strong>{{ row.sale_month }}</strong>
+                </td>
+
+                <td data-label="Sotuvlar">
+                  {{ row.sales_count }}
+                </td>
+
+                <td data-label="Sotuv">
+                  {{ "{:,.0f}".format(row.total_sell or 0).replace(",", " ") }}
+                </td>
+
+                <td data-label="Tannarx">
+                  {{ "{:,.0f}".format(row.total_cost or 0).replace(",", " ") }}
+                </td>
+
+                <td data-label="Foyda">
+                  <strong>
+                    {{ "{:,.0f}".format(row.total_profit or 0).replace(",", " ") }}
+                  </strong>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="kpi-entry-empty">
+        Tanlangan davrda sotuv mavjud emas.
+      </div>
+    {% endif %}
+  </section>
+
+</section>
+{% endblock %}
