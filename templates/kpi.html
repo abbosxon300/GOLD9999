@@ -6,7 +6,7 @@
       <div class="kpi-h1">KPI</div>
       <div class="kpi-h2">Kategoriyalar bo‘yicha qoldiq</div>
     </div>
-    <a class="kpi-mini-btn" href="{{ url_for('kirim') }}">+ Kirim</a>
+
   </div>
 
   <div class="kpi-grid-2">
@@ -17,7 +17,7 @@
           <div class="kpi-card-title">{{ c.name }}</div>
           <div class="kpi-pill">Batafsil</div>
         </div>
-        <div class="kpi-card-value">{{ v | round(2) }}</div>
+        <div class="kpi-card-value">{{ "{:,.0f}".format(v or 0).replace(",", " ") }}</div>
         <div class="kpi-card-sub">Qoldiq</div>
       </a>
     {% endfor %}

@@ -7,6 +7,7 @@ from flask import (
     request,
     url_for,
 )
+from datetime import datetime
 
 
 def register_kpi_routes(
@@ -106,10 +107,28 @@ def register_kpi_routes(
 
 
             if product_id <= 0 or qty <= 0:
+                flash(
+                    "Mahsulot va miqdorni to‘g‘ri kiriting",
+                    "danger",
+                )
+                return redirect(
+                    url_for(
+                        "kpi_kirim",
+                        category_id=category_id,
+                    )
+                )
 
-                flash("Mahsulot va miqdorni to‘g‘ri kiriting", "danger")
-
-                return redirect(url_for("kpi_kirim", category_id=category_id))
+            if unit_cost_uzs <= 0:
+                flash(
+                    "Tannarx musbat son bo‘lishi kerak",
+                    "danger",
+                )
+                return redirect(
+                    url_for(
+                        "kpi_kirim",
+                        category_id=category_id,
+                    )
+                )
 
 
             db = get_db()
@@ -171,4 +190,31 @@ def register_kpi_routes(
                 flash(str(exc), "danger")
 
             return redirect(url_for("kpi"))
-        return render_template("kpi_kirim.html", category=cat, products=products, app_name=app_name)
+        recent_moves = q(
+            """
+            SELECT
+                m.id,
+                m.move_date,
+                m.qty,
+                m.unit_cost_uzs,
+                m.note,
+                p.name AS product_name
+            FROM inventory_moves m
+            JOIN products p
+              ON p.id=m.product_id
+            WHERE m.move_type='IN'
+              AND p.category_id=?
+            ORDER BY m.id DESC
+            LIMIT 10
+            """,
+            (category_id,),
+        )
+
+        return render_template(
+            "kpi_kirim.html",
+            category=cat,
+            products=products,
+            recent_moves=recent_moves,
+            today=datetime.now().strftime("%Y-%m-%d"),
+            app_name=app_name,
+        )

@@ -22,7 +22,7 @@
           {% for r in prod_rows %}
           <tr>
             <td>{{ r.product_name }}</td>
-            <td class="tr">{{ (r.stock_qty or 0) | round(2) }}</td>
+            <td class="tr">{{ "{:,.0f}".format(r.stock_qty or 0).replace(",", " ") }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -31,6 +31,13 @@
   </div>
 
   <div style="height:12px"></div>
-  <a class="btn" href="{{ url_for('kirim') }}">Kirim</a>
+  <a
+    class="btn"
+    href="{{ url_for(
+      'kpi_kirim',
+      category_id=cat.id
+    ) }}">
+    + Kirim
+  </a>
 </div>
 {% endblock %}

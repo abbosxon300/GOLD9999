@@ -90,7 +90,8 @@
         {% endif %}
         <a href="{{ url_for("sales") }}" class="{% if request.path.startswith('/sales') %}active{% endif %}" title="Sotuv"><span class="sb-ico">🛒</span><span class="sb-lbl">Sotuv</span></a>
         {% if session.get("role") == "admin" %}
-        <a href="{{ url_for("kpi") }}" class="{% if request.path.startswith('/kpi') or request.path.startswith('/kirim') %}active{% endif %}" title="Kirim"><span class="sb-ico">📦</span><span class="sb-lbl">Kirim</span></a>
+        <a href="{{ url_for("kpi") }}" class="{% if request.path.startswith('/kpi') %}active{% endif %}" title="Kirim"><span class="sb-ico">📦</span><span class="sb-lbl">Kirim</span></a>
+        <a href="{{ url_for("reports") }}" class="{% if request.path.startswith('/reports') %}active{% endif %}" title="Hisobot"><span class="sb-ico">📊</span><span class="sb-lbl">Hisobot</span></a>
 <details class="sb-group" {% if request.path.startswith('/settings') %}open{% endif %}>
   <summary class="sb-group-title {% if request.path.startswith('/settings') %}active{% endif %}" title="Sozlamalar">
     <span class="sb-ico">⚙️</span><span class="sb-lbl">Sozlamalar</span>
@@ -120,6 +121,7 @@
   <a class="bn-item" href="{{ url_for('sales') }}"><span class="bn-ico">🛒</span><span>Sotuv</span></a>
   {% if session.get("role") == "admin" %}
   <a class="bn-item" href="{{ url_for('kpi') }}"><span class="bn-ico">📦</span><span>Kirim</span></a>
+  <a class="bn-item" href="{{ url_for('reports') }}"><span class="bn-ico">📊</span><span>Hisobot</span></a>
 
   <div class="bn-item bn-more-wrap">
     <input id="bnMoreToggle" class="bn-more-toggle" type="checkbox" />

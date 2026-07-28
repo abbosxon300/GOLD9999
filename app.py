@@ -57,10 +57,6 @@ try:
 except Exception:
     register_auth_routes = None
 
-try:
-    from routes.kirim import register_kirim_routes
-except Exception:
-    register_kirim_routes = None
 
 try:
     from routes.kassa import register_kassa_routes
@@ -71,6 +67,11 @@ try:
     from routes.kpi import register_kpi_routes
 except Exception:
     register_kpi_routes = None
+
+try:
+    from routes.reports import register_reports_routes
+except Exception:
+    register_reports_routes = None
 
 try:
     from routes.settings import register_settings_routes
@@ -438,6 +439,15 @@ if register_kpi_routes:
     )
 
 
+if register_reports_routes:
+    register_reports_routes(
+        app,
+        app_name=APP_NAME,
+        login_required=login_required,
+        admin_required=admin_required,
+    )
+
+
 if register_kassa_routes:
     register_kassa_routes(
         app,
@@ -449,18 +459,6 @@ if register_kassa_routes:
     )
 
 
-if register_kirim_routes:
-    register_kirim_routes(
-        app,
-        init_db=init_db,
-        get_db=get_db,
-        q=q,
-        q1=q1,
-        parse_int=parse_int,
-        parse_float=parse_float,
-        login_required=login_required,
-        admin_required=admin_required,
-    )
 
 
 if register_sales_routes:

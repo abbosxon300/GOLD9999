@@ -1,81 +1,247 @@
 {% extends "base.html" %}
+{% set title = "Kirim → " ~ category.name %}
+
 {% block content %}
+<div class="kpi-entry-page">
 
-<div class="card" style="padding:18px; margin-bottom:16px;">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+  <section class="card kpi-entry-head">
     <div>
-      <div style="font-size:18px; font-weight:700;">Mahsulotlar ({{ category.name }})</div>
-      <div style="opacity:.8; margin-top:4px;">Ombordagi qoldiq va default narxlar. Kirim qo‘shish uchun pastdagi formadan mahsulotni tanlang.</div>
+      <h1>{{ category.name }}</h1>
+      <p>Kirim va ombor qoldig‘i</p>
     </div>
-    <a class="btn" href="/kpi/{{ category.id }}" style="white-space:nowrap;">⬅️ KPI ga qaytish</a>
-  </div>
-</div>
 
-<div class="card" style="padding:16px; margin-bottom:16px;">
-  <div style="font-weight:700; margin-bottom:10px;">Mahsulotlar ro‘yxati</div>
+    <a class="btn kpi-entry-back" href="{{ url_for('kpi') }}">
+      ← Orqaga
+    </a>
+  </section>
 
-  <div style="overflow:auto; border-radius:12px; border:1px solid rgba(255,255,255,.08);">
-    <table class="table" style="width:100%; min-width:780px;">
-      <thead>
-        <tr>
-          <th style="text-align:left;">ID</th>
-          <th style="text-align:left;">Nomi</th>
-          <th style="text-align:right;">Qoldiq</th>
-          <th style="text-align:right;">Default narx</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in products %}
-        <tr>
-          <td style="opacity:.9;">{{ p.id }}</td>
-          <td style="font-weight:600;">{{ p.name }}</td>
-          <td style="text-align:right;">{{ "%.3f"|format(p.stock_qty or 0) }}</td>
-          <td style="text-align:right;">{{ p.sell_price_default_uzs or 0 }}</td>
-        </tr>
+  {% if products %}
+    <section class="card kpi-entry-summary">
+      {% for p in products %}
+        <div class="kpi-entry-product-summary">
+          <div>
+            <span>Mahsulot</span>
+            <strong>{{ p.name }}</strong>
+          </div>
+
+          <div>
+            <span>Qoldiq</span>
+            <strong>
+              {{ "{:,.3f}".format(
+                p.stock_qty or 0
+              ).rstrip("0").rstrip(".").replace(",", " ") }}
+            </strong>
+          </div>
+
+          <div>
+            <span>Sotuv narxi</span>
+            <strong>
+              {{ "{:,.0f}".format(
+                p.sell_price_default_uzs or 0
+              ).replace(",", " ") }}
+              so‘m
+            </strong>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  <section class="card kpi-entry-form-card">
+    <div class="kpi-entry-section-head">
+      <div>
+        <h2>Kirim qo‘shish</h2>
+        <p>Miqdor va tannarxni kiriting</p>
+      </div>
+    </div>
+
+    {% if products %}
+      <form method="post" class="kpi-entry-form">
+
+        {% if products|length == 1 %}
+          {% set selected_product = products[0] %}
+
+          <input
+            type="hidden"
+            name="product_id"
+            value="{{ selected_product.id }}">
+
+          <div class="kpi-entry-field">
+            <label>Mahsulot</label>
+            <div class="kpi-entry-static-value">
+              {{ selected_product.name }}
+            </div>
+          </div>
         {% else %}
-        <tr>
-          <td colspan="4" style="opacity:.8;">Bu kategoriyada mahsulot topilmadi.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+          <div class="kpi-entry-field">
+            <label for="kpi-entry-product">Mahsulot</label>
+            <select
+              id="kpi-entry-product"
+              name="product_id"
+              required>
+              <option value="">Tanlang</option>
+
+              {% for p in products %}
+                <option value="{{ p.id }}">
+                  {{ p.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+
+        <div class="kpi-entry-field">
+          <label for="kpi-entry-qty">Miqdor</label>
+          <input
+            id="kpi-entry-qty"
+            name="qty"
+            type="number"
+            min="0.001"
+            step="0.001"
+            placeholder="Masalan: 10"
+            required>
+        </div>
+
+        <div class="kpi-entry-field">
+          <label for="kpi-entry-cost">Tannarx</label>
+          <div class="kpi-entry-money-input">
+            <input
+              id="kpi-entry-cost"
+              name="cost_uzs"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="Masalan: 45 000"
+              required>
+            <span>so‘m</span>
+          </div>
+        </div>
+
+        <div class="kpi-entry-field">
+          <label for="kpi-entry-date">Sana</label>
+          <input
+            id="kpi-entry-date"
+            name="move_date"
+            type="date"
+            value="{{ today }}"
+            required>
+        </div>
+
+        <div class="kpi-entry-field kpi-entry-note-field">
+          <label for="kpi-entry-note">Izoh</label>
+          <input
+            id="kpi-entry-note"
+            name="note"
+            type="text"
+            placeholder="Ixtiyoriy"
+            autocomplete="off">
+        </div>
+
+        <button class="btn kpi-entry-save" type="submit">
+          Saqlash
+        </button>
+      </form>
+    {% else %}
+      <div class="kpi-entry-empty">
+        Ushbu kategoriyada faol mahsulot yo‘q.
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card kpi-entry-history-card">
+    <div class="kpi-entry-section-head">
+      <div>
+        <h2>Oxirgi kirimlar</h2>
+      </div>
+
+      <span class="kpi-entry-count">
+        {{ recent_moves|length }} ta
+      </span>
+    </div>
+
+    {% if recent_moves %}
+      <div class="kpi-entry-table-wrap">
+        <table class="kpi-entry-table">
+          <thead>
+            <tr>
+              <th>Sana</th>
+              <th>Mahsulot</th>
+              <th>Miqdor</th>
+              <th>Tannarx</th>
+              <th>Izoh</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for move in recent_moves %}
+              <tr>
+                <td data-label="Sana">
+                  {{ move.move_date }}
+                </td>
+
+                <td data-label="Mahsulot">
+                  <strong>{{ move.product_name }}</strong>
+                </td>
+
+                <td data-label="Miqdor">
+                  {{ "{:,.3f}".format(
+                    move.qty or 0
+                  ).rstrip("0").rstrip(".").replace(",", " ") }}
+                </td>
+
+                <td data-label="Tannarx">
+                  {{ "{:,.0f}".format(
+                    move.unit_cost_uzs or 0
+                  ).replace(",", " ") }}
+                  so‘m
+                </td>
+
+                <td data-label="Izoh">
+                  {{ move.note or "—" }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="kpi-entry-empty">
+        Hozircha kirim mavjud emas.
+      </div>
+    {% endif %}
+  </section>
+
 </div>
 
-<div class="card" style="padding:16px;">
-  <div style="font-weight:700; margin-bottom:10px;">Kirim qo‘shish</div>
+<script>
+(function () {
+  const price = document.querySelector('input[name="cost_uzs"]');
 
-  <form method="POST" style="display:grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap:12px; align-items:end;">
-    <div>
-      <label style="display:block; font-weight:600; margin-bottom:6px;">Mahsulot</label>
-      <select name="product_id" required
-              style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
-        <option value="" disabled selected>— Mahsulotni tanlang —</option>
-        {% for p in products %}
-          <option value="{{ p.id }}">{{ p.name }} (ID: {{ p.id }})</option>
-        {% endfor %}
-      </select>
-    </div>
+  if (!price) return;
 
-    <div>
-      <label style="display:block; font-weight:600; margin-bottom:6px;">Miqdor</label>
-      <input name="qty" type="number" step="0.001" min="0" required
-             placeholder="Masalan: 10"
-             style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
-    </div>
+  function formatPriceInput(value) {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  }
 
-    <div>
-      <label style="display:block; font-weight:600; margin-bottom:6px;">Tannarx (so‘m)</label>
-      <input name="cost_uzs" type="number" step="1" min="0" required
-             placeholder="Masalan: 4500"
-             style="width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); color: inherit;">
-    </div>
+  function rawValue(value) {
+    return value.replace(/\s/g, "");
+  }
 
-    <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center; justify-content:flex-start; margin-top:6px;">
-      <button class="btn" type="submit">✅ Saqlash</button>
-      <div style="opacity:.8;">Saqlangandan keyin qoldiq yangilanadi va KPI sahifada ko‘rinadi.</div>
-    </div>
-  </form>
-</div>
+  price.addEventListener("input", function () {
+    const pos = this.selectionStart;
+    this.value = formatPriceInput(this.value);
+    this.setSelectionRange(this.value.length, this.value.length);
+  });
+
+  const form = price.closest("form");
+  if (form) {
+    form.addEventListener("submit", function () {
+      price.value = rawValue(price.value);
+    });
+  }
+})();
+</script>
 
 {% endblock %}
