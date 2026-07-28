@@ -553,8 +553,8 @@
    FLASH MESSAGES
    ========================= */
 
-.flash,
-.alert {
+.app-content .flash,
+.app-content .alert {
   margin-bottom: 16px;
   padding: 13px 15px;
 
@@ -570,16 +570,16 @@
   box-shadow: var(--ds-shadow-xs);
 }
 
-.flash.success,
-.alert.success {
+.app-content .flash.success,
+.app-content .alert.success {
   border-color: #bce5ca;
 
   background: var(--ds-success-soft);
   color: #12743a;
 }
 
-.flash.danger,
-.alert.danger {
+.app-content .flash.danger,
+.app-content .alert.danger {
   border-color: #ffcbd2;
 
   background: var(--ds-danger-soft);
