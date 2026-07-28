@@ -74,6 +74,66 @@ def register_settings_routes(
         flash("O‘zgardi ✅", "success")
         return redirect(url_for("settings_categories"))
 
+
+    @app.route(
+        "/settings/categories/edit/<int:cat_id>",
+        methods=["POST"],
+    )
+    @login_required
+    @admin_required
+    def settings_categories_edit(cat_id: int):
+        row = q1(
+            "SELECT id FROM categories WHERE id=?",
+            (cat_id,),
+        )
+        if not row:
+            flash("Kategoriya topilmadi", "danger")
+            return redirect(url_for("settings_categories"))
+
+        name = (request.form.get("name") or "").strip()
+        sort_raw = (request.form.get("sort_order") or "").strip()
+
+        if not name:
+            flash("Kategoriya nomi shart", "danger")
+            return redirect(url_for("settings_categories"))
+
+        try:
+            sort_order = int(sort_raw)
+        except (TypeError, ValueError):
+            flash("Tartib butun son bo‘lishi kerak", "danger")
+            return redirect(url_for("settings_categories"))
+
+        if sort_order < 0:
+            flash("Tartib manfiy bo‘lishi mumkin emas", "danger")
+            return redirect(url_for("settings_categories"))
+
+        duplicate = q1(
+            """
+            SELECT id
+            FROM categories
+            WHERE lower(trim(name))=lower(trim(?))
+              AND id<>?
+            LIMIT 1
+            """,
+            (name, cat_id),
+        )
+        if duplicate:
+            flash("Bu nomli kategoriya mavjud", "danger")
+            return redirect(url_for("settings_categories"))
+
+        exec_sql(
+            """
+            UPDATE categories
+            SET name=?, sort_order=?
+            WHERE id=?
+            """,
+            (name, sort_order, cat_id),
+        )
+
+        flash("Kategoriya yangilandi ✅", "success")
+        return redirect(url_for("settings_categories"))
+
+
     @app.route("/settings/products")
     @login_required
     @admin_required
