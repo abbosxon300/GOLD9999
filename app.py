@@ -13,6 +13,14 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from flask import Flask, g, render_template, request, redirect, url_for, flash, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
+from services.db import (
+    close_db as _db_close_db,
+    configure_db,
+    exec_sql as _db_exec_sql,
+    get_db as _db_get_db,
+    q as _db_q,
+    q1 as _db_q1,
+)
 from services.sales_helpers import (
     cart_add,
     cart_clear,
@@ -66,6 +74,8 @@ except Exception:
     register_sales_routes = None
 # --- /routes registration ---
 DB_PATH = os.path.join(BASE_DIR, "data.db")
+configure_db(DB_PATH)
+
 BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 
 
@@ -249,53 +259,39 @@ def _ensure_cash_move_for_sale(conn, sale_id: int):
             pass
         return
 def get_db() -> sqlite3.Connection:
-    if "db" not in g:
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
-        conn.execute("PRAGMA temp_store = MEMORY;")
-        conn.execute("PRAGMA cache_size = -20000;")
+    return _db_get_db()
 
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
-        g.db = conn
-    return g.db
 
 @app.teardown_appcontext
 def close_db(exc=None):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+    return _db_close_db(exc)
 
-def q1(sql: str, params: tuple = ()) -> Optional[sqlite3.Row]:
-    cur = get_db().execute(sql, params)
-    row = cur.fetchone()
-    cur.close()
-    return row
 
-def q(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
-    cur = get_db().execute(sql, params)
-    rows = cur.fetchall()
-    cur.close()
-    return rows
+def q1(
+    sql: str,
+    params: tuple = (),
+) -> Optional[sqlite3.Row]:
+    return _db_q1(sql, params)
 
-def exec_sql(sql: str, params: tuple = ()) -> int:
-    db = get_db()
-    cur = db.execute(sql, params)
-    db.commit()
-    last_id = cur.lastrowid
-    # Auto: sotuv yakunlanganda kassaga IN yozish
-    # Auto: sotuv yakunlanganda kassaga IN yozish (faqat sales INSERT bo‘lsa)
-    try:
-        import re
-        if re.search(r"\binsert\s+into\s+sales\b", sql, re.IGNORECASE):
-            _ensure_cash_move_for_sale(db, last_id)
-    except Exception:
-        pass
 
-    cur.close()
-    return last_id
+def q(
+    sql: str,
+    params: tuple = (),
+) -> list[sqlite3.Row]:
+    return _db_q(sql, params)
+
+
+def exec_sql(
+    sql: str,
+    params: tuple = (),
+) -> int:
+    return _db_exec_sql(sql, params)
+
+
+
+
+
+
 
 
 def init_db() -> None:
