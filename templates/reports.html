@@ -1,47 +1,129 @@
 {% extends "base.html" %}
-{% set title = "Hisobot" %}
+{% set title = "Hisobotlar" %}
 
 {% block content %}
+<section class="reports-page">
 
-<div class="page-header">
-    <h1>📊 Hisobot</h1>
-    <p>Barcha hisobotlar</p>
-</div>
+  <header class="reports-header">
+    <div class="reports-header-icon">📊</div>
 
-<div class="cards-grid">
+    <div>
+      <h1>Hisobotlar</h1>
+      <p>Barcha hisobotlar va tahlillar</p>
+    </div>
+  </header>
 
-    <a class="kpi-card-2" href="{{ url_for('sales_history') }}">
-        <h3>💰 Sotuv</h3>
+  <div class="reports-grid">
+
+    <a class="report-card report-card-sales"
+       href="{{ url_for('sales_history') }}">
+      <span class="report-icon">💰</span>
+
+      <div class="report-card-body">
+        <h2>Sotuv</h2>
+        <p>Barcha sotuvlar tarixi va tafsilotlari</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('kpi') }}">
-        <h3>📦 Kirim</h3>
+    <a class="report-card report-card-entry"
+       href="{{ url_for('kpi') }}">
+      <span class="report-icon">📦</span>
+
+      <div class="report-card-body">
+        <h2>Kirim</h2>
+        <p>Kirim va ombordagi harakatlar</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('kassa') }}">
-        <h3>💵 Kassa</h3>
+    <a class="report-card report-card-cash"
+       href="{{ url_for('kassa') }}">
+      <span class="report-icon">💵</span>
+
+      <div class="report-card-body">
+        <h2>Kassa</h2>
+        <p>Kassa kirim-chiqim hisoboti</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('report_profit') }}">
-        <h3>📈 Foyda</h3>
+    <a class="report-card report-card-profit"
+       href="{{ url_for('report_profit') }}">
+      <span class="report-icon">📈</span>
+
+      <div class="report-card-body">
+        <h2>Foyda</h2>
+        <p>Sotuv, tannarx va foyda tahlili</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('report_agents') }}">
-        <h3>👤 Sotuvchilar</h3>
+    <a class="report-card report-card-agents"
+       href="{{ url_for('report_agents') }}">
+      <span class="report-icon">👤</span>
+
+      <div class="report-card-body">
+        <h2>Sotuvchilar</h2>
+        <p>Sotuvchilar bo‘yicha hisobot</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('report_daily') }}">
-        <h3>📅 Kunlik</h3>
+    <a class="report-card report-card-daily"
+       href="{{ url_for('report_daily') }}">
+      <span class="report-icon">📅</span>
+
+      <div class="report-card-body">
+        <h2>Kunlik</h2>
+        <p>Kunlik sotuv va foyda hisoboti</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('report_monthly') }}">
-        <h3>📆 Oylik</h3>
+    <a class="report-card report-card-monthly"
+       href="{{ url_for('report_monthly') }}">
+      <span class="report-icon">🗓️</span>
+
+      <div class="report-card-body">
+        <h2>Oylik</h2>
+        <p>Oylik sotuv va foyda hisoboti</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-    <a class="kpi-card-2" href="{{ url_for('reports_excel') }}">
-        <h3>📥 Excel eksport</h3>
+    <a class="report-card report-card-excel"
+       href="{{ url_for('reports_excel') }}">
+      <span class="report-icon">📄</span>
+
+      <div class="report-card-body">
+        <h2>Excel eksport</h2>
+        <p>Barcha hisobotlarni Excel faylga olish</p>
+      </div>
+
+      <span class="report-arrow">→</span>
     </a>
 
-</div>
+  </div>
 
+  <div class="reports-info">
+    <span class="reports-info-icon">i</span>
+
+    <div>
+      <strong>Hisobotlar yordamida biznesingizni tahlil qiling</strong>
+      <p>
+        Turli davrlar bo‘yicha sotuv, foyda va boshqa
+        ko‘rsatkichlarni kuzating.
+      </p>
+    </div>
+  </div>
+
+</section>
 {% endblock %}
