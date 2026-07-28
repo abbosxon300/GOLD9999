@@ -28,6 +28,7 @@ def register_settings_routes(
     q1,
     exec_sql,
     parse_int,
+    parse_float,
     login_required,
     admin_required,
 ):
@@ -191,6 +192,97 @@ def register_settings_routes(
         except sqlite3.IntegrityError:
             flash("Bu nom band", "danger")
         return redirect(url_for("settings_products"))
+
+    @app.route(
+        "/settings/products/edit/<int:product_id>",
+        methods=["POST"],
+    )
+    @login_required
+    @admin_required
+    def settings_products_edit(product_id: int):
+        init_db()
+
+        product = q1(
+            "SELECT id FROM products WHERE id=?",
+            (product_id,),
+        )
+        if not product:
+            flash("Mahsulot topilmadi", "danger")
+            return redirect(url_for("settings_products"))
+
+        name = (request.form.get("name") or "").strip()
+        category_id = parse_int(
+            request.form.get("category_id") or "0"
+        )
+        sell_price = parse_float(
+            request.form.get(
+                "sell_price_default_uzs"
+            ) or ""
+        )
+
+        if not name or category_id <= 0:
+            flash(
+                "Mahsulot nomi va kategoriya shart",
+                "danger",
+            )
+            return redirect(url_for("settings_products"))
+
+        if sell_price is None or sell_price <= 0:
+            flash(
+                "Sotuv narxi musbat son bo‘lishi kerak",
+                "danger",
+            )
+            return redirect(url_for("settings_products"))
+
+        category = q1(
+            """
+            SELECT id
+            FROM categories
+            WHERE id=?
+              AND is_active=1
+            """,
+            (category_id,),
+        )
+        if not category:
+            flash(
+                "Faol kategoriya topilmadi",
+                "danger",
+            )
+            return redirect(url_for("settings_products"))
+
+        duplicate = q1(
+            """
+            SELECT id
+            FROM products
+            WHERE lower(trim(name))=lower(trim(?))
+              AND id<>?
+            LIMIT 1
+            """,
+            (name, product_id),
+        )
+        if duplicate:
+            flash("Bu nomli mahsulot mavjud", "danger")
+            return redirect(url_for("settings_products"))
+
+        exec_sql(
+            """
+            UPDATE products
+            SET name=?,
+                category_id=?,
+                sell_price_default_uzs=?
+            WHERE id=?
+            """,
+            (
+                name,
+                category_id,
+                float(sell_price),
+                product_id,
+            ),
+        )
+
+        flash("Mahsulot yangilandi ✅", "success")
+        return redirect(url_for("settings_products"))
+
 
     @app.route("/settings/products/toggle/<int:product_id>", methods=["POST"])
     @login_required

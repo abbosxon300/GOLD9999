@@ -1,39 +1,482 @@
 {% extends "base.html" %}
 {% set title = "Sozlamalar → Mahsulotlar" %}
+
 {% block content %}
-  <div class="card">
-    <b>Yangi mahsulot</b>
-    <form method="post" action="/settings/products/add" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
-      <input name="name" placeholder="Mahsulot nomi" required>
-      <select name="category_id" required>
-        <option value="">Kategoriya</option>
-        {% for c in cats %}
-          <option value="{{ c.id }}">{{ c.name }}</option>
-        {% endfor %}
-      </select>
-      <input name="sell_price_default_uzs" placeholder="Standart narx (so‘m)" required>
-      <button class="btn" type="submit">Qo‘shish</button>
+<div class="product-settings-page">
+
+  <section class="card product-create-card">
+    <div class="product-section-head">
+      <div>
+        <h2>Yangi mahsulot</h2>
+        <p>Mahsulot, kategoriya va sotuv narxini kiriting</p>
+      </div>
+    </div>
+
+    <form
+      method="post"
+      action="{{ url_for('settings_products_add') }}"
+      class="product-create-form">
+
+      <div class="product-field">
+        <label for="product-name">Mahsulot nomi</label>
+        <input
+          id="product-name"
+          name="name"
+          type="text"
+          placeholder="Masalan: SHIM"
+          autocomplete="off"
+          required>
+      </div>
+
+      <div class="product-field">
+        <label for="product-category">Kategoriya</label>
+        <select
+          id="product-category"
+          name="category_id"
+          required>
+          <option value="">Kategoriyani tanlang</option>
+          {% for c in cats %}
+            <option value="{{ c.id }}">
+              {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="product-field">
+        <label for="product-sell-price">
+          Sotuv narxi
+        </label>
+        <input
+          id="product-sell-price"
+          name="sell_price_default_uzs"
+          type="number"
+          min="1"
+          step="1"
+          placeholder="Masalan: 70 000"
+          required>
+      </div>
+
+      <button
+        class="btn product-add-btn"
+        type="submit">
+        + Qo‘shish
+      </button>
     </form>
+  </section>
+
+  <section class="card product-list-card">
+    <div class="product-section-head">
+      <div>
+        <h2>Mahsulotlar</h2>
+        <p>Narx, kategoriya va faol holatini boshqaring</p>
+      </div>
+
+      <span class="product-count">
+        {{ rows|length }} ta
+      </span>
+    </div>
+
+    {% if rows %}
+      <div class="product-table-wrap">
+        <table class="product-table">
+          <thead>
+            <tr>
+              <th>Mahsulot</th>
+              <th class="product-category-col">Kategoriya</th>
+              <th class="product-price-col">Sotuv narxi</th>
+              <th class="product-status-col">Holat</th>
+              <th class="product-actions-col">Amallar</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td data-label="Mahsulot">
+                  <strong>{{ r.name }}</strong>
+                </td>
+
+                <td data-label="Kategoriya">
+                  <span class="product-category-badge">
+                    {{ r.category_name }}
+                  </span>
+                </td>
+
+                <td
+                  class="product-price-cell"
+                  data-label="Sotuv narxi">
+                  {{ "{:,.0f}".format(
+                    r.sell_price_default_uzs or 0
+                  ).replace(",", " ") }}
+                  <span>so‘m</span>
+                </td>
+
+                <td data-label="Holat">
+                  {% if r.is_active == 1 %}
+                    <span class="product-status is-active">
+                      <span class="product-status-dot"></span>
+                      Faol
+                    </span>
+                  {% else %}
+                    <span class="product-status is-inactive">
+                      <span class="product-status-dot"></span>
+                      O‘chirilgan
+                    </span>
+                  {% endif %}
+                </td>
+
+                <td
+                  class="product-actions-cell"
+                  data-label="Amallar">
+
+                  <button
+                    type="button"
+                    class="product-action-btn product-edit-open"
+                    data-product-id="{{ r.id }}"
+                    data-product-name="{{ r.name|e }}"
+                    data-product-category="{{ r.category_id }}"
+                    data-product-price="{{
+                      r.sell_price_default_uzs or 0
+                    }}">
+                    ✏️ Tahrirlash
+                  </button>
+
+                  <button
+                    type="button"
+                    class="product-action-btn product-toggle-open {% if r.is_active == 1 %}is-warning{% else %}is-success{% endif %}"
+                    data-product-toggle-url="{{ url_for(
+                      'settings_products_toggle',
+                      product_id=r.id
+                    ) }}"
+                    data-product-toggle-name="{{ r.name|e }}"
+                    data-product-toggle-action="{% if r.is_active == 1 %}faolsizlantirish{% else %}faollashtirish{% endif %}">
+
+                    {% if r.is_active == 1 %}
+                      ⏸ Faolsizlantirish
+                    {% else %}
+                      ▶ Faollashtirish
+                    {% endif %}
+                  </button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="product-empty">
+        <div class="product-empty-icon">📦</div>
+        <strong>Mahsulot mavjud emas</strong>
+        <p>Yuqoridagi forma orqali mahsulot qo‘shing.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<div
+  id="product-edit-modal"
+  class="product-modal"
+  hidden>
+
+  <div
+    class="product-modal-backdrop"
+    data-product-edit-close>
   </div>
 
-  <div class="card">
-    <b>Ro‘yxat</b>
-    <table style="margin-top:10px">
-      <tr><th>ID</th><th>Nomi</th><th>Kategoriya</th><th>Standart narx</th><th>Holat</th><th></th></tr>
-      {% for r in rows %}
-      <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.name }}</td>
-        <td>{{ r.category_name }}</td>
-        <td>{{ "%.0f"|format(r.sell_price_default_uzs or 0) }}</td>
-        <td>{{ "Faol" if r.is_active==1 else "Nofaol" }}</td>
-        <td>
-          <form method="post" action="/settings/products/toggle/{{ r.id }}">
-            <button class="btn" type="submit">Holatini o‘zgartirish</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+  <div
+    class="product-modal-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="product-edit-title">
+
+    <div class="product-modal-head">
+      <div>
+        <h3 id="product-edit-title">
+          Mahsulotni tahrirlash
+        </h3>
+        <p>Mahsulot ma’lumotlarini yangilang</p>
+      </div>
+
+      <button
+        type="button"
+        class="product-modal-close"
+        data-product-edit-close
+        aria-label="Yopish">
+        ×
+      </button>
+    </div>
+
+    <form
+      id="product-edit-form"
+      method="post"
+      action=""
+      class="product-modal-form">
+
+      <div class="product-field">
+        <label for="product-edit-name">
+          Mahsulot nomi
+        </label>
+        <input
+          id="product-edit-name"
+          name="name"
+          type="text"
+          autocomplete="off"
+          required>
+      </div>
+
+      <div class="product-field">
+        <label for="product-edit-category">
+          Kategoriya
+        </label>
+        <select
+          id="product-edit-category"
+          name="category_id"
+          required>
+          {% for c in cats %}
+            <option value="{{ c.id }}">
+              {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="product-field">
+        <label for="product-edit-price">
+          Sotuv narxi
+        </label>
+        <input
+          id="product-edit-price"
+          name="sell_price_default_uzs"
+          type="number"
+          min="1"
+          step="1"
+          required>
+      </div>
+
+      <div class="product-modal-actions">
+        <button
+          type="button"
+          class="btn product-cancel-btn"
+          data-product-edit-close>
+          Bekor qilish
+        </button>
+
+        <button
+          type="submit"
+          class="btn product-save-btn">
+          Saqlash
+        </button>
+      </div>
+    </form>
   </div>
+</div>
+
+<div
+  id="product-toggle-modal"
+  class="product-modal"
+  hidden>
+
+  <div
+    class="product-modal-backdrop"
+    data-product-toggle-close>
+  </div>
+
+  <div
+    class="product-modal-dialog product-confirm-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="product-toggle-title">
+
+    <div class="product-modal-head">
+      <div>
+        <h3 id="product-toggle-title">
+          Holatni o‘zgartirish
+        </h3>
+        <p id="product-toggle-message"></p>
+      </div>
+
+      <button
+        type="button"
+        class="product-modal-close"
+        data-product-toggle-close
+        aria-label="Yopish">
+        ×
+      </button>
+    </div>
+
+    <form
+      id="product-toggle-form"
+      method="post"
+      action="">
+
+      <div class="product-modal-actions product-confirm-actions">
+        <button
+          type="button"
+          class="btn product-cancel-btn"
+          data-product-toggle-close>
+          Bekor qilish
+        </button>
+
+        <button
+          type="submit"
+          class="btn product-confirm-btn">
+          Tasdiqlash
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  const editModal = document.getElementById(
+    "product-edit-modal"
+  );
+  const editForm = document.getElementById(
+    "product-edit-form"
+  );
+  const editName = document.getElementById(
+    "product-edit-name"
+  );
+  const editCategory = document.getElementById(
+    "product-edit-category"
+  );
+  const editPrice = document.getElementById(
+    "product-edit-price"
+  );
+
+  const toggleModal = document.getElementById(
+    "product-toggle-modal"
+  );
+  const toggleForm = document.getElementById(
+    "product-toggle-form"
+  );
+  const toggleMessage = document.getElementById(
+    "product-toggle-message"
+  );
+
+  if (
+    !editModal ||
+    !editForm ||
+    !editName ||
+    !editCategory ||
+    !editPrice ||
+    !toggleModal ||
+    !toggleForm ||
+    !toggleMessage
+  ) {
+    return;
+  }
+
+  const syncBodyLock = () => {
+    const modalOpen =
+      !editModal.hidden || !toggleModal.hidden;
+
+    document.body.classList.toggle(
+      "product-modal-open",
+      modalOpen
+    );
+  };
+
+  const openEditModal = (button) => {
+    editForm.action =
+      `/settings/products/edit/${
+        encodeURIComponent(button.dataset.productId)
+      }`;
+
+    editName.value =
+      button.dataset.productName || "";
+
+    editCategory.value =
+      button.dataset.productCategory || "";
+
+    editPrice.value =
+      Math.round(
+        Number(button.dataset.productPrice || 0)
+      );
+
+    editModal.hidden = false;
+    syncBodyLock();
+
+    requestAnimationFrame(() => {
+      editName.focus();
+      editName.select();
+    });
+  };
+
+  const closeEditModal = () => {
+    editModal.hidden = true;
+    editForm.action = "";
+    syncBodyLock();
+  };
+
+  const openToggleModal = (button) => {
+    toggleForm.action =
+      button.dataset.productToggleUrl || "";
+
+    const productName =
+      button.dataset.productToggleName || "";
+
+    const action =
+      button.dataset.productToggleAction || "";
+
+    toggleMessage.textContent =
+      `${productName} mahsuloti ${action} qilinsinmi?`;
+
+    toggleModal.hidden = false;
+    syncBodyLock();
+  };
+
+  const closeToggleModal = () => {
+    toggleModal.hidden = true;
+    toggleForm.action = "";
+    toggleMessage.textContent = "";
+    syncBodyLock();
+  };
+
+  document.addEventListener("click", (event) => {
+    const editButton = event.target.closest(
+      ".product-edit-open"
+    );
+
+    if (editButton) {
+      openEditModal(editButton);
+      return;
+    }
+
+    const toggleButton = event.target.closest(
+      ".product-toggle-open"
+    );
+
+    if (toggleButton) {
+      openToggleModal(toggleButton);
+      return;
+    }
+
+    if (event.target.closest("[data-product-edit-close]")) {
+      closeEditModal();
+      return;
+    }
+
+    if (
+      event.target.closest("[data-product-toggle-close]")
+    ) {
+      closeToggleModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (!editModal.hidden) {
+      closeEditModal();
+    } else if (!toggleModal.hidden) {
+      closeToggleModal();
+    }
+  });
+})();
+</script>
 {% endblock %}

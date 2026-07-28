@@ -417,6 +417,7 @@ if register_settings_routes:
         q1=q1,
         exec_sql=exec_sql,
         parse_int=parse_int,
+        parse_float=parse_float,
         login_required=login_required,
         admin_required=admin_required,
     )
