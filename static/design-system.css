@@ -428,6 +428,45 @@
   opacity: .8;
 }
 
+
+/* =========================
+   SHARED FIELD COMPONENT
+   ========================= */
+
+.ui-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ui-field > label {
+  color: var(--ds-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ui-field > input:not([type="checkbox"]):not([type="radio"]),
+.ui-field > select,
+.ui-field > textarea,
+.ui-field > .kpi-entry-static-value {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ui-field > .kpi-entry-static-value {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 10px 13px;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 /* =========================
    TABLE SYSTEM
    ========================= */
