@@ -371,14 +371,14 @@ def register_sales_routes(
         cart = cart_get()
         cart["items"].pop(str(product_id), None)
         session["cart"] = cart
-        return redirect(url_for("home"))
+        return redirect(url_for("sales"))
 
     @app.route("/sales/clear", methods=["POST"])
     @login_required
     def sales_clear():
         session["cart"] = {"items": {}}
         flash("Savat tozalandi", "success")
-        return redirect(url_for("home"))
+        return redirect(url_for("sales"))
 
     @app.route(
         "/sales/checkout",
@@ -392,7 +392,7 @@ def register_sales_routes(
 
         if not cart["items"]:
             flash("Savat bo‘sh", "danger")
-            return redirect(url_for("home"))
+            return redirect(url_for("sales"))
 
         db = get_db()
 
@@ -560,7 +560,7 @@ def register_sales_routes(
             db.rollback()
             flash(str(exc), "danger")
 
-        return redirect(url_for("home"))
+        return redirect(url_for("sales"))
 
     @app.route(
         "/sales/qty/<int:product_id>/<action>",
@@ -649,3 +649,85 @@ def register_sales_routes(
             request.referrer
             or url_for("sales")
         )
+
+    # ===== SALES POS API START =====
+
+    def _sales_pos_cart_payload():
+        cart = cart_get()
+        items = []
+
+        for product_id, item in cart.get("items", {}).items():
+            qty = float(item.get("qty") or 0)
+            price = float(item.get("price") or 0)
+
+            items.append({
+                "product_id": int(product_id),
+                "name": str(item.get("name") or ""),
+                "qty": qty,
+                "price": price,
+                "line_total": qty * price,
+            })
+
+        return {
+            "ok": True,
+            "items": items,
+            "item_count": len(items),
+            "qty_total": sum(
+                float(item["qty"])
+                for item in items
+            ),
+            "cart_total": cart_total(cart),
+        }
+
+    @app.route("/sales/api/cart", methods=["GET"])
+    @login_required
+    def sales_api_cart():
+        from flask import jsonify
+
+        return jsonify(_sales_pos_cart_payload())
+
+    @app.route("/sales/api/products", methods=["GET"])
+    @login_required
+    def sales_api_products():
+        from flask import jsonify
+
+        init_db()
+
+        category_id = parse_int(
+            request.args.get("category_id") or "0"
+        )
+
+        if category_id <= 0:
+            return jsonify({
+                "ok": True,
+                "products": [],
+            })
+
+        products = q("""
+            SELECT
+                p.id,
+                p.name,
+                p.sell_price_default_uzs AS sell_default,
+                COALESCE(p.stock_qty, 0) AS qty
+            FROM products p
+            WHERE p.is_active=1
+              AND p.category_id=?
+            ORDER BY p.name
+        """, (category_id,))
+
+        return jsonify({
+            "ok": True,
+            "products": [
+                {
+                    "id": int(product["id"]),
+                    "name": str(product["name"]),
+                    "sell_default": float(
+                        product["sell_default"] or 0
+                    ),
+                    "qty": float(product["qty"] or 0),
+                }
+                for product in products
+            ],
+        })
+
+    # ===== SALES POS API END =====
