@@ -180,20 +180,6 @@ def _ensure_cash_move_for_sale(conn, sale_id: int):
         if not cur.fetchone():
             return
 
-        # sale_id ustuni (eski DBlar uchun)
-        try:
-            cols = [r[1] for r in cur.execute("PRAGMA table_info(cash_moves)").fetchall()]
-            if "sale_id" not in cols:
-                cur.execute("ALTER TABLE cash_moves ADD COLUMN sale_id INTEGER")
-        except Exception:
-            pass
-
-        # unique index (oddiy index ham dublikatni ushlaydi, NULL bo‘lsa ham)
-        try:
-            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_moves_sale_id ON cash_moves(sale_id)")
-        except Exception:
-            pass
-
         # dublikat tekshiruv
         try:
             cur.execute("SELECT 1 FROM cash_moves WHERE sale_id=? LIMIT 1", (sale_id,))
