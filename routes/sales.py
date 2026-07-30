@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 import uuid
 
 from services.business_writes import (
@@ -15,6 +15,15 @@ from flask import (
     session,
     url_for,
 )
+
+from services.device_identity import get_device_identity
+from services.offline.constants import OPERATION_CREATE
+from services.offline.models import SyncRecord
+from services.offline.sales_aggregate import (
+    SALE_AGGREGATE_SCHEMA_VERSION,
+    SaleAggregatePayload,
+)
+from services.offline.sqlite_queue import SQLiteSyncQueue
 
 
 def register_sales_routes(
@@ -413,6 +422,9 @@ def register_sales_routes(
             with business_transaction(db) as tx:
                 sale_date = date.today().isoformat()
 
+                sale_uuid = str(uuid.uuid4())
+                sale_sync_version = 1
+
                 sale_id = tx.execute(
                     """
                     INSERT INTO sales(
@@ -420,9 +432,11 @@ def register_sales_routes(
                         agent_id,
                         total_sell_uzs,
                         total_cost_uzs,
-                        total_profit_uzs
+                        total_profit_uzs,
+                        entity_uuid,
+                        sync_version
                     )
-                    VALUES(?,?,?,?,?)
+                    VALUES(?,?,?,?,?,?,?)
                     """,
                     (
                         sale_date,
@@ -430,12 +444,15 @@ def register_sales_routes(
                         0,
                         0,
                         0,
+                        sale_uuid,
+                        sale_sync_version,
                     ),
                 ).lastrowid
 
                 total_sell = 0.0
                 total_cost = 0.0
                 total_profit = 0.0
+                aggregate_items = []
 
                 for product_id, item in (
                     cart["items"].items()
@@ -480,6 +497,30 @@ def register_sales_routes(
                     total_cost += cost_total
                     total_profit += profit
 
+                    product_row = tx.execute(
+                        """
+                        SELECT entity_uuid
+                        FROM products
+                        WHERE id=?
+                          AND is_active=1
+                        """,
+                        (pid,),
+                    ).fetchone()
+
+                    if (
+                        product_row is None
+                        or not str(
+                            product_row["entity_uuid"] or ""
+                        ).strip()
+                    ):
+                        raise ValueError(
+                            "Mahsulot offline UUID topilmadi: "
+                            f"{item['name']}"
+                        )
+
+                    item_uuid = str(uuid.uuid4())
+                    item_sync_version = 1
+
                     sale_item_id = tx.execute(
                         """
                         INSERT INTO sale_items(
@@ -503,10 +544,21 @@ def register_sales_routes(
                             sell_total,
                             cost_total,
                             profit,
-                            str(uuid.uuid4()),
-                            1,
+                            item_uuid,
+                            item_sync_version,
                         ),
                     ).lastrowid
+
+                    aggregate_items.append({
+                        "entity_uuid": item_uuid,
+                        "sync_version": item_sync_version,
+                        "product_uuid": str(
+                            product_row["entity_uuid"]
+                        ),
+                        "qty": qty,
+                        "sell_price_uzs": price,
+                        "unit_cost_uzs": unit_cost,
+                    })
 
                     consume_stock(
                         tx,
@@ -542,6 +594,64 @@ def register_sales_routes(
                     move_date=sale_date,
                     amount_uzs=total_sell,
                     note=f"Auto sale #{sale_id}",
+                )
+
+                aggregate = SaleAggregatePayload.from_payload({
+                    "schema_version": (
+                        SALE_AGGREGATE_SCHEMA_VERSION
+                    ),
+                    "entity_uuid": sale_uuid,
+                    "sync_version": sale_sync_version,
+                    "sale_date": sale_date,
+                    "agent_username": (
+                        session.get("username")
+                    ),
+                    "items": aggregate_items,
+                })
+
+                identity = get_device_identity(tx)
+
+                device_uuid = (
+                    getattr(
+                        identity,
+                        "installation_uuid",
+                        None,
+                    )
+                    or getattr(
+                        identity,
+                        "device_uuid",
+                        None,
+                    )
+                    or getattr(
+                        identity,
+                        "database_uuid",
+                        None,
+                    )
+                )
+
+                if not str(device_uuid or "").strip():
+                    raise RuntimeError(
+                        "Offline device UUID topilmadi"
+                    )
+
+                sync_record = SyncRecord(
+                    entity_type="sales_aggregate",
+                    entity_uuid=sale_uuid,
+                    operation=OPERATION_CREATE,
+                    payload=aggregate.to_payload(),
+                    device_uuid=str(device_uuid),
+                    occurred_at=datetime.now(
+                        timezone.utc
+                    ),
+                )
+
+                sync_queue = SQLiteSyncQueue(
+                    lambda: get_db()
+                )
+
+                sync_queue.enqueue(
+                    sync_record,
+                    connection=tx,
                 )
 
             session["cart"] = {

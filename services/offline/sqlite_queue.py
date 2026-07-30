@@ -90,6 +90,8 @@ class SQLiteSyncQueue:
     def enqueue(
         self,
         record: SyncRecord,
+        *,
+        connection: sqlite3.Connection | None = None,
     ) -> str:
         if not isinstance(record, SyncRecord):
             raise TypeError(
@@ -136,7 +138,17 @@ class SQLiteSyncQueue:
         queue_uuid = new_queue_uuid()
         now = utc_now_iso()
 
-        con = self._connection_factory()
+        owns_connection = connection is None
+        con = (
+            self._connection_factory()
+            if owns_connection
+            else connection
+        )
+
+        if con is None:
+            raise RuntimeError(
+                "SQLite connection olinmadi"
+            )
 
         try:
             con.execute(
@@ -174,12 +186,17 @@ class SQLiteSyncQueue:
                 ),
             )
 
-            con.commit()
+            if owns_connection:
+                con.commit()
+
         except Exception:
-            con.rollback()
+            if owns_connection:
+                con.rollback()
             raise
+
         finally:
-            con.close()
+            if owns_connection:
+                con.close()
 
         return queue_uuid
 
