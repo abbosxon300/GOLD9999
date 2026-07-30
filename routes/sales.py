@@ -1,6 +1,7 @@
 from datetime import date
 from services.business_writes import (
     business_transaction,
+    consume_stock,
     ensure_sale_cash_move,
 )
 
@@ -395,8 +396,14 @@ def register_sales_routes(
         cart = cart_get()
 
         if not cart["items"]:
-            flash("Savat bo‘sh", "danger")
-            return redirect(url_for("sales"))
+            flash(
+                "Savat bo‘sh",
+                "danger",
+            )
+
+            return redirect(
+                url_for("sales")
+            )
 
         db = get_db()
 
@@ -404,7 +411,8 @@ def register_sales_routes(
             with business_transaction(db) as tx:
                 sale_date = date.today().isoformat()
 
-                sale_id = tx.execute("""
+                sale_id = tx.execute(
+                    """
                     INSERT INTO sales(
                         sale_date,
                         agent_id,
@@ -413,13 +421,15 @@ def register_sales_routes(
                         total_profit_uzs
                     )
                     VALUES(?,?,?,?,?)
-                """, (
-                    sale_date,
-                    session.get("user_id"),
-                    0,
-                    0,
-                    0,
-                )).lastrowid
+                    """,
+                    (
+                        sale_date,
+                        session.get("user_id"),
+                        0,
+                        0,
+                        0,
+                    ),
+                ).lastrowid
 
                 total_sell = 0.0
                 total_cost = 0.0
@@ -428,16 +438,27 @@ def register_sales_routes(
                 for product_id, item in (
                     cart["items"].items()
                 ):
-                    pid = int(product_id)
-                    qty = float(item["qty"])
-                    price = float(item["price"])
+                    pid = int(
+                        product_id
+                    )
+
+                    qty = float(
+                        item["qty"]
+                    )
+
+                    price = float(
+                        item["price"]
+                    )
 
                     if qty <= 0 or price <= 0:
                         raise ValueError(
-                            "Savatda noto‘g‘ri qiymat bor"
+                            "Savatda noto‘g‘ri "
+                            "qiymat bor"
                         )
 
-                    available = product_qty(pid)
+                    available = product_qty(
+                        pid
+                    )
 
                     if available + 1e-9 < qty:
                         raise ValueError(
@@ -447,7 +468,9 @@ def register_sales_routes(
                         )
 
                     sell_total = qty * price
-                    unit_cost = product_avg_cost(pid)
+                    unit_cost = product_avg_cost(
+                        pid
+                    )
                     cost_total = qty * unit_cost
                     profit = sell_total - cost_total
 
@@ -455,7 +478,8 @@ def register_sales_routes(
                     total_cost += cost_total
                     total_profit += profit
 
-                    sale_item_id = tx.execute("""
+                    sale_item_id = tx.execute(
+                        """
                         INSERT INTO sale_items(
                             sale_id,
                             product_id,
@@ -466,62 +490,45 @@ def register_sales_routes(
                             profit_uzs
                         )
                         VALUES(?,?,?,?,?,?,?)
-                    """, (
-                        sale_id,
-                        pid,
-                        qty,
-                        price,
-                        sell_total,
-                        cost_total,
-                        profit,
-                    )).lastrowid
-
-                    tx.execute("""
-                        INSERT INTO inventory_moves(
-                            move_date,
-                            move_type,
-                            product_id,
+                        """,
+                        (
+                            sale_id,
+                            pid,
                             qty,
-                            unit_cost_uzs,
-                            note,
-                            source_type,
-                            source_id
-                        )
-                        VALUES(?,?,?,?,?,?,?,?)
-                    """, (
-                        sale_date,
-                        "OUT",
-                        pid,
-                        qty,
-                        unit_cost,
-                        f"Sotuv #{sale_id}",
-                        "sale_item",
-                        sale_item_id,
-                    ))
+                            price,
+                            sell_total,
+                            cost_total,
+                            profit,
+                        ),
+                    ).lastrowid
 
-                    tx.execute("""
-                        UPDATE products
-                        SET stock_qty=
-                            COALESCE(stock_qty, 0) - ?
-                        WHERE id=?
-                    """, (
-                        qty,
-                        pid,
-                    ))
+                    consume_stock(
+                        tx,
+                        move_date=sale_date,
+                        product_id=pid,
+                        qty=qty,
+                        unit_cost_uzs=unit_cost,
+                        note=f"Sotuv #{sale_id}",
+                        source_type="sale_item",
+                        source_id=sale_item_id,
+                    )
 
-                tx.execute("""
+                tx.execute(
+                    """
                     UPDATE sales
                     SET
                         total_sell_uzs=?,
                         total_cost_uzs=?,
                         total_profit_uzs=?
                     WHERE id=?
-                """, (
-                    total_sell,
-                    total_cost,
-                    total_profit,
-                    sale_id,
-                ))
+                    """,
+                    (
+                        total_sell,
+                        total_cost,
+                        total_profit,
+                        sale_id,
+                    ),
+                )
 
                 ensure_sale_cash_move(
                     tx,
@@ -531,7 +538,9 @@ def register_sales_routes(
                     note=f"Auto sale #{sale_id}",
                 )
 
-            session["cart"] = {"items": {}}
+            session["cart"] = {
+                "items": {},
+            }
 
             flash(
                 "Sotuv yakunlandi ✅",
@@ -539,9 +548,14 @@ def register_sales_routes(
             )
 
         except Exception as exc:
-            flash(str(exc), "danger")
+            flash(
+                str(exc),
+                "danger",
+            )
 
-        return redirect(url_for("sales"))
+        return redirect(
+            url_for("sales")
+        )
 
     @app.route(
         "/sales/qty/<int:product_id>/<action>",

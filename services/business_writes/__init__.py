@@ -15,11 +15,27 @@ from services.business_writes.cash import (
     update_cash_move,
     update_cash_move_note,
 )
+from services.business_writes.inventory import (
+    InventoryMoveResult,
+    consume_stock,
+    get_inventory_move,
+    get_product_stock,
+    normalize_inventory_move_type,
+    receive_stock,
+    record_inventory_move,
+)
 from services.business_writes.transaction import (
     business_transaction,
 )
 
 __all__ = [
+    "InventoryMoveResult",
+    "consume_stock",
+    "get_inventory_move",
+    "get_product_stock",
+    "normalize_inventory_move_type",
+    "receive_stock",
+    "record_inventory_move",
     "CashMoveResult",
     "business_transaction",
     "create_cash_move",

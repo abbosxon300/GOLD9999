@@ -1,3 +1,8 @@
+from services.business_writes import (
+    business_transaction,
+    receive_stock,
+)
+
 from datetime import date
 
 from flask import (
@@ -79,38 +84,92 @@ def register_kpi_routes(
     def kpi_kirim(category_id: int):
         init_db()
 
-        cat = q1("SELECT * FROM categories WHERE id=? AND is_active=1", (category_id,))
-        if not cat:
-            flash("Kategoriya topilmadi", "danger")
-            return redirect(url_for("kpi"))
+        cat = q1(
+            """
+            SELECT *
+            FROM categories
+            WHERE id=?
+              AND is_active=1
+            """,
+            (
+                category_id,
+            ),
+        )
 
-        products = q("""
-            SELECT id, name,
-                   COALESCE(stock_qty,0) AS stock_qty,
-                   COALESCE(sell_price_default_uzs,0) AS sell_price_default_uzs
+        if not cat:
+            flash(
+                "Kategoriya topilmadi",
+                "danger",
+            )
+
+            return redirect(
+                url_for("kpi")
+            )
+
+        products = q(
+            """
+            SELECT
+                id,
+                name,
+                COALESCE(stock_qty, 0)
+                    AS stock_qty,
+                COALESCE(
+                    sell_price_default_uzs,
+                    0
+                ) AS sell_price_default_uzs
             FROM products
-            WHERE is_active=1 AND category_id=?
+            WHERE is_active=1
+              AND category_id=?
             ORDER BY name
-        """, (category_id,))
+            """,
+            (
+                category_id,
+            ),
+        )
 
         if request.method == "POST":
+            product_id = parse_int(
+                request.form.get("product_id")
+            )
 
-            product_id = parse_int(request.form.get("product_id"))
+            qty = (
+                parse_float(
+                    request.form.get("qty")
+                )
+                or 0.0
+            )
 
-            qty = parse_float(request.form.get("qty")) or 0.0
+            unit_cost_uzs = (
+                parse_float(
+                    request.form.get("cost_uzs")
+                )
+                or parse_float(
+                    request.form.get(
+                        "unit_cost_uzs"
+                    )
+                )
+                or 0.0
+            )
 
-            unit_cost_uzs = (parse_float(request.form.get("cost_uzs")) or parse_float(request.form.get("unit_cost_uzs")) or 0.0)
+            move_date = (
+                request.form.get("move_date")
+                or ""
+            ).strip() or datetime.now().strftime(
+                "%Y-%m-%d"
+            )
 
-            move_date = (request.form.get("move_date") or "").strip() or datetime.now().strftime("%Y-%m-%d")
-
-            note = (request.form.get("note") or "").strip()
-
+            note = (
+                request.form.get("note")
+                or ""
+            ).strip()
 
             if product_id <= 0 or qty <= 0:
                 flash(
-                    "Mahsulot va miqdorni to‘g‘ri kiriting",
+                    "Mahsulot va miqdorni "
+                    "to‘g‘ri kiriting",
                     "danger",
                 )
+
                 return redirect(
                     url_for(
                         "kpi_kirim",
@@ -120,9 +179,11 @@ def register_kpi_routes(
 
             if unit_cost_uzs <= 0:
                 flash(
-                    "Tannarx musbat son bo‘lishi kerak",
+                    "Tannarx musbat son "
+                    "bo‘lishi kerak",
                     "danger",
                 )
+
                 return redirect(
                     url_for(
                         "kpi_kirim",
@@ -130,66 +191,35 @@ def register_kpi_routes(
                     )
                 )
 
-
             db = get_db()
 
             try:
-                db.execute("BEGIN")
-
-                product = db.execute("""
-                    SELECT id
-                    FROM products
-                    WHERE id=?
-                      AND category_id=?
-                      AND is_active=1
-                """, (
-                    int(product_id),
-                    int(category_id),
-                )).fetchone()
-
-                if not product:
-                    raise ValueError(
-                        "Mahsulot topilmadi yoki nofaol"
+                with business_transaction(db) as tx:
+                    receive_stock(
+                        tx,
+                        move_date=move_date,
+                        product_id=product_id,
+                        qty=qty,
+                        unit_cost_uzs=unit_cost_uzs,
+                        note=note or "KPI kirim",
+                        category_id=category_id,
                     )
 
-                db.execute("""
-                    INSERT INTO inventory_moves(
-                        move_date,
-                        move_type,
-                        product_id,
-                        qty,
-                        unit_cost_uzs,
-                        note,
-                        source_type,
-                        source_id
-                    )
-                    VALUES(?,?,?,?,?,?,NULL,NULL)
-                """, (
-                    move_date,
-                    "IN",
-                    int(product_id),
-                    float(qty),
-                    float(unit_cost_uzs),
-                    note or "KPI kirim",
-                ))
-
-                db.execute("""
-                    UPDATE products
-                    SET stock_qty=COALESCE(stock_qty, 0) + ?
-                    WHERE id=?
-                """, (
-                    float(qty),
-                    int(product_id),
-                ))
-
-                db.commit()
-                flash("Kirim qo‘shildi ✅", "success")
+                flash(
+                    "Kirim qo‘shildi ✅",
+                    "success",
+                )
 
             except Exception as exc:
-                db.rollback()
-                flash(str(exc), "danger")
+                flash(
+                    str(exc),
+                    "danger",
+                )
 
-            return redirect(url_for("kpi"))
+            return redirect(
+                url_for("kpi")
+            )
+
         recent_moves = q(
             """
             SELECT
@@ -207,7 +237,9 @@ def register_kpi_routes(
             ORDER BY m.id DESC
             LIMIT 10
             """,
-            (category_id,),
+            (
+                category_id,
+            ),
         )
 
         return render_template(
@@ -215,6 +247,8 @@ def register_kpi_routes(
             category=cat,
             products=products,
             recent_moves=recent_moves,
-            today=datetime.now().strftime("%Y-%m-%d"),
+            today=datetime.now().strftime(
+                "%Y-%m-%d"
+            ),
             app_name=app_name,
         )
