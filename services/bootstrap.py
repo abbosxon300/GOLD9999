@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash
 
 from services.db import exec_sql, get_db, q1
 from services.migrations import run_migrations
+from services.device_identity import ensure_installation_identity
 
 
 def init_db(backup_dir: str) -> None:
@@ -26,6 +27,7 @@ def init_db(backup_dir: str) -> None:
     connection = get_db()
 
     run_migrations(connection)
+    ensure_installation_identity(connection)
 
     admin = q1(
         """
