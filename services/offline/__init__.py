@@ -25,6 +25,12 @@ from services.offline.constants import (
     SYNC_STATUS_SYNCING,
 )
 from services.offline.engine import SyncEngine
+from services.offline.http_api import (
+    HttpSyncApi,
+    HttpSyncApiError,
+    HttpSyncResponseError,
+    HttpSyncTransportError,
+)
 from services.offline.log import (
     StoredSyncLog,
     SyncLogEntry,
@@ -74,6 +80,10 @@ __all__ = [
     "PullBatch",
     "RemoteChange",
     "SyncApi",
+    "HttpSyncApi",
+    "HttpSyncApiError",
+    "HttpSyncResponseError",
+    "HttpSyncTransportError",
     "SyncCursorState",
     "SyncCursorStore",
     "SQLiteSyncCursorStore",
