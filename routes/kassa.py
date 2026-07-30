@@ -1,4 +1,12 @@
 from datetime import date
+from services.business_writes import (
+    business_transaction,
+    create_cash_move,
+    delete_cash_move,
+    get_cash_move,
+    update_cash_move,
+    update_cash_move_note,
+)
 
 from flask import (
     flash,
@@ -58,24 +66,14 @@ def register_kassa_routes(
                 return redirect(url_for("kassa"))
 
             try:
-                db.execute("BEGIN")
-
-                db.execute("""
-                    INSERT INTO cash_moves(
-                        move_date,
-                        direction,
-                        amount_uzs,
-                        note
+                with business_transaction(db) as tx:
+                    create_cash_move(
+                        tx,
+                        move_date=date.today().isoformat(),
+                        direction=direction,
+                        amount_uzs=amount,
+                        note=note,
                     )
-                    VALUES(?,?,?,?)
-                """, (
-                    date.today().isoformat(),
-                    direction,
-                    amount,
-                    note,
-                ))
-
-                db.commit()
 
                 flash(
                     "Kassa harakati saqlandi ✅",
@@ -83,7 +81,6 @@ def register_kassa_routes(
                 )
 
             except Exception as exc:
-                db.rollback()
                 flash(str(exc), "danger")
 
             return redirect(url_for("kassa"))
@@ -166,19 +163,16 @@ def register_kassa_routes(
         init_db()
         db = get_db()
 
-        row = db.execute("""
-            SELECT
-                id,
-                sale_id
-            FROM cash_moves
-            WHERE id=?
-        """, (move_id,)).fetchone()
+        row = get_cash_move(
+            db,
+            move_id,
+        )
 
-        if not row:
+        if row is None:
             flash("Topilmadi", "danger")
             return redirect(url_for("kassa"))
 
-        if row["sale_id"] is not None:
+        if row.sale_id is not None:
             flash(
                 "Auto sale yozuvini "
                 "o‘chirib bo‘lmaydi",
@@ -187,14 +181,11 @@ def register_kassa_routes(
             return redirect(url_for("kassa"))
 
         try:
-            db.execute("BEGIN")
-
-            db.execute("""
-                DELETE FROM cash_moves
-                WHERE id=?
-            """, (move_id,))
-
-            db.commit()
+            with business_transaction(db) as tx:
+                delete_cash_move(
+                    tx,
+                    move_id=move_id,
+                )
 
             flash(
                 "O‘chirildi ✅",
@@ -202,7 +193,6 @@ def register_kassa_routes(
             )
 
         except Exception as exc:
-            db.rollback()
             flash(str(exc), "danger")
 
         return redirect(url_for("kassa"))
@@ -217,23 +207,16 @@ def register_kassa_routes(
         init_db()
         db = get_db()
 
-        row = db.execute("""
-            SELECT
-                id,
-                move_date,
-                direction,
-                amount_uzs,
-                note,
-                sale_id
-            FROM cash_moves
-            WHERE id=?
-        """, (move_id,)).fetchone()
+        row = get_cash_move(
+            db,
+            move_id,
+        )
 
-        if not row:
+        if row is None:
             flash("Topilmadi", "danger")
             return redirect(url_for("kassa"))
 
-        is_auto_sale = row["sale_id"] is not None
+        is_auto_sale = row.sale_id is not None
 
         if request.method == "POST":
             note = (
@@ -241,19 +224,13 @@ def register_kassa_routes(
             ).strip()
 
             try:
-                db.execute("BEGIN")
-
                 if is_auto_sale:
-                    db.execute("""
-                        UPDATE cash_moves
-                        SET note=?
-                        WHERE id=?
-                    """, (
-                        note,
-                        move_id,
-                    ))
-
-                    db.commit()
+                    with business_transaction(db) as tx:
+                        update_cash_move_note(
+                            tx,
+                            move_id=move_id,
+                            note=note,
+                        )
 
                     flash(
                         "Saqlandi ✅ "
@@ -265,11 +242,11 @@ def register_kassa_routes(
 
                 move_date = (
                     request.form.get("move_date") or ""
-                ).strip() or row["move_date"]
+                ).strip() or row.move_date
 
                 direction = (
                     request.form.get("direction")
-                    or row["direction"]
+                    or row.direction
                     or "IN"
                 ).strip().upper()
 
@@ -278,8 +255,6 @@ def register_kassa_routes(
                 ).replace(" ", "").replace(",", "").strip()
 
                 if direction not in ("IN", "OUT"):
-                    db.rollback()
-
                     flash(
                         "Direction xato (IN/OUT)",
                         "danger",
@@ -298,8 +273,6 @@ def register_kassa_routes(
                     amount = 0.0
 
                 if amount <= 0:
-                    db.rollback()
-
                     flash(
                         "Summa noto‘g‘ri",
                         "danger",
@@ -312,23 +285,15 @@ def register_kassa_routes(
                         )
                     )
 
-                db.execute("""
-                    UPDATE cash_moves
-                    SET
-                        move_date=?,
-                        direction=?,
-                        amount_uzs=?,
-                        note=?
-                    WHERE id=?
-                """, (
-                    move_date,
-                    direction,
-                    amount,
-                    note,
-                    move_id,
-                ))
-
-                db.commit()
+                with business_transaction(db) as tx:
+                    update_cash_move(
+                        tx,
+                        move_id=move_id,
+                        move_date=move_date,
+                        direction=direction,
+                        amount_uzs=amount,
+                        note=note,
+                    )
 
                 flash(
                     "Saqlandi ✅",
@@ -338,7 +303,6 @@ def register_kassa_routes(
                 return redirect(url_for("kassa"))
 
             except Exception as exc:
-                db.rollback()
                 flash(str(exc), "danger")
 
                 return redirect(

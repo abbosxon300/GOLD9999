@@ -1,4 +1,8 @@
 from datetime import date
+from services.business_writes import (
+    business_transaction,
+    ensure_sale_cash_move,
+)
 
 from flask import (
     flash,
@@ -397,157 +401,135 @@ def register_sales_routes(
         db = get_db()
 
         try:
-            db.execute("BEGIN")
+            with business_transaction(db) as tx:
+                sale_date = date.today().isoformat()
 
-            sale_date = date.today().isoformat()
-
-            sale_id = db.execute("""
-                INSERT INTO sales(
-                    sale_date,
-                    agent_id,
-                    total_sell_uzs,
-                    total_cost_uzs,
-                    total_profit_uzs
-                )
-                VALUES(?,?,?,?,?)
-            """, (
-                sale_date,
-                session.get("user_id"),
-                0,
-                0,
-                0,
-            )).lastrowid
-
-            total_sell = 0.0
-            total_cost = 0.0
-            total_profit = 0.0
-
-            for product_id, item in (
-                cart["items"].items()
-            ):
-                pid = int(product_id)
-                qty = float(item["qty"])
-                price = float(item["price"])
-
-                if qty <= 0 or price <= 0:
-                    raise ValueError(
-                        "Savatda noto‘g‘ri qiymat bor"
-                    )
-
-                available = product_qty(pid)
-
-                if available + 1e-9 < qty:
-                    raise ValueError(
-                        "Qoldiq yetarli emas: "
-                        f"{item['name']} "
-                        f"(Bor: {available:.2f})"
-                    )
-
-                sell_total = qty * price
-                unit_cost = product_avg_cost(pid)
-                cost_total = qty * unit_cost
-                profit = sell_total - cost_total
-
-                total_sell += sell_total
-                total_cost += cost_total
-                total_profit += profit
-
-                sale_item_id = db.execute("""
-                    INSERT INTO sale_items(
-                        sale_id,
-                        product_id,
-                        qty,
-                        sell_price_uzs,
-                        sell_total_uzs,
-                        cost_total_uzs,
-                        profit_uzs
-                    )
-                    VALUES(?,?,?,?,?,?,?)
-                """, (
-                    sale_id,
-                    pid,
-                    qty,
-                    price,
-                    sell_total,
-                    cost_total,
-                    profit,
-                )).lastrowid
-
-                db.execute("""
-                    INSERT INTO inventory_moves(
-                        move_date,
-                        move_type,
-                        product_id,
-                        qty,
-                        unit_cost_uzs,
-                        note,
-                        source_type,
-                        source_id
-                    )
-                    VALUES(?,?,?,?,?,?,?,?)
-                """, (
-                    sale_date,
-                    "OUT",
-                    pid,
-                    qty,
-                    unit_cost,
-                    f"Sotuv #{sale_id}",
-                    "sale_item",
-                    sale_item_id,
-                ))
-
-                db.execute("""
-                    UPDATE products
-                    SET stock_qty=
-                        COALESCE(stock_qty, 0) - ?
-                    WHERE id=?
-                """, (
-                    qty,
-                    pid,
-                ))
-
-            db.execute("""
-                UPDATE sales
-                SET
-                    total_sell_uzs=?,
-                    total_cost_uzs=?,
-                    total_profit_uzs=?
-                WHERE id=?
-            """, (
-                total_sell,
-                total_cost,
-                total_profit,
-                sale_id,
-            ))
-
-            cursor = db.cursor()
-
-            cursor.execute("""
-                SELECT 1
-                FROM cash_moves
-                WHERE sale_id=?
-                LIMIT 1
-            """, (sale_id,))
-
-            if not cursor.fetchone():
-                cursor.execute("""
-                    INSERT INTO cash_moves(
-                        move_date,
-                        direction,
-                        amount_uzs,
-                        note,
-                        sale_id
+                sale_id = tx.execute("""
+                    INSERT INTO sales(
+                        sale_date,
+                        agent_id,
+                        total_sell_uzs,
+                        total_cost_uzs,
+                        total_profit_uzs
                     )
                     VALUES(?,?,?,?,?)
                 """, (
                     sale_date,
-                    "IN",
+                    session.get("user_id"),
+                    0,
+                    0,
+                    0,
+                )).lastrowid
+
+                total_sell = 0.0
+                total_cost = 0.0
+                total_profit = 0.0
+
+                for product_id, item in (
+                    cart["items"].items()
+                ):
+                    pid = int(product_id)
+                    qty = float(item["qty"])
+                    price = float(item["price"])
+
+                    if qty <= 0 or price <= 0:
+                        raise ValueError(
+                            "Savatda noto‘g‘ri qiymat bor"
+                        )
+
+                    available = product_qty(pid)
+
+                    if available + 1e-9 < qty:
+                        raise ValueError(
+                            "Qoldiq yetarli emas: "
+                            f"{item['name']} "
+                            f"(Bor: {available:.2f})"
+                        )
+
+                    sell_total = qty * price
+                    unit_cost = product_avg_cost(pid)
+                    cost_total = qty * unit_cost
+                    profit = sell_total - cost_total
+
+                    total_sell += sell_total
+                    total_cost += cost_total
+                    total_profit += profit
+
+                    sale_item_id = tx.execute("""
+                        INSERT INTO sale_items(
+                            sale_id,
+                            product_id,
+                            qty,
+                            sell_price_uzs,
+                            sell_total_uzs,
+                            cost_total_uzs,
+                            profit_uzs
+                        )
+                        VALUES(?,?,?,?,?,?,?)
+                    """, (
+                        sale_id,
+                        pid,
+                        qty,
+                        price,
+                        sell_total,
+                        cost_total,
+                        profit,
+                    )).lastrowid
+
+                    tx.execute("""
+                        INSERT INTO inventory_moves(
+                            move_date,
+                            move_type,
+                            product_id,
+                            qty,
+                            unit_cost_uzs,
+                            note,
+                            source_type,
+                            source_id
+                        )
+                        VALUES(?,?,?,?,?,?,?,?)
+                    """, (
+                        sale_date,
+                        "OUT",
+                        pid,
+                        qty,
+                        unit_cost,
+                        f"Sotuv #{sale_id}",
+                        "sale_item",
+                        sale_item_id,
+                    ))
+
+                    tx.execute("""
+                        UPDATE products
+                        SET stock_qty=
+                            COALESCE(stock_qty, 0) - ?
+                        WHERE id=?
+                    """, (
+                        qty,
+                        pid,
+                    ))
+
+                tx.execute("""
+                    UPDATE sales
+                    SET
+                        total_sell_uzs=?,
+                        total_cost_uzs=?,
+                        total_profit_uzs=?
+                    WHERE id=?
+                """, (
                     total_sell,
-                    f"Auto sale #{sale_id}",
+                    total_cost,
+                    total_profit,
                     sale_id,
                 ))
 
-            db.commit()
+                ensure_sale_cash_move(
+                    tx,
+                    sale_id=sale_id,
+                    move_date=sale_date,
+                    amount_uzs=total_sell,
+                    note=f"Auto sale #{sale_id}",
+                )
 
             session["cart"] = {"items": {}}
 
@@ -557,7 +539,6 @@ def register_sales_routes(
             )
 
         except Exception as exc:
-            db.rollback()
             flash(str(exc), "danger")
 
         return redirect(url_for("sales"))

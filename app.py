@@ -168,90 +168,6 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "GOLD9999_CHANGE_ME_2026
 # ---------------- DB helpers ----------------
 
 
-def _ensure_cash_move_for_sale(conn, sale_id: int):
-    """
-    Sotuv yakunlanganda cash_moves ga avtomatik IN yozish (dublikat yo‘q).
-    cash_moves.sale_id unique bo‘lgani uchun bir sotuv uchun 1 marta yoziladi.
-    """
-    try:
-        cur = conn.cursor()
-
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cash_moves'")
-        if not cur.fetchone():
-            return
-
-        # dublikat tekshiruv
-        try:
-            cur.execute("SELECT 1 FROM cash_moves WHERE sale_id=? LIMIT 1", (sale_id,))
-            if cur.fetchone():
-                return
-        except Exception:
-            return
-
-        # sales jadvalidan summani topamiz
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sales'")
-        if not cur.fetchone():
-            return
-
-        sales_cols = [r[1] for r in cur.execute("PRAGMA table_info(sales)").fetchall()]
-        amount_col = None
-        for cand in ["total_sell_uzs","total_uzs","jami_uzs","total","jami","sum_uzs","summa_uzs","amount_uzs","amount"]:
-            if cand in sales_cols:
-                amount_col = cand
-                break
-        if not amount_col:
-            return
-
-        row = cur.execute(f"SELECT {amount_col} FROM sales WHERE id=?", (sale_id,)).fetchone()
-        if not row:
-            return
-
-        try:
-            amount = float(row[0] or 0)
-        except Exception:
-            amount = 0.0
-        if amount <= 0:
-            return
-
-        try:
-            from datetime import date
-            move_date = date.today().isoformat()
-        except Exception:
-            move_date = None
-
-        cash_cols = [r[1] for r in cur.execute("PRAGMA table_info(cash_moves)").fetchall()]
-        has_move_date = "move_date" in cash_cols
-        has_sale_id = "sale_id" in cash_cols
-        note = f"Auto sale #{sale_id}"
-
-        if has_move_date and has_sale_id:
-            cur.execute(
-                "INSERT INTO cash_moves(move_date, direction, amount_uzs, note, sale_id) VALUES (?,?,?,?,?)",
-                (move_date, "IN", amount, note, sale_id)
-            )
-        elif has_move_date:
-            cur.execute(
-                "INSERT INTO cash_moves(move_date, direction, amount_uzs, note) VALUES (?,?,?,?)",
-                (move_date, "IN", amount, note)
-            )
-        elif has_sale_id:
-            cur.execute(
-                "INSERT INTO cash_moves(direction, amount_uzs, note, sale_id) VALUES (?,?,?,?)",
-                ("IN", amount, note, sale_id)
-            )
-        else:
-            cur.execute(
-                "INSERT INTO cash_moves(direction, amount_uzs, note) VALUES (?,?,?)",
-                ("IN", amount, note)
-            )
-
-        conn.commit()
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        return
 def get_db() -> sqlite3.Connection:
     return _db_get_db()
 
@@ -311,21 +227,6 @@ def product_avg_cost(product_id: int) -> float:
 
 
 # === END CART HELPERS ===
-
-
-
-
-def cash_in(conn, amount_uzs, note=""):
-    try:
-        a = float(amount_uzs or 0)
-    except Exception:
-        a = 0.0
-    if a == 0:
-        return
-    conn.execute(
-        "INSERT INTO cash_moves(direction, amount_uzs, note) VALUES (?,?,?)",
-        ("IN", a, note or "")
-    )
 
 
 
