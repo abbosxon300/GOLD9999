@@ -82,6 +82,14 @@ try:
     from routes.sales import register_sales_routes
 except Exception:
     register_sales_routes = None
+try:
+    from routes.offline_api import (
+        register_offline_api_routes,
+    )
+except Exception:
+    register_offline_api_routes = None
+
+
 # --- /routes registration ---
 DB_PATH = os.path.join(BASE_DIR, "data.db")
 configure_db(DB_PATH)
@@ -163,6 +171,7 @@ def init_db() -> None:
 register_sales_history(app)
 app.add_template_filter(fmt0_filter, "fmt0")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "GOLD9999_CHANGE_ME_2026")
+app.config["OFFLINE_SYNC_TOKEN"] = os.environ.get("OFFLINE_SYNC_TOKEN", "")
 
 
 # ---------------- DB helpers ----------------
@@ -401,6 +410,12 @@ if register_sales_routes:
 # /Kassa: Edit / Delete
 # =========================
 
+
+if register_offline_api_routes is not None:
+    register_offline_api_routes(
+        app,
+        get_db=get_db,
+    )
 
 # Auto DB init on import (init sahifa yo'q, methods=["GET", "POST"])
 with app.app_context():

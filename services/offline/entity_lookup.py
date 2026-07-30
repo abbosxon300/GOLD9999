@@ -10,6 +10,7 @@ ENTITY_TABLES = {
     "product": "products",
     "inventory_move": "inventory_moves",
     "sale": "sales",
+    "sales_aggregate": "sales",
     "cash_move": "cash_moves",
 }
 
