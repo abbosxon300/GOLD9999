@@ -1,3 +1,4 @@
+from services.offline.api import SyncApi
 from services.offline.cursor import (
     SyncCursorState,
     SyncCursorStore,
@@ -30,6 +31,8 @@ from services.offline.log import (
     SyncLogStore,
 )
 from services.offline.models import (
+    PullBatch,
+    RemoteChange,
     SyncConflict,
     SyncRecord,
     SyncResult,
@@ -68,6 +71,9 @@ from services.offline.status import (
 
 __all__ = [
     "ConnectionStatus",
+    "PullBatch",
+    "RemoteChange",
+    "SyncApi",
     "SyncCursorState",
     "SyncCursorStore",
     "SQLiteSyncCursorStore",

@@ -27,9 +27,37 @@ class SyncResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RemoteChange:
+    entity_type: str
+    entity_uuid: str
+    operation: str
+    payload: Mapping[str, Any]
+    version: int
+    device_uuid: str
+    occurred_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PullBatch:
+    changes: tuple[RemoteChange, ...]
+    next_cursor: str | None
+    batch_id: str
+    has_more: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SyncConflict:
     entity_type: str
     entity_uuid: str
     local_payload: Mapping[str, Any]
     remote_payload: Mapping[str, Any]
     detected_at: datetime
+
+
+__all__ = [
+    "PullBatch",
+    "RemoteChange",
+    "SyncConflict",
+    "SyncRecord",
+    "SyncResult",
+]
