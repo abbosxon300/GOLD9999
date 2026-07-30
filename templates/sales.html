@@ -1,106 +1,418 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="page-head">
-  <h1>Sotuv</h1>
-  <a class="kpi-pill" href="/sales/history">Mening sotuvlarim</a>
+<div class="sales-premium-page">
 
-  <div class="kpi-bar">
-    <div class="kpi-pill">Bugun: <b>{{ today }}</b></div>
-    <div class="kpi-pill">Sotuv: <b>{{ "{:,}".format(sum_sell or 0).replace(",", " ") }}</b></div>
-    {% if session.get("role") == "admin" %}
-    <div class="kpi-pill">Tannarx: <b>{{ "{:,}".format(sum_cost or 0).replace(",", " ") }}</b></div>
-    <div class="kpi-pill">Foyda: <b>{{ "{:,}".format(sum_profit or 0).replace(",", " ") }}</b></div>
-    {% endif %}
-  </div>
-</div>
+  <header class="sales-premium-hero">
+    <div class="sales-premium-heading">
+      <div>
+        <span class="sales-premium-eyebrow">Savdo boshqaruvi</span>
+        <h1>Sotuv</h1>
+        <p>Mahsulotlarni tanlang, savatni boshqaring va sotuvni yakunlang.</p>
+      </div>
 
-  <div class="card">
-    <div class="kpi-bar cat-bar">
-      {% for c in cats %}
-        <a class="kpi-pill cat-pill {% if c.id==selected_cat_id %}active{% endif %}" href="{{ url_for('sales', category_id=c.id) }}">{{ c.name }}</a>
-      {% endfor %}
+      <a class="sales-history-link" href="/sales/history">
+        <span class="sales-history-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+        </span>
+        <span>
+          <small>Tarix</small>
+          <strong>Mening sotuvlarim</strong>
+        </span>
+      </a>
     </div>
-  </div>
 
-
-<div class="grid-2">
-  <div class="card">
-    <div class="card-title">Mahsulotlar</div>
-
-    <div class="prod-grid">
-      {% for p in products %}
-        {% set icon = 'brand/tshirt.svg' %}
-        {% if 'shim' in p.name|lower %}{% set icon = 'brand/pants.svg' %}{% endif %}
-        {% if 'kepka' in p.name|lower %}{% set icon = 'brand/cap.svg' %}{% endif %}
-
-        <div class="prod-card">
-          <div class="prod-left">
-            <img class="prod-ico" src="{{ url_for('static', filename=icon) }}" alt="">
-            <div class="prod-meta">
-              <div class="prod-name">{{ p.name }}</div>
-              <div class="prod-sub">ID: {{ p.id }} · Qoldiq: {{ (p.qty or 0)|int }} · Default: {{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}</div>
-            </div>
-          </div>
-
-          <form class="prod-add" method="post" action="{{ url_for('sales_add') }}">
-            <input type="hidden" name="category_id" value="{{ selected_cat_id }}">
-            <input type="hidden" name="product_id" value="{{ p.id }}">
-
-            <input class="in qty" name="qty" inputmode="numeric" placeholder="qty" required>
-            <input class="in price" name="price_uzs" inputmode="numeric" value="{{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}" required>
-
-            <button class="btn plus" type="submit">+</button>
-          </form>
+    <div class="sales-summary-grid">
+      <article class="sales-summary-card">
+        <div class="sales-summary-icon is-date" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3v3M17 3v3M4 9h16" />
+            <rect x="4" y="5" width="16" height="16" rx="3" />
+          </svg>
         </div>
+        <div>
+          <span>Bugungi sana</span>
+          <strong>{{ today }}</strong>
+        </div>
+      </article>
+
+      <article class="sales-summary-card">
+        <div class="sales-summary-icon is-sales" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h16v11H4z" />
+            <path d="M8 11h8M8 15h4" />
+            <path d="M7 4h10" />
+          </svg>
+        </div>
+        <div>
+          <span>Bugungi sotuv</span>
+          <strong>{{ "{:,}".format(sum_sell or 0).replace(",", " ") }} so‘m</strong>
+        </div>
+      </article>
+
+      {% if session.get("role") == "admin" %}
+      <article class="sales-summary-card">
+        <div class="sales-summary-icon is-cost" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="m12 3 8 4-8 4-8-4 8-4Z" />
+            <path d="m4 12 8 4 8-4" />
+            <path d="m4 17 8 4 8-4" />
+          </svg>
+        </div>
+        <div>
+          <span>Tannarx</span>
+          <strong>{{ "{:,}".format(sum_cost or 0).replace(",", " ") }} so‘m</strong>
+        </div>
+      </article>
+
+      <article class="sales-summary-card">
+        <div class="sales-summary-icon is-profit" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 19V9M10 19V5M16 19v-7M22 19V3" />
+            <path d="m3 8 6-4 6 5 7-6" />
+          </svg>
+        </div>
+        <div>
+          <span>Foyda</span>
+          <strong>{{ "{:,}".format(sum_profit or 0).replace(",", " ") }} so‘m</strong>
+        </div>
+      </article>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="sales-catalog-toolbar">
+    <div class="sales-category-list" aria-label="Mahsulot kategoriyalari">
+      {% for c in cats %}
+        <a
+          class="sales-category-chip {% if c.id == selected_cat_id %}is-active{% endif %}"
+          href="{{ url_for('sales', category_id=c.id) }}"
+        >
+          {{ c.name }}
+        </a>
       {% endfor %}
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-head">
-      <div class="card-title">Savat</div>
-      <div class="badge">Jami: {{ "{:,}".format(cart_total or 0).replace(",", " ") }} so‘m</div>
-    </div>
+    <label class="sales-search">
+      <span aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m16 16 5 5" />
+        </svg>
+      </span>
+      <input
+        id="sales-product-search"
+        type="search"
+        placeholder="Mahsulot qidirish..."
+        autocomplete="off"
+      >
+    </label>
+  </section>
 
-    {% if cart_items %}
-      <div class="cart-list">
-        {% for it in cart_items %}
-          <div class="cart-row">
-            <div class="cart-name">{{ it.product_name or it.name }}</div>
-            <div class="cart-meta">
-              <span>Qty: <b>{{ it.qty|int }}</b></span>
-              <span>Narx: <b>{{ "{:,}".format((it.price_uzs if it.price_uzs is defined else it.price) or 0).replace(",", " ") }}</b></span>
-              <span>Jami: <b>{{ "{:,}".format(it.line_total or 0).replace(",", " ") }}</b></span>
+  <div class="sales-workspace">
+
+    <section class="sales-products-panel">
+      <div class="sales-section-head">
+        <div>
+          <span class="sales-section-eyebrow">Katalog</span>
+          <h2>Mahsulotlar</h2>
+        </div>
+        <span class="sales-product-count">{{ products|length }} ta mahsulot</span>
+      </div>
+
+      {% if products %}
+      <div class="sales-product-grid" id="sales-product-grid">
+        {% for p in products %}
+        <article
+          class="sales-product-card"
+          data-product-name="{{ p.name|lower }}"
+        >
+          <div class="sales-product-top">
+            <div class="sales-product-avatar" aria-hidden="true">
+              {{ p.name[:2]|upper }}
             </div>
 
-            <div class="cart-actions">
-              <form method="post" action="{{ url_for('sales', product_id=it.product_id, action='dec') }}">
-                <button class="btn sm" type="submit">−</button>
-              </form>
-              <form method="post" action="{{ url_for('sales', product_id=it.product_id, action='inc') }}">
-                <button class="btn sm" type="submit">+</button>
-              </form>
-              <form method="post" action="{{ url_for('sales_remove', product_id=it.product_id) }}">
-                <button class="btn sm danger" type="submit">x</button>
-              </form>
+            <div class="sales-product-identity">
+              <span class="sales-product-id">ID: {{ p.id }}</span>
+              <h3>{{ p.name }}</h3>
             </div>
+
+            {% set stock_qty = (p.qty or 0)|int %}
+            <span class="
+              sales-stock-badge
+              {% if stock_qty <= 0 %}
+                is-out
+              {% elif stock_qty <= 5 %}
+                is-low
+              {% else %}
+                is-ready
+              {% endif %}
+            ">
+              {% if stock_qty <= 0 %}
+                Tugagan
+              {% else %}
+                {{ stock_qty }} dona
+              {% endif %}
+            </span>
           </div>
+
+          <div class="sales-product-price">
+            <span>Standart narx</span>
+            <strong>
+              {{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}
+              <small>so‘m</small>
+            </strong>
+          </div>
+
+          <form
+            class="sales-product-form"
+            method="post"
+            action="{{ url_for('sales_add') }}"
+          >
+            <input
+              type="hidden"
+              name="category_id"
+              value="{{ selected_cat_id }}"
+            >
+            <input
+              type="hidden"
+              name="product_id"
+              value="{{ p.id }}"
+            >
+
+            <div class="sales-form-fields">
+              <label class="sales-field">
+                <span>Miqdor</span>
+                <input
+                  class="sales-input sales-qty-input"
+                  name="qty"
+                  type="number"
+                  inputmode="decimal"
+                  min="0.01"
+                  step="any"
+                  value="1"
+                  required
+                >
+              </label>
+
+              <label class="sales-field">
+                <span>Sotuv narxi</span>
+                <div class="sales-money-input">
+                  <input
+                    class="sales-input sales-price-input"
+                    name="price_uzs"
+                    inputmode="numeric"
+                    value="{{ "{:,}".format(p.sell_default or 0).replace(",", " ") }}"
+                    required
+                  >
+                  <small>so‘m</small>
+                </div>
+              </label>
+            </div>
+
+            <button
+              class="sales-add-button"
+              type="submit"
+              {% if stock_qty <= 0 %}disabled{% endif %}
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="9" cy="20" r="1.5" />
+                <circle cx="18" cy="20" r="1.5" />
+                <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.6L21 8H7" />
+              </svg>
+              {% if stock_qty <= 0 %}
+                Qoldiq yo‘q
+              {% else %}
+                Savatga qo‘shish
+              {% endif %}
+            </button>
+          </form>
+        </article>
         {% endfor %}
       </div>
 
-      <div class="cart-footer">
+      <div class="sales-search-empty" id="sales-search-empty" hidden>
+        <span>Qidiruv bo‘yicha mahsulot topilmadi.</span>
+      </div>
+      {% else %}
+      <div class="sales-empty-state">
+        <div class="sales-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="m12 3 8 4-8 4-8-4 8-4Z" />
+            <path d="M4 7v10l8 4 8-4V7" />
+          </svg>
+        </div>
+        <h3>Mahsulot mavjud emas</h3>
+        <p>Tanlangan kategoriyada faol mahsulot topilmadi.</p>
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="sales-cart-panel">
+      <div class="sales-cart-head">
+        <div>
+          <span class="sales-section-eyebrow">Buyurtma</span>
+          <h2>Savat</h2>
+        </div>
+
+        <span class="sales-cart-count">
+          {{ cart_items|length }} ta
+        </span>
+      </div>
+
+      {% if cart_items %}
+      <div class="sales-cart-list">
+        {% for it in cart_items %}
+        <article class="sales-cart-item">
+          <div class="sales-cart-avatar" aria-hidden="true">
+            {{ (it.product_name or it.name)[:2]|upper }}
+          </div>
+
+          <div class="sales-cart-content">
+            <div class="sales-cart-title-row">
+              <h3>{{ it.product_name or it.name }}</h3>
+
+              <form
+                method="post"
+                action="{{ url_for('sales_remove', product_id=it.product_id) }}"
+              >
+                <button
+                  class="sales-cart-remove"
+                  type="submit"
+                  aria-label="Savatdan o‘chirish"
+                  title="O‘chirish"
+                >
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M4 7h16M9 7V4h6v3M8 11v6M12 11v6M16 11v6" />
+                    <path d="m6 7 1 14h10l1-14" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+
+            <div class="sales-cart-price">
+              {{ "{:,}".format((it.price_uzs if it.price_uzs is defined else it.price) or 0).replace(",", " ") }}
+              so‘m
+            </div>
+
+            <div class="sales-cart-bottom">
+              <div class="sales-qty-control">
+                <form
+                  method="post"
+                  action="{{ url_for('sales', product_id=it.product_id, action='dec') }}"
+                >
+                  <button type="submit" aria-label="Miqdorni kamaytirish">−</button>
+                </form>
+
+                <strong>{{ it.qty|int }}</strong>
+
+                <form
+                  method="post"
+                  action="{{ url_for('sales', product_id=it.product_id, action='inc') }}"
+                >
+                  <button type="submit" aria-label="Miqdorni oshirish">+</button>
+                </form>
+              </div>
+
+              <div class="sales-cart-line-total">
+                <span>Jami</span>
+                <strong>
+                  {{ "{:,}".format(it.line_total or 0).replace(",", " ") }}
+                  so‘m
+                </strong>
+              </div>
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="sales-cart-checkout">
+        <div class="sales-cart-total-row">
+          <span>Umumiy summa</span>
+          <strong>
+            {{ "{:,}".format(cart_total or 0).replace(",", " ") }}
+            <small>so‘m</small>
+          </strong>
+        </div>
+
         <form method="post" action="{{ url_for('sales_checkout') }}">
-          <button class="btn primary" type="submit">Yakunlash</button>
-        </form>
-        <form method="post" action="{{ url_for('cart_clear') if false else url_for('sales') }}">
-          <!-- agar sizda cart_clear route bo'lmasa, bu tugma ko'rinmaydi -->
+          <button class="sales-checkout-button" type="submit">
+            <span>Yakunlash</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
         </form>
       </div>
-    {% else %}
-      <div class="muted">Savat bo‘sh.</div>
-    {% endif %}
+      {% else %}
+      <div class="sales-cart-empty">
+        <div class="sales-cart-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="9" cy="20" r="1.5" />
+            <circle cx="18" cy="20" r="1.5" />
+            <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.6L21 8H7" />
+          </svg>
+        </div>
+        <h3>Savat bo‘sh</h3>
+        <p>Mahsulot tanlang va savatga qo‘shing.</p>
+      </div>
+
+      <div class="sales-cart-empty-total">
+        <span>Umumiy summa</span>
+        <strong>0 <small>so‘m</small></strong>
+      </div>
+      {% endif %}
+    </aside>
+
   </div>
 </div>
+
+<script>
+(() => {
+  const searchInput = document.getElementById("sales-product-search");
+  const cards = Array.from(
+    document.querySelectorAll(".sales-product-card")
+  );
+  const emptyState = document.getElementById("sales-search-empty");
+
+  if (searchInput && cards.length) {
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.trim().toLocaleLowerCase("uz");
+
+      let visibleCount = 0;
+
+      cards.forEach((card) => {
+        const name = card.dataset.productName || "";
+        const visible = !query || name.includes(query);
+
+        card.hidden = !visible;
+
+        if (visible) {
+          visibleCount += 1;
+        }
+      });
+
+      if (emptyState) {
+        emptyState.hidden = visibleCount !== 0;
+      }
+    });
+  }
+
+  document.querySelectorAll(".sales-price-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      const digits = input.value.replace(/\D/g, "");
+
+      input.value = digits
+        ? Number(digits).toLocaleString("ru-RU")
+        : "";
+    });
+  });
+})();
+</script>
 
 {% endblock %}
