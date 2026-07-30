@@ -1,3 +1,7 @@
+from services.offline.cursor import (
+    SyncCursorState,
+    SyncCursorStore,
+)
 from services.offline.conflict import (
     CONFLICT_RESOLUTION_MANUAL,
     CONFLICT_RESOLUTION_USE_LOCAL,
@@ -45,6 +49,9 @@ from services.offline.sqlite_conflict import (
     SQLiteSyncConflictStore,
     new_conflict_uuid,
 )
+from services.offline.sqlite_cursor import (
+    SQLiteSyncCursorStore,
+)
 from services.offline.sqlite_log import (
     SQLiteSyncLog,
     new_log_uuid,
@@ -61,6 +68,9 @@ from services.offline.status import (
 
 __all__ = [
     "ConnectionStatus",
+    "SyncCursorState",
+    "SyncCursorStore",
+    "SQLiteSyncCursorStore",
     "DIRECTION_PULL",
     "DIRECTION_PUSH",
     "OPERATION_CREATE",

@@ -3,17 +3,19 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 
-OFFLINE_SYNC_SCHEMA_VERSION = 1
+OFFLINE_SYNC_SCHEMA_VERSION = 2
 
 SYNC_QUEUE_TABLE = "sync_queue"
 SYNC_LOG_TABLE = "sync_log"
 SYNC_CONFLICTS_TABLE = "sync_conflicts"
+SYNC_CURSOR_TABLE = "sync_cursor"
 
 OFFLINE_SYNC_TABLES = frozenset(
     {
         SYNC_QUEUE_TABLE,
         SYNC_LOG_TABLE,
         SYNC_CONFLICTS_TABLE,
+        SYNC_CURSOR_TABLE,
     }
 )
 
@@ -238,6 +240,19 @@ def ensure_offline_sync_schema(
 
     con.execute(
         """
+        CREATE TABLE IF NOT EXISTS sync_cursor (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scope TEXT NOT NULL UNIQUE,
+            cursor_value TEXT,
+            last_batch_id TEXT,
+            last_pulled_at TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    con.execute(
+        """
         CREATE TABLE IF NOT EXISTS sync_conflicts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             conflict_uuid TEXT NOT NULL UNIQUE,
@@ -349,6 +364,19 @@ def validate_offline_sync_schema(
             "started_at",
             "finished_at",
             "created_at",
+        },
+    )
+
+    _assert_columns(
+        con,
+        SYNC_CURSOR_TABLE,
+        {
+            "id",
+            "scope",
+            "cursor_value",
+            "last_batch_id",
+            "last_pulled_at",
+            "updated_at",
         },
     )
 
