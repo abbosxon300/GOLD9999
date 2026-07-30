@@ -1,4 +1,6 @@
 from datetime import date
+import uuid
+
 from services.business_writes import (
     business_transaction,
     consume_stock,
@@ -487,9 +489,11 @@ def register_sales_routes(
                             sell_price_uzs,
                             sell_total_uzs,
                             cost_total_uzs,
-                            profit_uzs
+                            profit_uzs,
+                            entity_uuid,
+                            sync_version
                         )
-                        VALUES(?,?,?,?,?,?,?)
+                        VALUES(?,?,?,?,?,?,?,?,?)
                         """,
                         (
                             sale_id,
@@ -499,6 +503,8 @@ def register_sales_routes(
                             sell_total,
                             cost_total,
                             profit,
+                            str(uuid.uuid4()),
+                            1,
                         ),
                     ).lastrowid
 
