@@ -42,6 +42,13 @@ class SyncQueue(Protocol):
     ) -> None:
         """Yozuvni xatolik holatiga o‘tkazadi."""
 
+    def mark_conflict(
+        self,
+        entity_uuid: str,
+        error_message: str,
+    ) -> None:
+        """Yozuvni conflict holatiga o‘tkazadi."""
+
     def count_by_status(
         self,
         status: str,

@@ -30,6 +30,7 @@ from services.offline.models import (
     SyncRecord,
     SyncResult,
 )
+from services.offline.queue import SyncQueue
 from services.offline.schema import (
     OFFLINE_SYNC_SCHEMA_VERSION,
     OFFLINE_SYNC_TABLES,
@@ -94,6 +95,7 @@ __all__ = [
     "CONFLICT_RESOLUTION_MANUAL",
     "SyncConflict",
     "SyncEngine",
+    "SyncQueue",
     "SyncRecord",
     "SyncResult",
     "deserialize_payload",

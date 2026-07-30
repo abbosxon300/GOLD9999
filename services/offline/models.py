@@ -21,6 +21,9 @@ class SyncResult:
     status: str
     message: str
     remote_version: int | None = None
+    remote_payload: Mapping[str, Any] | None = None
+    remote_device_uuid: str | None = None
+    local_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

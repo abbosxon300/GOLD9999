@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from services.offline.constants import (
+    SYNC_STATUS_CONFLICT,
     SYNC_STATUS_FAILED,
     SYNC_STATUS_PENDING,
     SYNC_STATUS_SYNCED,
@@ -438,6 +439,69 @@ class SQLiteSyncQueue:
                 """,
                 (
                     SYNC_STATUS_FAILED,
+                    normalized_error,
+                    now,
+                    normalized_uuid,
+                    SYNC_STATUS_SYNCED,
+                ),
+            )
+
+            if cursor.rowcount == 0:
+                existing = con.execute(
+                    """
+                    SELECT status
+                    FROM sync_queue
+                    WHERE entity_uuid=?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (normalized_uuid,),
+                ).fetchone()
+
+                if existing is None:
+                    raise LookupError(
+                        "Sync queue yozuvi topilmadi: "
+                        f"{normalized_uuid}"
+                    )
+
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
+
+    def mark_conflict(
+        self,
+        entity_uuid: str,
+        error_message: str,
+    ) -> None:
+        normalized_uuid = _normalize_required_text(
+            entity_uuid,
+            field_name="entity_uuid",
+        )
+        normalized_error = _normalize_required_text(
+            error_message,
+            field_name="error_message",
+        )
+
+        now = utc_now_iso()
+        con = self._connection_factory()
+
+        try:
+            cursor = con.execute(
+                """
+                UPDATE sync_queue
+                SET
+                    status=?,
+                    last_error=?,
+                    next_attempt_at=NULL,
+                    updated_at=?
+                WHERE entity_uuid=?
+                  AND status<>?
+                """,
+                (
+                    SYNC_STATUS_CONFLICT,
                     normalized_error,
                     now,
                     normalized_uuid,
