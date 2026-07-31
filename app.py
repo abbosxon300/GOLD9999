@@ -88,6 +88,12 @@ try:
     )
 except Exception:
     register_offline_api_routes = None
+try:
+    from routes.offline_status import (
+        register_offline_status_routes,
+    )
+except Exception:
+    register_offline_status_routes = None
 
 
 # --- /routes registration ---
@@ -415,6 +421,12 @@ if register_offline_api_routes is not None:
     register_offline_api_routes(
         app,
         get_db=get_db,
+    )
+
+if register_offline_status_routes is not None:
+    register_offline_status_routes(
+        app,
+        login_required=login_required,
     )
 
 # Auto DB init on import (init sahifa yo'q, methods=["GET", "POST"])

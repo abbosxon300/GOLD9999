@@ -1036,3 +1036,161 @@ body.dark-mode .app-content td {
     padding-inline: 12px;
   }
 }
+
+/* Sidebar live connection status */
+.sidebar-brand-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.sidebar-brand-mark {
+  transition:
+    background-color .2s ease,
+    border-color .2s ease,
+    color .2s ease,
+    box-shadow .2s ease,
+    transform .2s ease;
+}
+
+.sidebar-brand-status:hover .sidebar-brand-mark {
+  transform: scale(1.06);
+}
+
+.sidebar-brand-mark--online {
+  color: #fff;
+  border-color: rgba(34, 197, 94, .58);
+  background: #16a34a;
+  box-shadow:
+    0 0 0 4px rgba(34, 197, 94, .14),
+    0 10px 28px rgba(0, 0, 0, .20);
+}
+
+.sidebar-brand-mark--syncing {
+  color: #fff;
+  border-color: rgba(250, 204, 21, .62);
+  background: #eab308;
+  box-shadow:
+    0 0 0 4px rgba(234, 179, 8, .16),
+    0 10px 28px rgba(0, 0, 0, .20);
+  animation:
+    sidebar-sync-pulse 1.4s ease-in-out infinite;
+}
+
+.sidebar-brand-mark--offline {
+  color: #fff;
+  border-color: rgba(248, 113, 113, .64);
+  background: #dc2626;
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, .15),
+    0 10px 28px rgba(0, 0, 0, .20);
+}
+
+.sidebar-brand-mark--unknown {
+  color: #fff;
+  border-color: rgba(148, 163, 184, .50);
+  background: #64748b;
+}
+
+@keyframes sidebar-sync-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(234, 179, 8, .14),
+      0 10px 28px rgba(0, 0, 0, .20);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(234, 179, 8, .04),
+      0 10px 28px rgba(0, 0, 0, .20);
+  }
+}
+
+/* Offline status page */
+.offline-status-card {
+  display: grid;
+  gap: 24px;
+}
+
+.offline-status-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.offline-status-main h2,
+.offline-status-main p {
+  margin: 0;
+}
+
+.offline-page-diamond {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #fff;
+}
+
+.offline-page-diamond svg {
+  width: 29px;
+  height: 29px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.offline-page-diamond--online {
+  background: #16a34a;
+}
+
+.offline-page-diamond--syncing {
+  background: #eab308;
+}
+
+.offline-page-diamond--offline {
+  background: #dc2626;
+}
+
+.offline-status-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.offline-status-item {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 14px;
+}
+
+.offline-status-item span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.offline-status-item strong {
+  font-size: 24px;
+}
+
+.offline-status-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .offline-status-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}

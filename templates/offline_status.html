@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Ulanish holati</h1>
+    <p>Server va offline sinxronlash diagnostikasi.</p>
+  </div>
+</div>
+
+<section class="card offline-status-card">
+  <div class="offline-status-main">
+    <span
+      class="offline-page-diamond offline-page-diamond--{{ offline_status.indicator }}"
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24">
+        <path d="M3 8.5 7 3h10l4 5.5L12 21 3 8.5Z"/>
+        <path d="M3 8.5h18M7 3l5 18M17 3l-5 18M7 3l5 5.5L17 3"/>
+      </svg>
+    </span>
+
+    <div>
+      <h2>{{ offline_status.label }}</h2>
+      <p>
+        {{ offline_status.message or "Tizim holati tekshirildi." }}
+      </p>
+    </div>
+  </div>
+
+  <div class="offline-status-grid">
+    <div class="offline-status-item">
+      <span>Navbatda</span>
+      <strong>{{ offline_status.pending_count }}</strong>
+    </div>
+
+    <div class="offline-status-item">
+      <span>Sinxronlanmoqda</span>
+      <strong>{{ offline_status.syncing_count }}</strong>
+    </div>
+
+    <div class="offline-status-item">
+      <span>Xatolik</span>
+      <strong>{{ offline_status.failed_count }}</strong>
+    </div>
+
+    <div class="offline-status-item">
+      <span>Konflikt</span>
+      <strong>{{ offline_status.conflict_count }}</strong>
+    </div>
+  </div>
+
+  <div class="offline-status-footer">
+    <span>Oxirgi sinxronlash:</span>
+    <strong>
+      {{ offline_status.last_sync_at or "Hali bajarilmagan" }}
+    </strong>
+  </div>
+</section>
+{% endblock %}

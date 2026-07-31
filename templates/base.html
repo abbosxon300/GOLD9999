@@ -29,12 +29,24 @@
   <aside class="app-sidebar" id="appSidebar">
 
     <div class="sidebar-brand">
-      <span class="sidebar-brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24">
-          <path d="M3 8.5 7 3h10l4 5.5L12 21 3 8.5Z"/>
-          <path d="M3 8.5h18M7 3l5 18M17 3l-5 18M7 3l5 5.5L17 3"/>
-        </svg>
-      </span>
+      <a
+        href="{{ url_for('offline_status_page') }}"
+        class="sidebar-brand-status"
+        id="sidebarConnectionStatus"
+        title="Ulanish holati tekshirilmoqda..."
+        aria-label="Ulanish holati"
+      >
+        <span
+          class="sidebar-brand-mark sidebar-brand-mark--unknown"
+          id="sidebarConnectionDiamond"
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 24 24">
+            <path d="M3 8.5 7 3h10l4 5.5L12 21 3 8.5Z"/>
+            <path d="M3 8.5h18M7 3l5 18M17 3l-5 18M7 3l5 5.5L17 3"/>
+          </svg>
+        </span>
+      </a>
 
       <span class="sidebar-brand-text">Gold 9999</span>
     </div>
@@ -478,6 +490,124 @@
       }
     } catch (error) {}
   }
+})();
+</script>
+
+
+<script>
+(function () {
+  const statusLink = document.getElementById(
+    "sidebarConnectionStatus"
+  );
+  const diamond = document.getElementById(
+    "sidebarConnectionDiamond"
+  );
+
+  if (!statusLink || !diamond) {
+    return;
+  }
+
+  const stateClasses = [
+    "sidebar-brand-mark--online",
+    "sidebar-brand-mark--syncing",
+    "sidebar-brand-mark--offline",
+    "sidebar-brand-mark--unknown"
+  ];
+
+  function applyStatus(data) {
+    stateClasses.forEach(function (className) {
+      diamond.classList.remove(className);
+    });
+
+    const allowedStates = [
+      "online",
+      "syncing",
+      "offline"
+    ];
+
+    const state = allowedStates.includes(data.indicator)
+      ? data.indicator
+      : "unknown";
+
+    diamond.classList.add(
+      "sidebar-brand-mark--" + state
+    );
+
+    const details = [
+      data.label || "Noma’lum",
+      data.message || "",
+      "Navbat: " + (data.pending_count || 0),
+      "Sinxronlash: " + (data.syncing_count || 0),
+      "Xatolik: " + (data.failed_count || 0),
+      "Konflikt: " + (data.conflict_count || 0),
+      "Oxirgi sync: "
+        + (data.last_sync_at || "hali yo‘q")
+    ];
+
+    statusLink.title = details
+      .filter(Boolean)
+      .join("\n");
+
+    statusLink.setAttribute(
+      "aria-label",
+      "Ulanish holati: "
+        + (data.label || "noma’lum")
+    );
+  }
+
+  async function refreshStatus() {
+    try {
+      const response = await fetch(
+        "{{ url_for('offline_status_api') }}",
+        {
+          method: "GET",
+          headers: {
+            "Accept": "application/json"
+          },
+          credentials: "same-origin",
+          cache: "no-store"
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Status HTTP " + response.status
+        );
+      }
+
+      const data = await response.json();
+      applyStatus(data);
+    } catch (error) {
+      applyStatus({
+        indicator: "offline",
+        label: "Server bilan aloqa yo‘q",
+        message: "Ulanish tekshiruvi muvaffaqiyatsiz."
+      });
+    }
+  }
+
+  refreshStatus();
+
+  window.setInterval(
+    refreshStatus,
+    15000
+  );
+
+  window.addEventListener(
+    "online",
+    refreshStatus
+  );
+
+  window.addEventListener(
+    "offline",
+    function () {
+      applyStatus({
+        indicator: "offline",
+        label: "Internet mavjud emas",
+        message: "Qurilma offline holatida."
+      });
+    }
+  );
 })();
 </script>
 
