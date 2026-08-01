@@ -13,6 +13,11 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from flask import Flask, g, render_template, request, redirect, url_for, flash, session, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
+from services.runtime_paths import (
+    backup_directory,
+    database_path,
+    ensure_runtime_directories,
+)
 from services.db import (
     close_db as _db_close_db,
     configure_db,
@@ -97,18 +102,19 @@ except Exception:
 
 
 # --- /routes registration ---
-DB_PATH = os.path.join(BASE_DIR, "data.db")
+ensure_runtime_directories()
+
+DB_PATH = str(database_path())
 configure_db(DB_PATH)
 
-BACKUP_DIR = os.path.join(BASE_DIR, "backups")
+BACKUP_DIR = str(backup_directory())
 
 
 # === DASHBOARD HELPERS ===
 import os, sqlite3
 
 def _db_path():
-    # project folderda data.db bor
-    return os.path.join(os.path.dirname(__file__), "data.db")
+    return DB_PATH
 
 def _tables(conn):
     return [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
@@ -174,7 +180,10 @@ def init_db() -> None:
     _bootstrap_init_db(BACKUP_DIR)
 
 # Register extra routes
-register_sales_history(app)
+register_sales_history(
+    app,
+    db_path=DB_PATH,
+)
 app.add_template_filter(fmt0_filter, "fmt0")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "GOLD9999_CHANGE_ME_2026")
 app.config["OFFLINE_SYNC_TOKEN"] = os.environ.get("OFFLINE_SYNC_TOKEN", "")
@@ -427,6 +436,7 @@ if register_offline_status_routes is not None:
     register_offline_status_routes(
         app,
         login_required=login_required,
+        db_path=DB_PATH,
     )
 
 # Auto DB init on import (init sahifa yo'q, methods=["GET", "POST"])

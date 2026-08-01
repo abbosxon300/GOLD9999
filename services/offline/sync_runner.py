@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Mapping
 
 from services.offline.engine import SyncEngine
+from services.runtime_paths import database_path
 from services.offline.http_api import HttpSyncApi
 from services.offline.schema import (
     ensure_offline_sync_schema,
@@ -33,7 +34,7 @@ ENV_DB_PATH = "OFFLINE_DB_PATH"
 
 
 def _project_db_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "data.db"
+    return database_path()
 
 
 def _required_text(

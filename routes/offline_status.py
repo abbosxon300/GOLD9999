@@ -53,10 +53,10 @@ def register_offline_status_routes(
     app,
     *,
     login_required,
+    db_path: str,
 ):
-    database_path = Path(app.root_path) / "data.db"
     connection_factory = create_connection_factory(
-        database_path
+        Path(db_path)
     )
     status_service = OfflineStatusService(
         connection_factory

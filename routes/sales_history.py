@@ -1,10 +1,13 @@
-import os
 import sqlite3
 from datetime import date, timedelta
 from flask import render_template, request, session, redirect, url_for
 
 
-def register_sales_history(app):
+def register_sales_history(
+    app,
+    *,
+    db_path: str,
+):
 
     @app.route("/sales/history")
     def sales_history():
@@ -17,9 +20,6 @@ def register_sales_history(app):
 
         from_date = (request.args.get("from") or default_from).strip()
         to_date = (request.args.get("to") or default_to).strip()
-
-        base_dir = os.path.dirname(os.path.dirname(__file__))
-        db_path = os.path.join(base_dir, "data.db")
 
         con = sqlite3.connect(db_path)
         cur = con.cursor()
