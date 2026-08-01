@@ -48,6 +48,17 @@ def backup_directory() -> Path:
     return data_directory() / "backups"
 
 
+def installation_state_directory() -> Path:
+    return data_directory() / "var"
+
+
+def installation_uuid_path() -> Path:
+    return (
+        installation_state_directory()
+        / "installation_uuid"
+    )
+
+
 def ensure_runtime_directories() -> None:
     data_directory().mkdir(
         parents=True,
@@ -55,6 +66,11 @@ def ensure_runtime_directories() -> None:
     )
 
     backup_directory().mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    installation_state_directory().mkdir(
         parents=True,
         exist_ok=True,
     )
@@ -67,5 +83,7 @@ __all__ = [
     "data_directory",
     "database_path",
     "ensure_runtime_directories",
+    "installation_state_directory",
+    "installation_uuid_path",
     "project_root",
 ]

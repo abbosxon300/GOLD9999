@@ -62,8 +62,9 @@ def configure_desktop_environment(
         exist_ok=True,
     )
 
-    os.environ["GOLD9999_DATA_DIR"] = str(
-        selected
+    os.environ.setdefault(
+        "GOLD9999_DATA_DIR",
+        str(selected),
     )
 
     os.environ.setdefault(

@@ -2,3 +2,4 @@ Flask
 waitress
 pywebview
 pyinstaller
+openpyxl

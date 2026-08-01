@@ -21,3 +21,8 @@ data.db-journal
 
 # Local device identity
 var/installation_uuid
+# Desktop build artifacts
+build/
+dist/
+*.spec
+!desktop/Gold9999.spec

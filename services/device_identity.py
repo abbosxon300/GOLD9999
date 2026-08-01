@@ -7,6 +7,10 @@ import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from services.runtime_paths import (
+    installation_state_directory,
+    installation_uuid_path,
+)
 from typing import Any
 
 from services.db import get_db
@@ -15,12 +19,10 @@ from services.db import get_db
 APP_METADATA_ROW_ID = 1
 DEFAULT_APP_VERSION = "unknown"
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-INSTALLATION_STATE_DIR = PROJECT_ROOT / "var"
-INSTALLATION_ID_PATH = (
-    INSTALLATION_STATE_DIR
-    / "installation_uuid"
+INSTALLATION_STATE_DIR = (
+    installation_state_directory()
 )
+INSTALLATION_ID_PATH = installation_uuid_path()
 
 
 @dataclass(frozen=True)
