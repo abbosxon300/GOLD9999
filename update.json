@@ -1,6 +1,6 @@
 {
-  "version": "1.0.2",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.2/Gold9999Setup.exe",
-  "sha256": "0d882ccedb43bc804b3ed68bae37e6b585206236c5cae312e7a1be07bcf6f6b3",
-  "release_notes": "Windows auto sync: dastur ochilganda server bilan har 15 soniyada avtomatik push va pull ishlaydi."
+  "version": "1.0.3",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.3/Gold9999Setup.exe",
+  "sha256": "cf34ea07414a23dee9c2ef329f523be2e057be6058aa137f266ee73fc9d31cd7",
+  "release_notes": "Auto update va Windows auto sync tuzatildi."
 }
