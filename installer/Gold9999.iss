@@ -73,7 +73,7 @@ Name: "{autodesktop}\{#MyAppName}"; \
 [Run]
 Filename: "{app}\{#MyAppExeName}"; \
     Description: "Запустить {#MyAppName}"; \
-    Flags: nowait postinstall skipifsilent
+    Flags: nowait runascurrentuser
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

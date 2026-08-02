@@ -462,6 +462,10 @@ def run_desktop(
         text_select=True,
     )
 
+    update_api.set_exit_callback(
+        window.destroy
+    )
+
     attach_python_update_prompt(
         window,
         update_api,

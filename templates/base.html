@@ -871,6 +871,34 @@
         );
 
         progressText.textContent = (
+          "Gold9999 avtomatik yopilmoqda..."
+        );
+
+        if (
+          typeof updateApi.exit_for_update
+          !== "function"
+        ) {
+          throw new Error(
+            "Ilovani avtomatik yopish API topilmadi."
+          );
+        }
+
+        const exitResult = await (
+          updateApi.exit_for_update()
+        );
+
+        if (
+          !exitResult
+          || !exitResult.success
+        ) {
+          throw new Error(
+            exitResult && exitResult.message
+              ? exitResult.message
+              : "Gold9999 avtomatik yopilmadi."
+          );
+        }
+
+        progressText.textContent = (
           "Dastur yangilanish uchun yopilishi mumkin."
         );
 

@@ -1,5 +1,8 @@
 ﻿from __future__ import annotations
 
+import threading
+import time
+
 from threading import Lock
 from typing import Any
 
@@ -20,6 +23,56 @@ class DesktopUpdateApi:
         self._updater = updater
         self._prepared: PreparedUpdate | None = None
         self._lock = Lock()
+        self._exit_callback = None
+
+    def set_exit_callback(
+        self,
+        callback,
+    ) -> None:
+        if callback is not None and not callable(callback):
+            raise TypeError(
+                "exit callback callable bo?lishi kerak"
+            )
+
+        self._exit_callback = callback
+
+    def exit_for_update(self) -> dict[str, Any]:
+        callback = self._exit_callback
+
+        if callback is None:
+            return {
+                "success": False,
+                "message": (
+                    "Desktop oynasini yopish "
+                    "callback?i sozlanmagan."
+                ),
+            }
+
+        def delayed_exit() -> None:
+            time.sleep(0.8)
+
+            try:
+                callback()
+            except Exception as exc:
+                print(
+                    "DESKTOP UPDATE EXIT FAILED:",
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+        threading.Thread(
+            target=delayed_exit,
+            name="Gold9999UpdateExit",
+            daemon=True,
+        ).start()
+
+        return {
+            "success": True,
+            "message": (
+                "Gold9999 yangilanish uchun "
+                "yopilmoqda."
+            ),
+        }
 
     def get_update_status(self) -> dict[str, Any]:
         return {

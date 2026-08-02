@@ -42,6 +42,7 @@ def build_silent_installer_arguments(
         "/SUPPRESSMSGBOXES",
         "/NORESTART",
         "/CLOSEAPPLICATIONS",
+        "/FORCECLOSEAPPLICATIONS",
     ]
 
     if log_path is not None:
