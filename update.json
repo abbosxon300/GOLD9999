@@ -1,6 +1,6 @@
 {
-  "version": "1.0.6",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.6/Gold9999Setup.exe",
-  "sha256": "1024d470e400cdd3a2e0a381857cc81ae71b23da456e7f916f451fe75f1cde33",
-  "release_notes": "Yangilanish tekshiruvi Python launcher tomonidan boshqariladi."
+  "version": "1.0.7",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.7/Gold9999Setup.exe",
+  "sha256": "7535a061b12d90829ff7bb23a814cad3f091502a7729e54380637816e7f43aec",
+  "release_notes": "Avtomatik yangilanish tizimining yakuniy real sinovi."
 }
