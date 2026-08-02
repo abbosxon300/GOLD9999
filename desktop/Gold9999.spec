@@ -84,7 +84,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=str(
-        PROJECT_ROOT
+        Path(PROJECT_ROOT)
         / "desktop"
         / "assets"
         / "gold9999.ico"
