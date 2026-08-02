@@ -26,3 +26,6 @@ build/
 dist/
 *.spec
 !desktop/Gold9999.spec
+
+# Installer build output
+installer_output/
