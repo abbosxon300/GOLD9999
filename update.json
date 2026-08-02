@@ -1,6 +1,6 @@
 {
-  "version": "1.0.3",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.3/Gold9999Setup.exe",
-  "sha256": "cf34ea07414a23dee9c2ef329f523be2e057be6058aa137f266ee73fc9d31cd7",
-  "release_notes": "Auto update va Windows auto sync tuzatildi."
+  "version": "1.0.4",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.4/Gold9999Setup.exe",
+  "sha256": "cb3c50d3fed03342b4302f104541eabf68a1c34ba7f52628e7207a3d399300a0",
+  "release_notes": "Ilova monitor oynasini maksimal egallab ochiladi."
 }
