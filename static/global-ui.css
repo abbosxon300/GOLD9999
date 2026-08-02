@@ -1381,3 +1381,22 @@ body.desktop-update-open {
     width: 100%;
   }
 }
+
+.sidebar-version-badge {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 2px;
+  padding: 5px 10px;
+  border: 1px solid rgba(74, 222, 128, 0.28);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.09);
+  color: #86efac;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+
+.app-sidebar.collapsed .sidebar-version-badge {
+  display: none;
+}

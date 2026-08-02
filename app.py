@@ -12,6 +12,7 @@ from functools import wraps
 from typing import Optional, Dict, Any, List, Tuple
 
 from flask import Flask, g, render_template, request, redirect, url_for, flash, session, send_file
+from desktop.version import APP_VERSION
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.runtime_paths import (
     backup_directory,
@@ -174,6 +175,13 @@ def _sum_in_out(conn, table, amount_cols=("amount","summa","amount_uzs","summa_u
 # === END DASHBOARD HELPERS ===
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+
+@app.context_processor
+def inject_app_version():
+    return {
+        "app_version": APP_VERSION,
+    }
 
 
 def init_db() -> None:
