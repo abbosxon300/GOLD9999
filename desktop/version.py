@@ -3,7 +3,7 @@
 import re
 
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 _VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\."
