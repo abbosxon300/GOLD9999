@@ -1,6 +1,6 @@
 {
-  "version": "1.0.9",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.9/Gold9999Setup.exe",
-  "sha256": "c4406cea0992a6d868018e5769a8c3ebf3769238681cfcca8d14fbae7ed2af98",
-  "release_notes": "Yangilash bosilganda Gold9999 avtomatik yopiladi va o‘rnatish tugagach yangi versiya avtomatik ochiladi."
+  "version": "1.0.10",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.10/Gold9999Setup.exe",
+  "sha256": "833516ed5c8fc90c09c27a559c03aaf676bd11b33a1ba6aead1e0115e137d278",
+  "release_notes": "Desktop va Start Menu yorliqlari uchun icon aniq bog‘landi. Avtomatik yangilanish oqimi yakunlandi."
 }
