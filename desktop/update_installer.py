@@ -84,6 +84,52 @@ def _windows_creation_flags() -> int:
     )
 
 
+def _windows_helper_path(
+    installer: Path,
+) -> Path:
+    return installer.parent / "run-update.cmd"
+
+
+def _quote_cmd_value(value: str) -> str:
+    return '"' + str(value).replace('"', '""') + '"'
+
+
+def _write_windows_update_helper(
+    installer: Path,
+    arguments: tuple[str, ...],
+) -> Path:
+    helper = _windows_helper_path(installer)
+
+    installer_command = subprocess.list2cmdline(
+        list(arguments)
+    )
+
+    installer_value = _quote_cmd_value(
+        str(installer)
+    )
+
+    helper_text = (
+        "@echo off\r\n"
+        "setlocal\r\n"
+        "timeout /t 2 /nobreak >nul\r\n"
+        f"start \"\" /wait {installer_command}\r\n"
+        "set \"INSTALL_EXIT=%ERRORLEVEL%\"\r\n"
+        "if \"%INSTALL_EXIT%\"==\"0\" (\r\n"
+        f"  del /f /q {installer_value} >nul 2>&1\r\n"
+        ")\r\n"
+        "del /f /q \"%~f0\" >nul 2>&1\r\n"
+        "exit /b %INSTALL_EXIT%\r\n"
+    )
+
+    helper.write_text(
+        helper_text,
+        encoding="utf-8",
+        newline="",
+    )
+
+    return helper
+
+
 def launch_silent_installer(
     installer_path: Path,
     *,
@@ -101,12 +147,12 @@ def launch_silent_installer(
 
     if installer.stat().st_size <= 0:
         raise UpdateInstallerError(
-            "Installer fayli bo‘sh"
+            "Installer fayli bo?sh"
         )
 
     if not callable(runner):
         raise TypeError(
-            "runner callable bo‘lishi kerak"
+            "runner callable bo?lishi kerak"
         )
 
     arguments = build_silent_installer_arguments(
@@ -114,10 +160,29 @@ def launch_silent_installer(
         log_path=log_path,
     )
 
+    if os.name == "nt":
+        helper = _write_windows_update_helper(
+            installer,
+            arguments,
+        )
+
+        command = [
+            "cmd.exe",
+            "/d",
+            "/s",
+            "/c",
+            str(helper),
+        ]
+
+        cwd = str(helper.parent)
+    else:
+        command = list(arguments)
+        cwd = str(installer.parent)
+
     try:
         process = runner(
-            list(arguments),
-            cwd=str(installer.parent),
+            command,
+            cwd=cwd,
             close_fds=True,
             creationflags=(
                 _windows_creation_flags()
@@ -126,7 +191,7 @@ def launch_silent_installer(
     except OSError as exc:
         raise UpdateInstallerError(
             "Update installerini ishga "
-            f"tushirib bo‘lmadi: {exc}"
+            f"tushirib bo?lmadi: {exc}"
         ) from exc
 
     process_id = int(
@@ -139,7 +204,7 @@ def launch_silent_installer(
 
     if process_id <= 0:
         raise UpdateInstallerError(
-            "Installer process ID olinmadi"
+            "Installer helper process ID olinmadi"
         )
 
     return InstallerLaunchResult(

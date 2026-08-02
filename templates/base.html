@@ -248,18 +248,60 @@
           </svg>
         </button>
 
-        <button
-          type="button"
-          class="topbar-icon-button topbar-notification"
-          aria-label="Bildirishnomalar"
-          title="Bildirishnomalar"
-        >
-          <svg viewBox="0 0 24 24">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
-            <path d="M10 21h4"/>
-          </svg>
-          <span class="notification-badge">0</span>
-        </button>
+        <div class="notification-center">
+          <button
+            type="button"
+            class="topbar-icon-button topbar-notification"
+            id="notificationBell"
+            aria-label="Yangilanishlar"
+            title="Yangilanishlar"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+              <path d="M10 21h4"/>
+            </svg>
+
+            <span
+              class="notification-badge"
+              id="notificationBadge"
+              hidden
+            >
+              1
+            </span>
+          </button>
+
+          <section
+            class="notification-panel"
+            id="notificationPanel"
+            hidden
+            aria-label="Yangilanishlar"
+          >
+            <header class="notification-panel-header">
+              <div>
+                <span>Gold9999</span>
+                <strong>Yangilanishlar</strong>
+              </div>
+
+              <button
+                type="button"
+                id="notificationClose"
+                aria-label="Yopish"
+              >
+                ?
+              </button>
+            </header>
+
+            <div
+              class="notification-panel-body"
+              id="notificationContent"
+            >
+              <p class="notification-empty">
+                Yangilanish ma?lumoti yuklanmoqda...
+              </p>
+            </div>
+          </section>
+        </div>
 
         <div class="topbar-profile">
           <div class="topbar-avatar">
@@ -614,6 +656,223 @@
         message: "Qurilma offline holatida."
       });
     }
+  );
+})();
+</script>
+
+
+
+<script>
+(function () {
+  const bell = document.getElementById(
+    "notificationBell"
+  );
+  const badge = document.getElementById(
+    "notificationBadge"
+  );
+  const panel = document.getElementById(
+    "notificationPanel"
+  );
+  const closeButton = document.getElementById(
+    "notificationClose"
+  );
+  const content = document.getElementById(
+    "notificationContent"
+  );
+
+  if (
+    !bell
+    || !badge
+    || !panel
+    || !content
+  ) {
+    return;
+  }
+
+  const seenKey = (
+    "gold9999_seen_release_version"
+  );
+
+  let releaseData = null;
+  let apiAttempts = 0;
+
+  function escapeHtml(value) {
+    const node = document.createElement("div");
+    node.textContent = String(value || "");
+    return node.innerHTML;
+  }
+
+  function seenVersion() {
+    try {
+      return localStorage.getItem(seenKey) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function markSeen() {
+    if (!releaseData || !releaseData.version) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        seenKey,
+        releaseData.version
+      );
+    } catch (error) {}
+
+    badge.hidden = true;
+  }
+
+  function renderRelease(data) {
+    releaseData = data;
+
+    const version = data.version || "Noma?lum";
+    const notes = (
+      data.release_notes
+      || "Ushbu versiya uchun izoh berilmagan."
+    );
+
+    content.innerHTML = (
+      '<article class="notification-release">'
+      + '<div class="notification-release-top">'
+      + '<span class="notification-release-icon">?</span>'
+      + '<div>'
+      + '<strong>Gold9999 v'
+      + escapeHtml(version)
+      + '</strong>'
+      + '<span>Yangi versiya ma?lumoti</span>'
+      + '</div>'
+      + '</div>'
+      + '<p>'
+      + escapeHtml(notes)
+      + '</p>'
+      + '<div class="notification-release-status">'
+      + (
+          data.update_available
+            ? 'Yangilanish o?rnatishga tayyor'
+            : 'Siz ushbu versiyadan foydalanyapsiz'
+        )
+      + '</div>'
+      + '</article>'
+    );
+
+    badge.hidden = (
+      seenVersion() === version
+    );
+  }
+
+  function showError(message) {
+    content.innerHTML = (
+      '<p class="notification-empty">'
+      + escapeHtml(message)
+      + '</p>'
+    );
+  }
+
+  async function loadReleaseInfo() {
+    const api = (
+      window.pywebview
+      && window.pywebview.api
+    );
+
+    if (
+      !api
+      || typeof api.get_release_info
+      !== "function"
+    ) {
+      apiAttempts += 1;
+
+      if (apiAttempts < 40) {
+        window.setTimeout(
+          loadReleaseInfo,
+          500
+        );
+      }
+
+      return;
+    }
+
+    try {
+      const result = await api.get_release_info();
+
+      if (!result || !result.success) {
+        showError(
+          result && result.message
+            ? result.message
+            : "Yangilanish ma?lumoti olinmadi."
+        );
+        return;
+      }
+
+      renderRelease(result);
+
+    } catch (error) {
+      showError(
+        "Yangilanish ma?lumotini yuklab bo?lmadi."
+      );
+    }
+  }
+
+  function openPanel() {
+    panel.hidden = false;
+    bell.setAttribute(
+      "aria-expanded",
+      "true"
+    );
+    markSeen();
+  }
+
+  function closePanel() {
+    panel.hidden = true;
+    bell.setAttribute(
+      "aria-expanded",
+      "false"
+    );
+  }
+
+  bell.addEventListener(
+    "click",
+    function (event) {
+      event.stopPropagation();
+
+      if (panel.hidden) {
+        openPanel();
+      } else {
+        closePanel();
+      }
+    }
+  );
+
+  if (closeButton) {
+    closeButton.addEventListener(
+      "click",
+      closePanel
+    );
+  }
+
+  document.addEventListener(
+    "click",
+    function (event) {
+      if (
+        !panel.hidden
+        && !panel.contains(event.target)
+        && !bell.contains(event.target)
+      ) {
+        closePanel();
+      }
+    }
+  );
+
+  window.addEventListener(
+    "pywebviewready",
+    loadReleaseInfo
+  );
+
+  window.setTimeout(
+    loadReleaseInfo,
+    300
   );
 })();
 </script>

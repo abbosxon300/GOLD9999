@@ -74,6 +74,44 @@ class DesktopUpdateApi:
             ),
         }
 
+    def get_release_info(self) -> dict[str, Any]:
+        if self._updater is None:
+            return {
+                "success": False,
+                "enabled": False,
+                "message": (
+                    "Yangilanish serveri "
+                    "sozlanmagan."
+                ),
+            }
+
+        try:
+            result = self._updater.check_for_update()
+            manifest = result.manifest
+
+            return {
+                "success": True,
+                "enabled": True,
+                "version": manifest.version,
+                "release_notes": (
+                    manifest.release_notes
+                ),
+                "current_version": APP_VERSION,
+                "update_available": (
+                    manifest.update_available
+                ),
+            }
+
+        except Exception as exc:
+            return {
+                "success": False,
+                "enabled": True,
+                "message": (
+                    "Yangilanish ma?lumotini "
+                    f"olib bo?lmadi: {exc}"
+                ),
+            }
+
     def get_update_status(self) -> dict[str, Any]:
         return {
             "enabled": self._updater is not None,
