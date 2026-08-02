@@ -361,6 +361,7 @@ def run_desktop(
         height=900,
         min_size=(1050, 680),
         resizable=True,
+        maximized=True,
         text_select=True,
     )
 
