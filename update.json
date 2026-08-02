@@ -1,6 +1,6 @@
 {
-  "version": "1.0.10",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.10/Gold9999Setup.exe",
-  "sha256": "833516ed5c8fc90c09c27a559c03aaf676bd11b33a1ba6aead1e0115e137d278",
-  "release_notes": "Desktop va Start Menu yorliqlari uchun icon aniq bog‘landi. Avtomatik yangilanish oqimi yakunlandi."
+  "version": "1.0.11",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.11/Gold9999Setup.exe",
+  "sha256": "0cb57d8b849afd785418396ec50943d90d62f394efe83bc5d562ce79e843bbb4",
+  "release_notes": "Dastur versiyasi sidebar pastida doimiy ko‘rsatiladi."
 }
