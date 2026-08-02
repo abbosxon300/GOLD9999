@@ -123,22 +123,6 @@ class UpdateClient:
                         f"Manifest HTTP status noto‘g‘ri: {status}"
                     )
 
-                content_type = str(
-                    response.headers.get(
-                        "Content-Type",
-                        "",
-                    )
-                ).lower()
-
-                if (
-                    "application/json"
-                    not in content_type
-                ):
-                    raise UpdateResponseError(
-                        "Manifest Content-Type "
-                        "application/json emas"
-                    )
-
                 content = response.read(
                     MAX_MANIFEST_BYTES + 1
                 )
