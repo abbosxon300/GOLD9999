@@ -7,6 +7,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from desktop.version import APP_VERSION
 from services.runtime_paths import (
     installation_state_directory,
     installation_uuid_path,
@@ -17,7 +18,7 @@ from services.db import get_db
 
 
 APP_METADATA_ROW_ID = 1
-DEFAULT_APP_VERSION = "unknown"
+DEFAULT_APP_VERSION = APP_VERSION
 
 INSTALLATION_STATE_DIR = (
     installation_state_directory()
