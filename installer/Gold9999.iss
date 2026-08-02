@@ -1,5 +1,9 @@
 ﻿#define MyAppName "Gold9999"
-#define MyAppVersion "1.0.0"
+
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
+
 #define MyAppPublisher "Gold9999"
 #define MyAppExeName "Gold9999.exe"
 

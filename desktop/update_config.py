@@ -8,6 +8,11 @@ UPDATE_MANIFEST_ENV = (
     "GOLD9999_UPDATE_MANIFEST_URL"
 )
 
+DEFAULT_UPDATE_MANIFEST_URL = (
+    "https://raw.githubusercontent.com/"
+    "abbosxon300/GOLD9999/main/update.json"
+)
+
 
 def get_update_manifest_url() -> str | None:
     value = str(
@@ -18,7 +23,7 @@ def get_update_manifest_url() -> str | None:
     ).strip()
 
     if not value:
-        return None
+        value = DEFAULT_UPDATE_MANIFEST_URL
 
     parsed = urlparse(value)
 
@@ -42,6 +47,7 @@ def update_enabled() -> bool:
 
 
 __all__ = [
+    "DEFAULT_UPDATE_MANIFEST_URL",
     "UPDATE_MANIFEST_ENV",
     "get_update_manifest_url",
     "update_enabled",
