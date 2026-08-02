@@ -1,6 +1,6 @@
-﻿{
-  "version": "1.0.0",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.0/Gold9999Setup.exe",
-  "sha256": "e8f478f5b9ffb6b94d2120955c8599e32c2800d9661b63d69d468d0e179903ff",
-  "release_notes": "Gold9999 Windows Desktop dasturining birinchi barqaror versiyasi."
+{
+  "version": "1.0.1",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.1/Gold9999Setup.exe",
+  "sha256": "6a38e79f309a45a244780ce2389e18950db39bb8941bc1764f97d5f483a413e9",
+  "release_notes": "Auto update tizimining birinchi real sinovi."
 }
