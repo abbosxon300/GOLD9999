@@ -60,14 +60,23 @@ Source: "..\dist\Gold9999\*"; \
     DestDir: "{app}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
+Source: "..\desktop\assets\gold9999.ico"; \
+    DestDir: "{app}"; \
+    DestName: "gold9999.ico"; \
+    Flags: ignoreversion
+
 [Icons]
 Name: "{group}\{#MyAppName}"; \
     Filename: "{app}\{#MyAppExeName}"; \
-    WorkingDir: "{app}"
+    WorkingDir: "{app}"; \
+    IconFilename: "{app}\gold9999.ico"; \
+    IconIndex: 0
 
 Name: "{autodesktop}\{#MyAppName}"; \
     Filename: "{app}\{#MyAppExeName}"; \
     WorkingDir: "{app}"; \
+    IconFilename: "{app}\gold9999.ico"; \
+    IconIndex: 0; \
     Tasks: desktopicon
 
 [Run]
