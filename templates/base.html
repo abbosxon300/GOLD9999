@@ -878,17 +878,87 @@
     }
   );
 
+  let updateCheckStarted = false;
+  let updateCheckAttempts = 0;
+  const maxUpdateCheckAttempts = 40;
+
+  function scheduleUpdateCheck() {
+    if (updateCheckStarted) {
+      return;
+    }
+
+    updateCheckAttempts += 1;
+
+    const api = (
+      window.pywebview
+      && window.pywebview.api
+    );
+
+    if (
+      api
+      && typeof api.check_for_update
+        === "function"
+    ) {
+      updateCheckStarted = true;
+
+      checkForUpdate().catch(
+        function (error) {
+          console.error(
+            "Gold9999 update check failed:",
+            error
+          );
+        }
+      );
+
+      return;
+    }
+
+    if (
+      updateCheckAttempts
+      < maxUpdateCheckAttempts
+    ) {
+      window.setTimeout(
+        scheduleUpdateCheck,
+        500
+      );
+    }
+  }
+
   document.addEventListener(
     "pywebviewready",
+    scheduleUpdateCheck
+  );
+
+  if (document.readyState === "loading") {
+    document.addEventListener(
+      "DOMContentLoaded",
+      function () {
+        window.setTimeout(
+          scheduleUpdateCheck,
+          250
+        );
+      },
+      {
+        once: true
+      }
+    );
+  } else {
+    window.setTimeout(
+      scheduleUpdateCheck,
+      250
+    );
+  }
+
+  window.addEventListener(
+    "load",
     function () {
       window.setTimeout(
-        function () {
-          checkForUpdate().catch(
-            function () {}
-          );
-        },
-        1500
+        scheduleUpdateCheck,
+        250
       );
+    },
+    {
+      once: true
     }
   );
 })();
