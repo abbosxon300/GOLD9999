@@ -1,6 +1,6 @@
 {
-  "version": "1.0.8",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.8/Gold9999Setup.exe",
-  "sha256": "84ffe2a8abab44c1ef3febbd40872de154ec1a6ab58b65bbeb0438ee2e0d6fe3",
-  "release_notes": "Yangi Gold9999 iconkasi va tezlashtirilgan ishga tushish."
+  "version": "1.0.9",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.9/Gold9999Setup.exe",
+  "sha256": "c4406cea0992a6d868018e5769a8c3ebf3769238681cfcca8d14fbae7ed2af98",
+  "release_notes": "Yangilash bosilganda Gold9999 avtomatik yopiladi va o‘rnatish tugagach yangi versiya avtomatik ochiladi."
 }
