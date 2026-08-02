@@ -10,6 +10,7 @@ from desktop.updater import create_desktop_updater
 
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -267,6 +268,99 @@ def create_update_api() -> DesktopUpdateApi:
     return DesktopUpdateApi(updater)
 
 
+def attach_python_update_prompt(
+    window,
+    update_api: DesktopUpdateApi,
+) -> None:
+    state = {
+        "running": False,
+        "shown": False,
+    }
+    state_lock = threading.Lock()
+
+    def run_check() -> None:
+        try:
+            result = update_api.check_for_update()
+
+            if not (
+                result.get("success")
+                and result.get("enabled")
+                and result.get("update_available")
+            ):
+                return
+
+            payload = json.dumps(
+                result,
+                ensure_ascii=False,
+            )
+
+            script = f"""
+            (() => {{
+              if (
+                typeof window.gold9999ShowUpdateModal
+                !== "function"
+              ) {{
+                return false;
+              }}
+
+              window.gold9999ShowUpdateModal(
+                {payload}
+              );
+
+              return true;
+            }})()
+            """
+
+            displayed = bool(
+                window.evaluate_js(script)
+            )
+
+            if displayed:
+                with state_lock:
+                    state["shown"] = True
+
+                print(
+                    "PYTHON UPDATE MODAL SHOWN:",
+                    result.get("current_version"),
+                    "->",
+                    result.get("version"),
+                    flush=True,
+                )
+            else:
+                print(
+                    "PYTHON UPDATE MODAL WAITING:"
+                    " sahifada modal hali tayyor emas",
+                    flush=True,
+                )
+
+        except Exception as exc:
+            print(
+                "PYTHON UPDATE CHECK FAILED:",
+                f"{type(exc).__name__}: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+        finally:
+            with state_lock:
+                state["running"] = False
+
+    def on_loaded() -> None:
+        with state_lock:
+            if state["shown"] or state["running"]:
+                return
+
+            state["running"] = True
+
+        threading.Thread(
+            target=run_check,
+            name="Gold9999UpdatePrompt",
+            daemon=True,
+        ).start()
+
+    window.events.loaded += on_loaded
+
+
 def run_desktop(
     *,
     host: str,
@@ -353,7 +447,7 @@ def run_desktop(
             flush=True,
         )
 
-    webview.create_window(
+    window = webview.create_window(
         APP_TITLE,
         login_url,
         js_api=update_api,
@@ -363,6 +457,11 @@ def run_desktop(
         resizable=True,
         maximized=True,
         text_select=True,
+    )
+
+    attach_python_update_prompt(
+        window,
+        update_api,
     )
 
     try:

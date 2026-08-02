@@ -752,6 +752,17 @@
     );
   }
 
+  window.gold9999ShowUpdateModal = function (data) {
+    updateApi = (
+      window.pywebview
+      && window.pywebview.api
+    );
+
+    showModal(data);
+
+    return true;
+  };
+
   function hideModal() {
     if (busy) {
       return;
