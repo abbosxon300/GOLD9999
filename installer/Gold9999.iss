@@ -11,6 +11,7 @@
 AppId={{B4119384-8A7D-4EE9-A1E8-65F62F9F9999}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+SetupIconFile=..\desktop\assets\gold9999.ico
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 

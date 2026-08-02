@@ -1,14 +1,5 @@
 from __future__ import annotations
 
-from desktop.sync_worker import (
-    WindowsSyncWorker,
-    create_default_worker,
-)
-from desktop.update_api import DesktopUpdateApi
-from desktop.update_config import get_update_manifest_url
-from desktop.updater import create_desktop_updater
-
-
 import argparse
 import json
 import os
@@ -256,7 +247,15 @@ def run_contract_check() -> None:
 
 
 
-def create_update_api() -> DesktopUpdateApi:
+def create_update_api():
+    from desktop.update_api import DesktopUpdateApi
+    from desktop.update_config import (
+        get_update_manifest_url,
+    )
+    from desktop.updater import (
+        create_desktop_updater,
+    )
+
     manifest_url = get_update_manifest_url()
 
     updater = (
@@ -270,7 +269,7 @@ def create_update_api() -> DesktopUpdateApi:
 
 def attach_python_update_prompt(
     window,
-    update_api: DesktopUpdateApi,
+    update_api,
 ) -> None:
     state = {
         "running": False,
@@ -412,7 +411,7 @@ def run_desktop(
 
     update_api = create_update_api()
 
-    sync_worker: WindowsSyncWorker | None = None
+    sync_worker = None
     sync_env_file = (
         Path(data_directory)
         / "offline.env"
@@ -420,6 +419,10 @@ def run_desktop(
 
     if sync_env_file.is_file():
         try:
+            from desktop.sync_worker import (
+                create_default_worker,
+            )
+
             sync_worker = create_default_worker(
                 data_directory=Path(
                     data_directory
