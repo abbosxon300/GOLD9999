@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from desktop.update_api import DesktopUpdateApi
+from desktop.update_config import get_update_manifest_url
+from desktop.updater import create_desktop_updater
+
+
 import argparse
 import os
 import socket
@@ -245,6 +250,19 @@ def run_contract_check() -> None:
     print("DESKTOP APP CONTRACT OK")
 
 
+
+def create_update_api() -> DesktopUpdateApi:
+    manifest_url = get_update_manifest_url()
+
+    updater = (
+        create_desktop_updater(manifest_url)
+        if manifest_url is not None
+        else None
+    )
+
+    return DesktopUpdateApi(updater)
+
+
 def run_desktop(
     *,
     host: str,
@@ -293,9 +311,12 @@ def run_desktop(
         ),
     )
 
+    update_api = create_update_api()
+
     webview.create_window(
         APP_TITLE,
         login_url,
+        js_api=update_api,
         width=1440,
         height=900,
         min_size=(1050, 680),

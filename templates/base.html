@@ -611,5 +611,288 @@
 })();
 </script>
 
+
+<div
+  class="desktop-update-modal"
+  id="desktopUpdateModal"
+  hidden
+  aria-hidden="true"
+>
+  <div class="desktop-update-backdrop"></div>
+
+  <section
+    class="desktop-update-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="desktopUpdateTitle"
+  >
+    <div class="desktop-update-icon" aria-hidden="true">
+      ?
+    </div>
+
+    <div class="desktop-update-content">
+      <span class="desktop-update-kicker">
+        Gold9999 yangilanishi
+      </span>
+
+      <h2 id="desktopUpdateTitle">
+        Yangi versiya mavjud
+      </h2>
+
+      <p id="desktopUpdateMessage">
+        Yangilanish tafsilotlari tekshirilmoqda.
+      </p>
+
+      <div
+        class="desktop-update-version"
+        id="desktopUpdateVersion"
+      ></div>
+
+      <div
+        class="desktop-update-notes"
+        id="desktopUpdateNotes"
+        hidden
+      ></div>
+
+      <div
+        class="desktop-update-progress"
+        id="desktopUpdateProgress"
+        hidden
+      >
+        <span class="desktop-update-spinner"></span>
+        <span id="desktopUpdateProgressText">
+          Yangilanish tayyorlanmoqda...
+        </span>
+      </div>
+
+      <div class="desktop-update-actions">
+        <button
+          type="button"
+          class="btn secondary"
+          id="desktopUpdateLater"
+        >
+          Keyinroq
+        </button>
+
+        <button
+          type="button"
+          class="btn primary"
+          id="desktopUpdateInstall"
+        >
+          Yangilash
+        </button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const modal = document.getElementById(
+    "desktopUpdateModal"
+  );
+
+  if (!modal) {
+    return;
+  }
+
+  const messageNode = document.getElementById(
+    "desktopUpdateMessage"
+  );
+  const versionNode = document.getElementById(
+    "desktopUpdateVersion"
+  );
+  const notesNode = document.getElementById(
+    "desktopUpdateNotes"
+  );
+  const progressNode = document.getElementById(
+    "desktopUpdateProgress"
+  );
+  const progressText = document.getElementById(
+    "desktopUpdateProgressText"
+  );
+  const laterButton = document.getElementById(
+    "desktopUpdateLater"
+  );
+  const installButton = document.getElementById(
+    "desktopUpdateInstall"
+  );
+
+  let updateApi = null;
+  let busy = false;
+
+  function showModal(data) {
+    const currentVersion = (
+      data.current_version || "noma?lum"
+    );
+    const newVersion = data.version || "noma?lum";
+
+    messageNode.textContent = (
+      data.message || "Yangi versiya mavjud."
+    );
+
+    versionNode.textContent = (
+      "Joriy versiya: "
+      + currentVersion
+      + "  ?  Yangi versiya: "
+      + newVersion
+    );
+
+    const notes = String(
+      data.release_notes || ""
+    ).trim();
+
+    notesNode.textContent = notes;
+    notesNode.hidden = !notes;
+
+    modal.hidden = false;
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add(
+      "desktop-update-open"
+    );
+  }
+
+  function hideModal() {
+    if (busy) {
+      return;
+    }
+
+    modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove(
+      "desktop-update-open"
+    );
+  }
+
+  function setBusy(enabled, text) {
+    busy = enabled;
+    progressNode.hidden = !enabled;
+    laterButton.disabled = enabled;
+    installButton.disabled = enabled;
+
+    if (text) {
+      progressText.textContent = text;
+    }
+  }
+
+  async function checkForUpdate() {
+    updateApi = (
+      window.pywebview
+      && window.pywebview.api
+    );
+
+    if (
+      !updateApi
+      || typeof updateApi.check_for_update
+        !== "function"
+    ) {
+      return;
+    }
+
+    const result = await (
+      updateApi.check_for_update()
+    );
+
+    if (
+      result
+      && result.success
+      && result.enabled
+      && result.update_available
+    ) {
+      showModal(result);
+    }
+  }
+
+  laterButton.addEventListener(
+    "click",
+    hideModal
+  );
+
+  installButton.addEventListener(
+    "click",
+    async function () {
+      if (!updateApi || busy) {
+        return;
+      }
+
+      try {
+        setBusy(
+          true,
+          "Yangilanish yuklanmoqda..."
+        );
+
+        const prepared = await (
+          updateApi.prepare_update()
+        );
+
+        if (
+          !prepared
+          || !prepared.success
+          || !prepared.update_available
+        ) {
+          throw new Error(
+            prepared && prepared.message
+              ? prepared.message
+              : "Yangilanish tayyorlanmadi."
+          );
+        }
+
+        setBusy(
+          true,
+          "Yangilanish o?rnatuvchisi ishga tushirilmoqda..."
+        );
+
+        const installed = await (
+          updateApi.install_prepared_update()
+        );
+
+        if (!installed || !installed.success) {
+          throw new Error(
+            installed && installed.message
+              ? installed.message
+              : "Yangilanish ishga tushmadi."
+          );
+        }
+
+        messageNode.textContent = (
+          installed.message
+          || "Yangilanish o?rnatuvchisi ishga tushirildi."
+        );
+
+        progressText.textContent = (
+          "Dastur yangilanish uchun yopilishi mumkin."
+        );
+
+      } catch (error) {
+        setBusy(false);
+
+        messageNode.textContent = (
+          error && error.message
+            ? error.message
+            : "Yangilanish vaqtida xato yuz berdi."
+        );
+
+        installButton.disabled = false;
+        laterButton.disabled = false;
+      }
+    }
+  );
+
+  document.addEventListener(
+    "pywebviewready",
+    function () {
+      window.setTimeout(
+        function () {
+          checkForUpdate().catch(
+            function () {}
+          );
+        },
+        1500
+      );
+    }
+  );
+})();
+</script>
+
 </body>
 </html>
