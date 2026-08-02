@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from desktop.sync_worker import (
+    WindowsSyncWorker,
+    create_default_worker,
+)
 from desktop.update_api import DesktopUpdateApi
 from desktop.update_config import get_update_manifest_url
 from desktop.updater import create_desktop_updater
@@ -267,6 +271,7 @@ def run_desktop(
     *,
     host: str,
     port: int,
+    data_directory: Path,
 ) -> None:
     if not _port_is_available(host, port):
         raise RuntimeError(
@@ -313,6 +318,41 @@ def run_desktop(
 
     update_api = create_update_api()
 
+    sync_worker: WindowsSyncWorker | None = None
+    sync_env_file = (
+        Path(data_directory)
+        / "offline.env"
+    )
+
+    if sync_env_file.is_file():
+        try:
+            sync_worker = create_default_worker(
+                data_directory=Path(
+                    data_directory
+                )
+            )
+            sync_worker.start()
+
+            print(
+                "WINDOWS AUTO SYNC STARTED:",
+                sync_env_file,
+                flush=True,
+            )
+
+        except Exception as exc:
+            print(
+                "WINDOWS AUTO SYNC START FAILED:",
+                f"{type(exc).__name__}: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
+    else:
+        print(
+            "WINDOWS AUTO SYNC DISABLED:",
+            f"config topilmadi: {sync_env_file}",
+            flush=True,
+        )
+
     webview.create_window(
         APP_TITLE,
         login_url,
@@ -324,9 +364,18 @@ def run_desktop(
         text_select=True,
     )
 
-    webview.start(
-        debug=False,
-    )
+    try:
+        webview.start(
+            debug=False,
+        )
+    finally:
+        if sync_worker is not None:
+            sync_worker.stop()
+
+            print(
+                "WINDOWS AUTO SYNC STOPPED",
+                flush=True,
+            )
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -407,6 +456,7 @@ def main() -> int:
         run_desktop(
             host=arguments.host,
             port=arguments.port,
+            data_directory=data_directory,
         )
 
     except (
