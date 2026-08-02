@@ -465,11 +465,7 @@ def build_pull_response(
 
     return PullResponse(
         changes=batch_changes,
-        next_cursor=(
-            str(next_offset)
-            if has_more
-            else None
-        ),
+        next_cursor=str(next_offset),
         batch_id=str(uuid.uuid4()),
         has_more=has_more,
     )

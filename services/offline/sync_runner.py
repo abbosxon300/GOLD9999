@@ -15,8 +15,14 @@ from services.offline.schema import (
     ensure_offline_sync_schema,
     validate_offline_sync_schema,
 )
+from services.offline.pull_runner import (
+    run_remote_pull,
+)
 from services.offline.sqlite_conflict import (
     SQLiteSyncConflictStore,
+)
+from services.offline.sqlite_cursor import (
+    SQLiteSyncCursorStore,
 )
 from services.offline.sqlite_log import SQLiteSyncLog
 from services.offline.sqlite_queue import SQLiteSyncQueue
@@ -299,9 +305,26 @@ def run_pending_sync(
 
     engine.queue.reset_stuck_syncing()
 
-    return engine.push_pending(
+    pushed_count = engine.push_pending(
         limit=normalized_limit
     )
+
+    connection_factory = create_connection_factory(
+        active_config.db_path
+    )
+
+    cursor_store = SQLiteSyncCursorStore(
+        connection_factory
+    )
+
+    pulled_count = run_remote_pull(
+        api=engine.api,
+        cursor_store=cursor_store,
+        connection_factory=connection_factory,
+        limit=normalized_limit,
+    )
+
+    return pushed_count + pulled_count
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
