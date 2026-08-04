@@ -380,19 +380,19 @@ def run_desktop(
             "o‘rnatilishi kerak."
         ) from exc
 
-    flask_application = (
-        _load_flask_application()
-    )
+    def start_local_server() -> None:
+        flask_application = (
+            _load_flask_application()
+        )
+
+        _serve_application(
+            flask_application=flask_application,
+            host=host,
+            port=port,
+        )
 
     server_thread = threading.Thread(
-        target=_serve_application,
-        kwargs={
-            "flask_application": (
-                flask_application
-            ),
-            "host": host,
-            "port": port,
-        },
+        target=start_local_server,
         name="gold9999-waitress",
         daemon=True,
     )
