@@ -1,6 +1,6 @@
 {
-  "version": "1.0.13",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.13/Gold9999Setup.exe",
-  "sha256": "0e0b0b31e802e2d2379fd8b074a6d5e78158d336c001678aeb91cefdfdadc75f",
-  "release_notes": "Avtomatik yangilash tizimining yakuniy real sinovi.\n\n- Detached update helper ishlaydi\n- Gold9999 avtomatik yopiladi\n- Installer mustaqil davom etadi\n- Ilova yangilangandan keyin qayta ochiladi\n- Vaqtinchalik update fayllari tozalanadi\n- Qo‘ng‘iroqchada yangi versiya ma’lumoti ko‘rinadi"
+  "version": "1.0.14",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.14/Gold9999Setup.exe",
+  "sha256": "e97825302573c59ca7c007471a61de396737eb4ccbf8bc056483f8d22d93b14e",
+  "release_notes": "Avtomatik yangilanish helperi qayta ishlangan.\n\n- Installer bevosita mustaqil helper orqali ishga tushadi\n- Helper natijani update-helper.log fayliga yozadi\n- Xato bo‘lsa installer va loglar saqlanadi\n- Muvaffaqiyatli o‘rnatilgach vaqtinchalik installer o‘chiriladi\n- Qo‘ng‘iroqcha yangilanish haqida ma’lumot beradi"
 }
