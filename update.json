@@ -1,6 +1,6 @@
 {
-  "version": "1.0.14",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.14/Gold9999Setup.exe",
-  "sha256": "e97825302573c59ca7c007471a61de396737eb4ccbf8bc056483f8d22d93b14e",
-  "release_notes": "Avtomatik yangilanish helperi qayta ishlangan.\n\n- Installer bevosita mustaqil helper orqali ishga tushadi\n- Helper natijani update-helper.log fayliga yozadi\n- Xato bo‘lsa installer va loglar saqlanadi\n- Muvaffaqiyatli o‘rnatilgach vaqtinchalik installer o‘chiriladi\n- Qo‘ng‘iroqcha yangilanish haqida ma’lumot beradi"
+  "version": "1.0.15",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.15/Gold9999Setup.exe",
+  "sha256": "7767bab0bcd02770ac525ee672dd797453c3120447ab31953e240a870fd3294e",
+  "release_notes": "Login sahifasiga xavfsiz “Meni eslab qol” funksiyasi qo‘shildi.\n\n- Parol saqlanmaydi\n- 30 kunlik xavfsiz token ishlatiladi\n- Ilova keyingi ochilishda avtomatik login qiladi\n- Logout bosilganda token bekor qilinadi\n- Login sahifasiga chiroyli checkbox qo‘shildi\n- Avtomatik yangilanish helperi yaxshilandi"
 }
