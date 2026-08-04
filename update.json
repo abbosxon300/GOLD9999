@@ -1,6 +1,6 @@
 {
-  "version": "1.0.20",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.20/Gold9999Setup.exe",
-  "sha256": "7422878435fae5dd49599bdecc2d067cea3f19d575ddeee53556802eaac073e9",
-  "release_notes": "Desktop ilovada ikki marta bosish muammosi tuzatildi.\n\n- Bir vaqtda faqat bitta Gold9999 nusxasi ishlaydi\n- Ikkinchi marta bosilganda yangi jarayon port uchun urishmaydi\n- Birinchi ilova odatdagidek ochilishda davom etadi\n- Tasodifiy ochilmay qolish holati bartaraf etildi\n- Tez startup, “Meni eslab qol” va offline sync saqlanib qoldi"
+  "version": "1.0.21",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.21/Gold9999Setup.exe",
+  "sha256": "2636fa7dead9bc5188803f0e78272ec48436d31b28273522cda7f114b66f6a9c",
+  "release_notes": "Desktop ilovaga native Windows yuklanish oynasi qo‘shildi.\n\n- Ikonka bosilgach GOLD 9999 oynasi taxminan 0.3 soniyada ko‘rinadi\n- Flask va WebView fonda yuklanadi\n- Asosiy ilova tayyor bo‘lganda splash avtomatik yopiladi\n- Ikki marta bosish himoyasi saqlanib qoldi\n- “Meni eslab qol”, offline sync va tez startup ishlashda davom etadi"
 }
