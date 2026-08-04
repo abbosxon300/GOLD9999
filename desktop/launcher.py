@@ -402,12 +402,90 @@ def run_desktop(
         f"http://{host}:{port}/login"
     )
 
-    _wait_until_ready(
-        login_url,
-        timeout_seconds=(
-            STARTUP_TIMEOUT_SECONDS
-        ),
-    )
+    startup_html = """
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <title>Gold 9999</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(
+          circle at top,
+          #fff8d8 0%,
+          #f3ead0 42%,
+          #e6dcc0 100%
+        );
+      color: #332a16;
+      font-family:
+        "Segoe UI",
+        Arial,
+        sans-serif;
+    }
+
+    .startup {
+      text-align: center;
+    }
+
+    .startup-logo {
+      margin-bottom: 16px;
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: 2px;
+    }
+
+    .startup-spinner {
+      width: 38px;
+      height: 38px;
+      margin: 0 auto 18px;
+      border: 4px solid rgba(51, 42, 22, 0.16);
+      border-top-color: #94711d;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .startup-text {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="startup">
+    <div class="startup-logo">GOLD 9999</div>
+    <div class="startup-spinner"></div>
+    <div class="startup-text">
+      Ilova ishga tushmoqda...
+    </div>
+  </main>
+</body>
+</html>
+"""
 
     update_api = create_update_api()
 
@@ -452,7 +530,7 @@ def run_desktop(
 
     window = webview.create_window(
         APP_TITLE,
-        login_url,
+        html=startup_html,
         js_api=update_api,
         width=1440,
         height=900,
@@ -485,8 +563,62 @@ def run_desktop(
         exist_ok=True,
     )
 
+    def finish_startup() -> None:
+        try:
+            _wait_until_ready(
+                login_url,
+                timeout_seconds=(
+                    STARTUP_TIMEOUT_SECONDS
+                ),
+            )
+
+            window.load_url(login_url)
+
+        except Exception as exc:
+            error_message = (
+                f"{type(exc).__name__}: {exc}"
+            )
+
+            print(
+                "DESKTOP STARTUP FAILED:",
+                error_message,
+                file=sys.stderr,
+                flush=True,
+            )
+
+            window.load_html(
+                """
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>Gold 9999</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 48px;
+      background: #f6f0df;
+      color: #3a2f18;
+      font-family: "Segoe UI", Arial, sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 80px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ilovani ishga tushirib bo'lmadi</h1>
+  <p>Iltimos, ilovani yopib qayta oching.</p>
+</body>
+</html>
+                """
+            )
+
     try:
         webview.start(
+            finish_startup,
             debug=False,
             private_mode=False,
             storage_path=webview_storage_path,
