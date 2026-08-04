@@ -471,9 +471,25 @@ def run_desktop(
         update_api,
     )
 
+    webview_storage_path = os.path.join(
+        os.environ.get(
+            "LOCALAPPDATA",
+            os.path.expanduser("~"),
+        ),
+        "Gold9999",
+        "webview",
+    )
+
+    os.makedirs(
+        webview_storage_path,
+        exist_ok=True,
+    )
+
     try:
         webview.start(
             debug=False,
+            private_mode=False,
+            storage_path=webview_storage_path,
         )
     finally:
         if sync_worker is not None:
