@@ -100,25 +100,50 @@ def _write_windows_update_helper(
 ) -> Path:
     helper = _windows_helper_path(installer)
 
-    installer_command = subprocess.list2cmdline(
-        list(arguments)
+    trace_path = (
+        installer.parent
+        / "update-helper.log"
     )
 
-    installer_value = _quote_cmd_value(
-        str(installer)
+    command_parts = [
+        _quote_cmd_value(str(installer)),
+    ]
+
+    for argument in arguments[1:]:
+        if (
+            argument.startswith('/LOG="')
+            and argument.endswith('"')
+        ):
+            command_parts.append(argument)
+        else:
+            command_parts.append(
+                _quote_cmd_value(argument)
+            )
+
+    installer_command = " ".join(
+        command_parts
     )
 
     helper_text = (
         "@echo off\r\n"
         "setlocal\r\n"
-        "timeout /t 2 /nobreak >nul\r\n"
-        f"start \"\" /wait {installer_command}\r\n"
+        f"set \"TRACE={trace_path}\"\r\n"
+        "> \"%TRACE%\" echo UPDATE HELPER STARTED\r\n"
+        ">> \"%TRACE%\" echo Waiting for Gold9999 to close...\r\n"
+        "timeout /t 3 /nobreak >nul\r\n"
+        ">> \"%TRACE%\" echo Starting installer...\r\n"
+        f"{installer_command}\r\n"
         "set \"INSTALL_EXIT=%ERRORLEVEL%\"\r\n"
-        "if \"%INSTALL_EXIT%\"==\"0\" (\r\n"
-        f"  del /f /q {installer_value} >nul 2>&1\r\n"
+        ">> \"%TRACE%\" echo INSTALL EXIT=%INSTALL_EXIT%\r\n"
+        "if not \"%INSTALL_EXIT%\"==\"0\" (\r\n"
+        "  >> \"%TRACE%\" echo INSTALL FAILED - FILES KEPT\r\n"
+        "  exit /b %INSTALL_EXIT%\r\n"
         ")\r\n"
-        "del /f /q \"%~f0\" >nul 2>&1\r\n"
-        "exit /b %INSTALL_EXIT%\r\n"
+        ">> \"%TRACE%\" echo INSTALL SUCCEEDED\r\n"
+        f"del /f /q {_quote_cmd_value(str(installer))} "
+        ">nul 2>&1\r\n"
+        ">> \"%TRACE%\" echo INSTALLER REMOVED\r\n"
+        "exit /b 0\r\n"
     )
 
     helper.write_text(
