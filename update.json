@@ -1,6 +1,6 @@
 {
-  "version": "1.0.18",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.18/Gold9999Setup.exe",
-  "sha256": "d18babc26e6ad094302e2c3b192bac2b03b1ca54fbdf2dbc26329491fff19bc4",
-  "release_notes": "Desktop ilovaning ishga tushishi yanada tezlashtirildi.\n\n- Yuklanish oynasi taxminan 0.4 soniyada ko‘rinadi\n- Flask ilovasi fonda yuklanadi\n- Server tayyorlanishi oynani bloklamaydi\n- Login sahifasi tayyor bo‘lgach avtomatik ochiladi\n- “Meni eslab qol” va offline sync ishlashda davom etadi"
+  "version": "1.0.19",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.19/Gold9999Setup.exe",
+  "sha256": "3a4356eafd94799222a6234828b82106d5a73bcfe5beef10e7c833fc0076406d",
+  "release_notes": "Desktop ilovaning ishga tushishi tezlashtirildi.\n\n- OpenPyXL endi faqat Excel eksport bosilganda yuklanadi\n- Flask ilovasi tezroq ishga tushadi\n- Ichki server tayyor bo‘lish vaqti taxminan 1.1 soniyaga kamaydi\n- Excel hisobot eksporti ishlashda davom etadi\n- “Meni eslab qol” va offline sync saqlanib qoldi"
 }
