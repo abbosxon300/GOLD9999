@@ -38,12 +38,43 @@
 
       <form class="login-form" method="post" action="{{ url_for('login') }}">
         <label class="f-label">Username</label>
-        <input class="f-input" name="username" autocomplete="username" placeholder="admin" required>
+        <input
+          class="f-input"
+          name="username"
+          autocomplete="username"
+          placeholder="admin"
+          value="{{ entered_username|default('')|e }}"
+          required
+        >
 
         <label class="f-label">Password</label>
         <input class="f-input" type="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
 
-        <button class="btn-primary" type="submit">Kirish</button>
+        <label class="remember-login">
+          <input
+            type="checkbox"
+            name="remember_me"
+            value="1"
+            {% if remember_checked %}checked{% endif %}
+          >
+
+          <span class="remember-login-box">
+            <svg viewBox="0 0 16 16">
+              <path d="M3 8.3 6.4 11.5 13 4.8"/>
+            </svg>
+          </span>
+
+          <span class="remember-login-text">
+            <strong>Meni eslab qol</strong>
+            <small>
+              Keyingi safar avtomatik kirish
+            </small>
+          </span>
+        </label>
+
+        <button class="btn-primary" type="submit">
+          Kirish
+        </button>
 
         <div class="login-hint">Admin: <b>admin</b> / <b>admin123</b></div>
       </form>
