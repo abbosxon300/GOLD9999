@@ -2,8 +2,6 @@ from datetime import date, timedelta
 from io import BytesIO
 
 from flask import render_template, request, send_file
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 
 def register_reports_routes(
@@ -404,6 +402,15 @@ def register_reports_routes(
             from_date,
             to_date,
         )).fetchall()
+
+        from openpyxl import Workbook
+        from openpyxl.styles import (
+            Alignment,
+            Border,
+            Font,
+            PatternFill,
+            Side,
+        )
 
         workbook = Workbook()
         workbook.remove(workbook.active)
