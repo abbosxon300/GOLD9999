@@ -46,6 +46,187 @@ def _acquire_single_instance_mutex():
     return mutex_handle
 
 
+
+class NativeStartupSplash:
+    def __init__(self) -> None:
+        self._thread = None
+        self._ready = threading.Event()
+        self._hwnd = None
+
+    def start(self) -> None:
+        if sys.platform != "win32":
+            return
+
+        self._thread = threading.Thread(
+            target=self._run,
+            name="gold9999-native-splash",
+            daemon=True,
+        )
+        self._thread.start()
+
+        self._ready.wait(timeout=1.0)
+
+    def close(self) -> None:
+        if (
+            sys.platform == "win32"
+            and self._hwnd
+        ):
+            import ctypes
+
+            WM_CLOSE = 0x0010
+
+            ctypes.windll.user32.PostMessageW(
+                self._hwnd,
+                WM_CLOSE,
+                0,
+                0,
+            )
+
+    def _run(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        gdi32 = ctypes.windll.gdi32
+
+        WS_EX_TOPMOST = 0x00000008
+        WS_EX_TOOLWINDOW = 0x00000080
+
+        WS_POPUP = 0x80000000
+        WS_VISIBLE = 0x10000000
+        WS_BORDER = 0x00800000
+
+        SS_CENTER = 0x00000001
+        SS_NOTIFY = 0x00000100
+
+        SW_SHOW = 5
+        WM_SETFONT = 0x0030
+
+        DEFAULT_CHARSET = 1
+        OUT_DEFAULT_PRECIS = 0
+        CLIP_DEFAULT_PRECIS = 0
+        CLEARTYPE_QUALITY = 5
+        DEFAULT_PITCH = 0
+        FF_DONTCARE = 0
+
+        width = 470
+        height = 190
+
+        screen_width = user32.GetSystemMetrics(0)
+        screen_height = user32.GetSystemMetrics(1)
+
+        left = max(
+            0,
+            int((screen_width - width) / 2),
+        )
+        top = max(
+            0,
+            int((screen_height - height) / 2),
+        )
+
+        user32.CreateWindowExW.restype = (
+            wintypes.HWND
+        )
+
+        kernel32.GetModuleHandleW.restype = (
+            wintypes.HMODULE
+        )
+
+        instance = kernel32.GetModuleHandleW(
+            None
+        )
+
+        window_text = (
+            "GOLD 9999\r\n\r\n"
+            "Ilova ishga tushmoqda..."
+        )
+
+        hwnd = user32.CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            "STATIC",
+            window_text,
+            (
+                WS_POPUP
+                | WS_VISIBLE
+                | WS_BORDER
+                | SS_CENTER
+                | SS_NOTIFY
+            ),
+            left,
+            top,
+            width,
+            height,
+            None,
+            None,
+            instance,
+            None,
+        )
+
+        if not hwnd:
+            self._ready.set()
+            return
+
+        self._hwnd = hwnd
+
+        gdi32.CreateFontW.restype = (
+            wintypes.HANDLE
+        )
+
+        font = gdi32.CreateFontW(
+            -26,
+            0,
+            0,
+            0,
+            600,
+            False,
+            False,
+            False,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE,
+            "Segoe UI",
+        )
+
+        if font:
+            user32.SendMessageW(
+                hwnd,
+                WM_SETFONT,
+                font,
+                True,
+            )
+
+        user32.ShowWindow(
+            hwnd,
+            SW_SHOW,
+        )
+        user32.UpdateWindow(hwnd)
+
+        self._ready.set()
+
+        message = wintypes.MSG()
+
+        while user32.GetMessageW(
+            ctypes.byref(message),
+            None,
+            0,
+            0,
+        ) > 0:
+            user32.TranslateMessage(
+                ctypes.byref(message)
+            )
+            user32.DispatchMessageW(
+                ctypes.byref(message)
+            )
+
+        if font:
+            gdi32.DeleteObject(font)
+
+        self._hwnd = None
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -393,6 +574,7 @@ def run_desktop(
     host: str,
     port: int,
     data_directory: Path,
+    startup_splash=None,
 ) -> None:
     if not _port_is_available(host, port):
         raise RuntimeError(
@@ -592,6 +774,9 @@ def run_desktop(
     )
 
     def finish_startup() -> None:
+        if startup_splash is not None:
+            startup_splash.close()
+
         try:
             _wait_until_ready(
                 login_url,
@@ -713,6 +898,7 @@ def _argument_parser() -> argparse.ArgumentParser:
 def main() -> int:
     arguments = _argument_parser().parse_args()
     mutex_handle = None
+    startup_splash = None
 
     if (
         not arguments.check
@@ -728,6 +914,11 @@ def main() -> int:
                 flush=True,
             )
             return 0
+
+        startup_splash = (
+            NativeStartupSplash()
+        )
+        startup_splash.start()
 
     try:
         data_directory = (
@@ -756,6 +947,7 @@ def main() -> int:
             host=arguments.host,
             port=arguments.port,
             data_directory=data_directory,
+            startup_splash=startup_splash,
         )
 
     except (
@@ -770,6 +962,10 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    finally:
+        if startup_splash is not None:
+            startup_splash.close()
 
     return 0
 
