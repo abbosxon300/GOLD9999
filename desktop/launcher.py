@@ -16,6 +16,34 @@ APP_TITLE = "Gold 9999"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 STARTUP_TIMEOUT_SECONDS = 20.0
+SINGLE_INSTANCE_MUTEX_NAME = "Local\\Gold9999DesktopSingleInstance"
+ERROR_ALREADY_EXISTS = 183
+
+
+def _acquire_single_instance_mutex():
+    if sys.platform != "win32":
+        return object()
+
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+
+    mutex_handle = kernel32.CreateMutexW(
+        None,
+        False,
+        SINGLE_INSTANCE_MUTEX_NAME,
+    )
+
+    if not mutex_handle:
+        raise OSError(
+            "Single-instance mutex yaratilmadi"
+        )
+
+    if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+        kernel32.CloseHandle(mutex_handle)
+        return None
+
+    return mutex_handle
 
 
 def _project_root() -> Path:
@@ -684,6 +712,22 @@ def _argument_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     arguments = _argument_parser().parse_args()
+    mutex_handle = None
+
+    if (
+        not arguments.check
+        and not arguments.server_smoke
+    ):
+        mutex_handle = (
+            _acquire_single_instance_mutex()
+        )
+
+        if mutex_handle is None:
+            print(
+                "GOLD9999 ALLAQACHON ISHLAYAPTI",
+                flush=True,
+            )
+            return 0
 
     try:
         data_directory = (
