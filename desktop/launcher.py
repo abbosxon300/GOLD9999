@@ -46,187 +46,6 @@ def _acquire_single_instance_mutex():
     return mutex_handle
 
 
-
-class NativeStartupSplash:
-    def __init__(self) -> None:
-        self._thread = None
-        self._ready = threading.Event()
-        self._hwnd = None
-
-    def start(self) -> None:
-        if sys.platform != "win32":
-            return
-
-        self._thread = threading.Thread(
-            target=self._run,
-            name="gold9999-native-splash",
-            daemon=True,
-        )
-        self._thread.start()
-
-        self._ready.wait(timeout=1.0)
-
-    def close(self) -> None:
-        if (
-            sys.platform == "win32"
-            and self._hwnd
-        ):
-            import ctypes
-
-            WM_CLOSE = 0x0010
-
-            ctypes.windll.user32.PostMessageW(
-                self._hwnd,
-                WM_CLOSE,
-                0,
-                0,
-            )
-
-    def _run(self) -> None:
-        import ctypes
-        from ctypes import wintypes
-
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        gdi32 = ctypes.windll.gdi32
-
-        WS_EX_TOPMOST = 0x00000008
-        WS_EX_TOOLWINDOW = 0x00000080
-
-        WS_POPUP = 0x80000000
-        WS_VISIBLE = 0x10000000
-        WS_BORDER = 0x00800000
-
-        SS_CENTER = 0x00000001
-        SS_NOTIFY = 0x00000100
-
-        SW_SHOW = 5
-        WM_SETFONT = 0x0030
-
-        DEFAULT_CHARSET = 1
-        OUT_DEFAULT_PRECIS = 0
-        CLIP_DEFAULT_PRECIS = 0
-        CLEARTYPE_QUALITY = 5
-        DEFAULT_PITCH = 0
-        FF_DONTCARE = 0
-
-        width = 470
-        height = 190
-
-        screen_width = user32.GetSystemMetrics(0)
-        screen_height = user32.GetSystemMetrics(1)
-
-        left = max(
-            0,
-            int((screen_width - width) / 2),
-        )
-        top = max(
-            0,
-            int((screen_height - height) / 2),
-        )
-
-        user32.CreateWindowExW.restype = (
-            wintypes.HWND
-        )
-
-        kernel32.GetModuleHandleW.restype = (
-            wintypes.HMODULE
-        )
-
-        instance = kernel32.GetModuleHandleW(
-            None
-        )
-
-        window_text = (
-            "GOLD 9999\r\n\r\n"
-            "Ilova ishga tushmoqda..."
-        )
-
-        hwnd = user32.CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
-            "STATIC",
-            window_text,
-            (
-                WS_POPUP
-                | WS_VISIBLE
-                | WS_BORDER
-                | SS_CENTER
-                | SS_NOTIFY
-            ),
-            left,
-            top,
-            width,
-            height,
-            None,
-            None,
-            instance,
-            None,
-        )
-
-        if not hwnd:
-            self._ready.set()
-            return
-
-        self._hwnd = hwnd
-
-        gdi32.CreateFontW.restype = (
-            wintypes.HANDLE
-        )
-
-        font = gdi32.CreateFontW(
-            -26,
-            0,
-            0,
-            0,
-            600,
-            False,
-            False,
-            False,
-            DEFAULT_CHARSET,
-            OUT_DEFAULT_PRECIS,
-            CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY,
-            DEFAULT_PITCH | FF_DONTCARE,
-            "Segoe UI",
-        )
-
-        if font:
-            user32.SendMessageW(
-                hwnd,
-                WM_SETFONT,
-                font,
-                True,
-            )
-
-        user32.ShowWindow(
-            hwnd,
-            SW_SHOW,
-        )
-        user32.UpdateWindow(hwnd)
-
-        self._ready.set()
-
-        message = wintypes.MSG()
-
-        while user32.GetMessageW(
-            ctypes.byref(message),
-            None,
-            0,
-            0,
-        ) > 0:
-            user32.TranslateMessage(
-                ctypes.byref(message)
-            )
-            user32.DispatchMessageW(
-                ctypes.byref(message)
-            )
-
-        if font:
-            gdi32.DeleteObject(font)
-
-        self._hwnd = None
-
-
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -272,9 +91,12 @@ def configure_desktop_environment(
         exist_ok=True,
     )
 
-    os.environ.setdefault(
-        "GOLD9999_DATA_DIR",
-        str(selected),
+    os.environ["GOLD9999_DATA_DIR"] = str(
+        selected
+    )
+
+    os.environ["GOLD9999_DB_PATH"] = str(
+        selected / "data.db"
     )
 
     os.environ.setdefault(
@@ -288,6 +110,130 @@ def configure_desktop_environment(
         sys.path.insert(0, project_root)
 
     return selected
+
+
+
+def _desktop_database_requires_bootstrap(
+    data_directory: Path,
+) -> bool:
+    import sqlite3
+
+    database_path = (
+        Path(data_directory) / "data.db"
+    )
+
+    if not database_path.is_file():
+        return True
+
+    connection = sqlite3.connect(
+        database_path
+    )
+
+    try:
+        tables = {
+            str(row[0])
+            for row in connection.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type='table'
+                """
+            ).fetchall()
+        }
+
+        required_tables = {
+            "users",
+            "categories",
+            "products",
+        }
+
+        if not required_tables.issubset(tables):
+            return True
+
+        users = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM users"
+            ).fetchone()[0]
+        )
+
+        categories = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM categories"
+            ).fetchone()[0]
+        )
+
+        products = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM products"
+            ).fetchone()[0]
+        )
+
+        return (
+            users <= 1
+            and categories == 0
+            and products == 0
+        )
+
+    finally:
+        connection.close()
+
+
+def _run_first_install_if_required(
+    data_directory: Path,
+) -> None:
+    from services.offline.first_install_state import (
+        is_first_install_bootstrap_complete,
+    )
+
+    if is_first_install_bootstrap_complete():
+        print(
+            "FIRST INSTALL BOOTSTRAP:"
+            " marker mavjud",
+            flush=True,
+        )
+        return
+
+    if not _desktop_database_requires_bootstrap(
+        data_directory
+    ):
+        print(
+            "FIRST INSTALL BOOTSTRAP:"
+            " mavjud desktop baza ? o'tkazib yuborildi",
+            flush=True,
+        )
+        return
+
+    database_path = (
+        Path(data_directory) / "data.db"
+    )
+    env_path = (
+        Path(data_directory) / "offline.env"
+    )
+
+    if not env_path.is_file():
+        raise RuntimeError(
+            "Birinchi o'rnatish uchun "
+            "offline.env topilmadi: "
+            f"{env_path}"
+        )
+
+    from services.offline.first_install_runner import (
+        run_first_install_from_files,
+    )
+
+    result = run_first_install_from_files(
+        database_path=database_path,
+        env_path=env_path,
+    )
+
+    print(
+        "FIRST INSTALL BOOTSTRAP OK:",
+        f"users={result.users}",
+        f"agents={result.agents}",
+        f"categories={result.categories}",
+        f"products={result.products}",
+        flush=True,
+    )
 
 
 def _load_flask_application():
@@ -574,7 +520,6 @@ def run_desktop(
     host: str,
     port: int,
     data_directory: Path,
-    startup_splash=None,
 ) -> None:
     if not _port_is_available(host, port):
         raise RuntimeError(
@@ -699,13 +644,27 @@ def run_desktop(
 
     update_api = create_update_api()
 
+
     sync_worker = None
     sync_env_file = (
         Path(data_directory)
         / "offline.env"
     )
 
-    if sync_env_file.is_file():
+    def start_sync_worker() -> None:
+        nonlocal sync_worker
+
+        if sync_worker is not None:
+            return
+
+        if not sync_env_file.is_file():
+            print(
+                "WINDOWS AUTO SYNC DISABLED:",
+                f"config topilmadi: {sync_env_file}",
+                flush=True,
+            )
+            return
+
         try:
             from desktop.sync_worker import (
                 create_default_worker,
@@ -725,18 +684,14 @@ def run_desktop(
             )
 
         except Exception as exc:
+            sync_worker = None
+
             print(
                 "WINDOWS AUTO SYNC START FAILED:",
                 f"{type(exc).__name__}: {exc}",
                 file=sys.stderr,
                 flush=True,
             )
-    else:
-        print(
-            "WINDOWS AUTO SYNC DISABLED:",
-            f"config topilmadi: {sync_env_file}",
-            flush=True,
-        )
 
     window = webview.create_window(
         APP_TITLE,
@@ -773,10 +728,8 @@ def run_desktop(
         exist_ok=True,
     )
 
-    def finish_startup() -> None:
-        if startup_splash is not None:
-            startup_splash.close()
 
+    def finish_startup() -> None:
         try:
             _wait_until_ready(
                 login_url,
@@ -784,6 +737,12 @@ def run_desktop(
                     STARTUP_TIMEOUT_SECONDS
                 ),
             )
+
+            _run_first_install_if_required(
+                Path(data_directory)
+            )
+
+            start_sync_worker()
 
             window.load_url(login_url)
 
@@ -799,31 +758,67 @@ def run_desktop(
                 flush=True,
             )
 
+            safe_message = (
+                error_message
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+
             window.load_html(
-                """
+                f"""
 <!doctype html>
 <html lang="uz">
 <head>
   <meta charset="utf-8">
   <title>Gold 9999</title>
   <style>
-    body {
+    body {{
       margin: 0;
       padding: 48px;
       background: #f6f0df;
       color: #3a2f18;
       font-family: "Segoe UI", Arial, sans-serif;
       text-align: center;
-    }
+    }}
 
-    h1 {
-      margin-top: 80px;
-    }
+    .card {{
+      max-width: 680px;
+      margin: 70px auto 0;
+      padding: 32px;
+      background: white;
+      border-radius: 18px;
+      box-shadow:
+        0 18px 50px rgba(58, 47, 24, 0.12);
+    }}
+
+    h1 {{
+      margin: 0 0 18px;
+    }}
+
+    p {{
+      line-height: 1.6;
+    }}
+
+    .error {{
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #fff1f1;
+      color: #9f1d1d;
+      word-break: break-word;
+    }}
   </style>
 </head>
 <body>
-  <h1>Ilovani ishga tushirib bo'lmadi</h1>
-  <p>Iltimos, ilovani yopib qayta oching.</p>
+  <main class="card">
+    <h1>Tizimni tayyorlab bo'lmadi</h1>
+    <p>
+      Internet va offline sozlamalarini tekshirib,
+      ilovani qayta oching.
+    </p>
+    <div class="error">{safe_message}</div>
+  </main>
 </body>
 </html>
                 """
@@ -898,7 +893,6 @@ def _argument_parser() -> argparse.ArgumentParser:
 def main() -> int:
     arguments = _argument_parser().parse_args()
     mutex_handle = None
-    startup_splash = None
 
     if (
         not arguments.check
@@ -914,11 +908,6 @@ def main() -> int:
                 flush=True,
             )
             return 0
-
-        startup_splash = (
-            NativeStartupSplash()
-        )
-        startup_splash.start()
 
     try:
         data_directory = (
@@ -947,7 +936,6 @@ def main() -> int:
             host=arguments.host,
             port=arguments.port,
             data_directory=data_directory,
-            startup_splash=startup_splash,
         )
 
     except (
@@ -962,10 +950,6 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-
-    finally:
-        if startup_splash is not None:
-            startup_splash.close()
 
     return 0
 
