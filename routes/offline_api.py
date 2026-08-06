@@ -134,6 +134,214 @@ def register_offline_api_routes(
         )
 
 
+
+    @app.get("/api/offline/bootstrap")
+    def offline_bootstrap():
+        expected_token = str(
+            app.config.get(
+                "OFFLINE_SYNC_TOKEN",
+                "",
+            )
+        ).strip()
+
+        if not expected_token:
+            return jsonify({
+                "success": False,
+                "message": (
+                    "OFFLINE_SYNC_TOKEN "
+                    "serverda sozlanmagan"
+                ),
+            }), 503
+
+        supplied_token = _bearer_token()
+
+        if (
+            supplied_token is None
+            or not hmac.compare_digest(
+                supplied_token,
+                expected_token,
+            )
+        ):
+            return jsonify({
+                "success": False,
+                "message": "Unauthorized",
+            }), 401
+
+        try:
+            db = get_db()
+
+            users = db.execute(
+                """
+                SELECT
+                    username,
+                    password_hash,
+                    full_name,
+                    role,
+                    is_active,
+                    created_at
+                FROM users
+                ORDER BY id
+                """
+            ).fetchall()
+
+            agents = db.execute(
+                """
+                SELECT
+                    id,
+                    full_name,
+                    phone,
+                    is_active
+                FROM agents
+                ORDER BY id
+                """
+            ).fetchall()
+
+            categories = db.execute(
+                """
+                SELECT
+                    entity_uuid,
+                    sync_version,
+                    name,
+                    sort_order,
+                    is_active,
+                    created_at
+                FROM categories
+                WHERE entity_uuid IS NOT NULL
+                ORDER BY sort_order, id
+                """
+            ).fetchall()
+
+            products = db.execute(
+                """
+                SELECT
+                    p.entity_uuid,
+                    p.sync_version,
+                    p.name,
+                    p.sell_price_default_uzs,
+                    p.is_active,
+                    p.created_at,
+                    c.entity_uuid AS category_uuid
+                FROM products p
+                JOIN categories c
+                  ON c.id=p.category_id
+                WHERE p.entity_uuid IS NOT NULL
+                  AND c.entity_uuid IS NOT NULL
+                ORDER BY p.id
+                """
+            ).fetchall()
+
+            database_uuid = (
+                ensure_database_identity(db)
+            )
+
+        except Exception:
+            app.logger.exception(
+                "Offline bootstrap endpoint failed"
+            )
+
+            return jsonify({
+                "success": False,
+                "message": (
+                    "Offline bootstrap server xatosi"
+                ),
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "schema_version": 1,
+            "database_uuid": database_uuid,
+            "users": [
+                {
+                    "username": str(
+                        row["username"]
+                    ),
+                    "password_hash": str(
+                        row["password_hash"]
+                    ),
+                    "full_name": (
+                        None
+                        if row["full_name"] is None
+                        else str(row["full_name"])
+                    ),
+                    "role": str(row["role"]),
+                    "is_active": int(
+                        row["is_active"]
+                    ),
+                    "created_at": str(
+                        row["created_at"]
+                    ),
+                }
+                for row in users
+            ],
+            "agents": [
+                {
+                    "server_id": int(row["id"]),
+                    "full_name": (
+                        None
+                        if row["full_name"] is None
+                        else str(row["full_name"])
+                    ),
+                    "phone": (
+                        None
+                        if row["phone"] is None
+                        else str(row["phone"])
+                    ),
+                    "is_active": int(
+                        row["is_active"]
+                    ),
+                }
+                for row in agents
+            ],
+            "categories": [
+                {
+                    "entity_uuid": str(
+                        row["entity_uuid"]
+                    ),
+                    "sync_version": int(
+                        row["sync_version"]
+                    ),
+                    "name": str(row["name"]),
+                    "sort_order": int(
+                        row["sort_order"]
+                    ),
+                    "is_active": int(
+                        row["is_active"]
+                    ),
+                    "created_at": str(
+                        row["created_at"]
+                    ),
+                }
+                for row in categories
+            ],
+            "products": [
+                {
+                    "entity_uuid": str(
+                        row["entity_uuid"]
+                    ),
+                    "sync_version": int(
+                        row["sync_version"]
+                    ),
+                    "category_uuid": str(
+                        row["category_uuid"]
+                    ),
+                    "name": str(row["name"]),
+                    "sell_price_default_uzs": float(
+                        row[
+                            "sell_price_default_uzs"
+                        ]
+                    ),
+                    "is_active": int(
+                        row["is_active"]
+                    ),
+                    "created_at": str(
+                        row["created_at"]
+                    ),
+                }
+                for row in products
+            ],
+        })
+
+
     @app.post("/api/offline/push")
     def offline_push():
         expected_token = str(
