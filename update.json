@@ -1,6 +1,6 @@
 {
-  "version": "1.0.21",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.21/Gold9999Setup.exe",
-  "sha256": "2636fa7dead9bc5188803f0e78272ec48436d31b28273522cda7f114b66f6a9c",
-  "release_notes": "Desktop ilovaga native Windows yuklanish oynasi qo‘shildi.\n\n- Ikonka bosilgach GOLD 9999 oynasi taxminan 0.3 soniyada ko‘rinadi\n- Flask va WebView fonda yuklanadi\n- Asosiy ilova tayyor bo‘lganda splash avtomatik yopiladi\n- Ikki marta bosish himoyasi saqlanib qoldi\n- “Meni eslab qol”, offline sync va tez startup ishlashda davom etadi"
+  "version": "1.0.22",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.22/Gold9999Setup.exe",
+  "sha256": "3c387a8688f623d4e1716e5922e4cd87b1935a640e9bc97a3298f8bad7817e32",
+  "release_notes": "Yangi kompyuterlar uchun avtomatik birinchi o‘rnatish tayyorlandi.\n\n- Yangi kompyuterda serverdan xodimlar avtomatik yuklanadi\n- Kategoriyalar va mahsulotlar lokal bazaga avtomatik tushadi\n- Ma’lumotlar AppData\\Local\\Gold9999 ichida saqlanadi\n- Birinchi yuklash tugagach tizim internetsiz ham ishlaydi\n- Qayta ochilganda boshlang‘ich yuklash takrorlanmaydi\n- Offline sync, “Meni eslab qol” va tez startup saqlanib qoldi"
 }
