@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import sqlite3
@@ -130,6 +130,7 @@ def fetch_bootstrap_snapshot(
     *,
     base_url: str,
     token: str,
+    installation_uuid: str | None = None,
     timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     normalized_url = _required_text(
@@ -142,18 +143,29 @@ def fetch_bootstrap_snapshot(
         field_name="token",
     )
 
+    headers = {
+        "Accept": "application/json",
+        "Authorization": (
+            f"Bearer {normalized_token}"
+        ),
+        "User-Agent": (
+            "Gold9999-FirstInstallBootstrap/1"
+        ),
+    }
+
+    normalized_installation_uuid = str(
+        installation_uuid or ""
+    ).strip()
+
+    if normalized_installation_uuid:
+        headers[
+            "X-Gold9999-Installation-UUID"
+        ] = normalized_installation_uuid
+
     request = Request(
         url=normalized_url + BOOTSTRAP_PATH,
         method="GET",
-        headers={
-            "Accept": "application/json",
-            "Authorization": (
-                f"Bearer {normalized_token}"
-            ),
-            "User-Agent": (
-                "Gold9999-FirstInstallBootstrap/1"
-            ),
-        },
+        headers=headers,
     )
 
     try:
@@ -590,11 +602,13 @@ def run_first_install_bootstrap(
     *,
     base_url: str,
     token: str,
+    installation_uuid: str | None = None,
     timeout_seconds: float = 30.0,
 ) -> BootstrapResult:
     payload = fetch_bootstrap_snapshot(
         base_url=base_url,
         token=token,
+        installation_uuid=installation_uuid,
         timeout_seconds=timeout_seconds,
     )
 

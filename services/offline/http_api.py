@@ -273,6 +273,7 @@ class HttpSyncApi:
         base_url: str,
         token: str,
         *,
+        installation_uuid: str | None = None,
         timeout_seconds: float = (
             DEFAULT_TIMEOUT_SECONDS
         ),
@@ -301,6 +302,9 @@ class HttpSyncApi:
             token,
             field_name="token",
         )
+        self._installation_uuid = str(
+            installation_uuid or ""
+        ).strip()
         self._timeout_seconds = _positive_float(
             timeout_seconds,
             field_name="timeout_seconds",
@@ -471,20 +475,27 @@ class HttpSyncApi:
                 separators=(",", ":"),
             ).encode("utf-8")
 
+        headers = {
+            "Accept": "application/json",
+            "Authorization": (
+                f"Bearer {self._token}"
+            ),
+            "Content-Type": "application/json",
+            "User-Agent": (
+                "Gold9999-OfflineSync/1"
+            ),
+        }
+
+        if self._installation_uuid:
+            headers[
+                "X-Gold9999-Installation-UUID"
+            ] = self._installation_uuid
+
         request = Request(
             url=url,
             data=body,
             method=method,
-            headers={
-                "Accept": "application/json",
-                "Authorization": (
-                    f"Bearer {self._token}"
-                ),
-                "Content-Type": "application/json",
-                "User-Agent": (
-                    "Gold9999-OfflineSync/1"
-                ),
-            },
+            headers=headers,
         )
 
         for attempt in range(

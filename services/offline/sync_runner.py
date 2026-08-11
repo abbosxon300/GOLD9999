@@ -270,6 +270,7 @@ def build_sync_engine(
     api = HttpSyncApi(
         config.base_url,
         config.token,
+        installation_uuid=config.device_uuid,
         timeout_seconds=config.timeout_seconds,
         max_attempts=config.max_attempts,
         retry_backoff_seconds=(
