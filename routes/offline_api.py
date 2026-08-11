@@ -31,6 +31,7 @@ from services.offline.provisioning import (
     RevokedActivationCodeError,
     UsedActivationCodeError,
     provision_device,
+    validate_device_credential,
 )
 
 
@@ -52,6 +53,64 @@ def _bearer_token() -> str | None:
     return token or None
 
 
+def _offline_request_authorized(
+    app: Flask,
+    db,
+) -> bool:
+    supplied_token = _bearer_token()
+
+    if supplied_token is None:
+        return False
+
+    expected_token = str(
+        app.config.get(
+            "OFFLINE_SYNC_TOKEN",
+            "",
+        )
+    ).strip()
+
+    if (
+        expected_token
+        and hmac.compare_digest(
+            supplied_token,
+            expected_token,
+        )
+    ):
+        return True
+
+    installation_uuid = str(
+        request.headers.get(
+            "X-Gold9999-Installation-UUID",
+            "",
+        )
+    ).strip()
+
+    if not installation_uuid:
+        return False
+
+    try:
+        valid = validate_device_credential(
+            db,
+            installation_uuid=installation_uuid,
+            credential=supplied_token,
+        )
+
+        if valid:
+            db.commit()
+
+        return bool(valid)
+
+    except (
+        ProvisioningError,
+        TypeError,
+        ValueError,
+    ):
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        return False
 def register_offline_api_routes(
     app: Flask,
     *,
@@ -64,30 +123,11 @@ def register_offline_api_routes(
 
     @app.get("/api/offline/pull")
     def offline_pull():
-        expected_token = str(
-            app.config.get(
-                "OFFLINE_SYNC_TOKEN",
-                "",
-            )
-        ).strip()
+        db = get_db()
 
-        if not expected_token:
-            return jsonify({
-                "success": False,
-                "message": (
-                    "OFFLINE_SYNC_TOKEN "
-                    "serverda sozlanmagan"
-                ),
-            }), 503
-
-        supplied_token = _bearer_token()
-
-        if (
-            supplied_token is None
-            or not hmac.compare_digest(
-                supplied_token,
-                expected_token,
-            )
+        if not _offline_request_authorized(
+            app,
+            db,
         ):
             return jsonify({
                 "success": False,
@@ -145,30 +185,11 @@ def register_offline_api_routes(
 
     @app.get("/api/offline/bootstrap")
     def offline_bootstrap():
-        expected_token = str(
-            app.config.get(
-                "OFFLINE_SYNC_TOKEN",
-                "",
-            )
-        ).strip()
+        db = get_db()
 
-        if not expected_token:
-            return jsonify({
-                "success": False,
-                "message": (
-                    "OFFLINE_SYNC_TOKEN "
-                    "serverda sozlanmagan"
-                ),
-            }), 503
-
-        supplied_token = _bearer_token()
-
-        if (
-            supplied_token is None
-            or not hmac.compare_digest(
-                supplied_token,
-                expected_token,
-            )
+        if not _offline_request_authorized(
+            app,
+            db,
         ):
             return jsonify({
                 "success": False,
@@ -453,30 +474,11 @@ def register_offline_api_routes(
 
     @app.post("/api/offline/push")
     def offline_push():
-        expected_token = str(
-            app.config.get(
-                "OFFLINE_SYNC_TOKEN",
-                "",
-            )
-        ).strip()
+        db = get_db()
 
-        if not expected_token:
-            return jsonify({
-                "success": False,
-                "message": (
-                    "OFFLINE_SYNC_TOKEN "
-                    "serverda sozlanmagan"
-                ),
-            }), 503
-
-        supplied_token = _bearer_token()
-
-        if (
-            supplied_token is None
-            or not hmac.compare_digest(
-                supplied_token,
-                expected_token,
-            )
+        if not _offline_request_authorized(
+            app,
+            db,
         ):
             return jsonify({
                 "success": False,
