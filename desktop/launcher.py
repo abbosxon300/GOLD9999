@@ -99,6 +99,15 @@ def configure_desktop_environment(
         selected / "data.db"
     )
 
+    os.environ[
+        "GOLD9999_DESKTOP_RUNTIME"
+    ] = "1"
+
+    os.environ.setdefault(
+        "GOLD9999_SAAS_URL",
+        "https://gold9999.pythonanywhere.com",
+    )
+
     os.environ.setdefault(
         "SECRET_KEY",
         "GOLD9999_DESKTOP_LOCAL_2026",
@@ -180,7 +189,7 @@ def _desktop_database_requires_bootstrap(
 
 def _run_first_install_if_required(
     data_directory: Path,
-) -> None:
+) -> bool:
     from services.offline.first_install_state import (
         is_first_install_bootstrap_complete,
     )
@@ -191,7 +200,7 @@ def _run_first_install_if_required(
             " marker mavjud",
             flush=True,
         )
-        return
+        return True
 
     if not _desktop_database_requires_bootstrap(
         data_directory
@@ -201,7 +210,7 @@ def _run_first_install_if_required(
             " mavjud desktop baza ? o'tkazib yuborildi",
             flush=True,
         )
-        return
+        return True
 
     database_path = (
         Path(data_directory) / "data.db"
@@ -211,11 +220,12 @@ def _run_first_install_if_required(
     )
 
     if not env_path.is_file():
-        raise RuntimeError(
-            "Birinchi o'rnatish uchun "
-            "offline.env topilmadi: "
-            f"{env_path}"
+        print(
+            "FIRST INSTALL:",
+            "SaaS login kutilmoqda",
+            flush=True,
         )
+        return False
 
     from services.offline.first_install_runner import (
         run_first_install_from_files,
@@ -234,6 +244,8 @@ def _run_first_install_if_required(
         f"products={result.products}",
         flush=True,
     )
+
+    return True
 
 
 def _load_flask_application():
@@ -557,6 +569,11 @@ def run_desktop(
         f"http://{host}:{port}/login"
     )
 
+    first_install_url = (
+        f"http://{host}:{port}"
+        "/desktop/first-install"
+    )
+
     startup_html = """
 <!doctype html>
 <html lang="uz">
@@ -738,13 +755,39 @@ def run_desktop(
                 ),
             )
 
-            _run_first_install_if_required(
-                Path(data_directory)
+            bootstrap_ready = (
+                _run_first_install_if_required(
+                    Path(data_directory)
+                )
             )
 
-            start_sync_worker()
+            if bootstrap_ready:
+                start_sync_worker()
+                window.load_url(
+                    login_url
+                )
 
-            window.load_url(login_url)
+            else:
+                def wait_for_provisioning():
+                    while True:
+                        if sync_env_file.is_file():
+                            start_sync_worker()
+                            return
+
+                        time.sleep(0.5)
+
+                threading.Thread(
+                    target=wait_for_provisioning,
+                    name=(
+                        "gold9999-"
+                        "provisioning-watch"
+                    ),
+                    daemon=True,
+                ).start()
+
+                window.load_url(
+                    first_install_url
+                )
 
         except Exception as exc:
             error_message = (

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
@@ -17,6 +17,7 @@ from services.offline.first_install_state import (
 
 OFFLINE_URL_KEY = "OFFLINE_SYNC_URL"
 OFFLINE_TOKEN_KEY = "OFFLINE_SYNC_TOKEN"
+OFFLINE_DEVICE_UUID_KEY = "OFFLINE_DEVICE_UUID"
 
 
 class FirstInstallRunnerError(RuntimeError):
@@ -116,6 +117,15 @@ def load_offline_environment(
         field_name=OFFLINE_TOKEN_KEY,
     )
 
+    _required_text(
+        result.get(
+            OFFLINE_DEVICE_UUID_KEY
+        ),
+        field_name=(
+            OFFLINE_DEVICE_UUID_KEY
+        ),
+    )
+
     return result
 
 
@@ -124,6 +134,7 @@ def run_first_install_setup(
     *,
     base_url: str,
     token: str,
+    installation_uuid: str | None = None,
     state_checker: Callable[[], bool] = (
         is_first_install_bootstrap_complete
     ),
@@ -184,6 +195,9 @@ def run_first_install_setup(
             connection,
             base_url=normalized_url,
             token=normalized_token,
+            installation_uuid=(
+                installation_uuid
+            ),
         )
 
         connection.commit()
@@ -252,6 +266,9 @@ def run_first_install_from_files(
             token=environment[
                 OFFLINE_TOKEN_KEY
             ],
+            installation_uuid=environment[
+                OFFLINE_DEVICE_UUID_KEY
+            ],
         )
 
     finally:
@@ -259,6 +276,7 @@ def run_first_install_from_files(
 
 
 __all__ = [
+    "OFFLINE_DEVICE_UUID_KEY",
     "OFFLINE_TOKEN_KEY",
     "OFFLINE_URL_KEY",
     "FirstInstallRunResult",

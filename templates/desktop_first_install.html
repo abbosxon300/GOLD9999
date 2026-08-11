@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+  <title>Gold 9999</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(
+          145deg,
+          #f7f2e6,
+          #eee3c8
+        );
+      color: #302714;
+      font-family:
+        "Segoe UI",
+        Arial,
+        sans-serif;
+    }
+
+    .card {
+      width: min(420px, calc(100vw - 40px));
+      padding: 34px;
+      background: #ffffff;
+      border: 1px solid rgba(80, 62, 24, 0.10);
+      border-radius: 22px;
+      box-shadow:
+        0 24px 70px
+        rgba(67, 52, 20, 0.13);
+    }
+
+    .brand {
+      margin-bottom: 8px;
+      text-align: center;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .subtitle {
+      margin-bottom: 28px;
+      text-align: center;
+      color: #7a6c4c;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input {
+      width: 100%;
+      height: 46px;
+      margin-bottom: 18px;
+      padding: 0 14px;
+      border: 1px solid #d8d1c1;
+      border-radius: 11px;
+      outline: none;
+      font-size: 15px;
+    }
+
+    input:focus {
+      border-color: #9b7a2e;
+      box-shadow:
+        0 0 0 3px
+        rgba(155, 122, 46, 0.12);
+    }
+
+    button {
+      width: 100%;
+      height: 48px;
+      border: 0;
+      border-radius: 11px;
+      background: #302714;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: .94;
+    }
+
+    .error {
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fff0f0;
+      color: #a02222;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .note {
+      margin-top: 18px;
+      color: #8a806b;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card">
+    <div class="brand">
+      GOLD 9999
+    </div>
+
+    <div class="subtitle">
+      Tizimni ushbu kompyuterda
+      birinchi marta faollashtiring.
+    </div>
+
+    {% if error %}
+      <div class="error">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form method="post">
+      <label for="username">
+        Login
+      </label>
+
+      <input
+        id="username"
+        name="username"
+        autocomplete="username"
+        value="{{ entered_username|default('')|e }}"
+        required
+        autofocus
+      >
+
+      <label for="password">
+        Parol
+      </label>
+
+      <input
+        id="password"
+        type="password"
+        name="password"
+        autocomplete="current-password"
+        required
+      >
+
+      <button type="submit">
+        Kirish va tizimni tayyorlash
+      </button>
+    </form>
+
+    <div class="note">
+      Birinchi kirishda internet kerak.
+      Keyinchalik tizim internetsiz ham
+      ishlashi mumkin.
+    </div>
+  </main>
+</body>
+</html>

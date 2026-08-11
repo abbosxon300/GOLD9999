@@ -65,6 +65,189 @@ def provisioning_path(
     )
 
 
+def login_provision_device(
+    *,
+    base_url: str,
+    username: str,
+    password: str,
+    installation_uuid: str,
+    timeout_seconds: float = (
+        DEFAULT_ACTIVATION_TIMEOUT_SECONDS
+    ),
+    opener: Callable[..., object] = urlopen,
+) -> ProvisioningState:
+    normalized_url = _required_text(
+        base_url,
+        field_name="base_url",
+    ).rstrip("/")
+
+    normalized_username = _required_text(
+        username,
+        field_name="username",
+    )
+
+    normalized_password = _required_text(
+        password,
+        field_name="password",
+    )
+
+    normalized_uuid = _required_text(
+        installation_uuid,
+        field_name="installation_uuid",
+    )
+
+    timeout = float(
+        timeout_seconds
+    )
+
+    if timeout <= 0:
+        raise ValueError(
+            "timeout_seconds musbat bo?lishi kerak"
+        )
+
+    payload = json.dumps(
+        {
+            "username": normalized_username,
+            "password": normalized_password,
+            "installation_uuid": normalized_uuid,
+        }
+    ).encode("utf-8")
+
+    request = Request(
+        normalized_url
+        + "/api/offline/login-provision",
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        response = opener(
+            request,
+            timeout=timeout,
+        )
+
+        try:
+            raw = response.read()
+        finally:
+            close = getattr(
+                response,
+                "close",
+                None,
+            )
+
+            if callable(close):
+                close()
+
+    except HTTPError as exc:
+        try:
+            body = exc.read()
+        except Exception:
+            body = b""
+
+        message = (
+            f"Login provisioning HTTP xato: "
+            f"{exc.code}"
+        )
+
+        try:
+            parsed = json.loads(
+                body.decode("utf-8")
+            )
+
+            server_message = parsed.get(
+                "message"
+            )
+
+            if (
+                isinstance(
+                    server_message,
+                    str,
+                )
+                and server_message.strip()
+            ):
+                message = (
+                    server_message.strip()
+                )
+
+        except Exception:
+            pass
+
+        raise ActivationRequestError(
+            message
+        ) from exc
+
+    except (
+        URLError,
+        TimeoutError,
+        OSError,
+    ) as exc:
+        raise ActivationRequestError(
+            "Serverga ulanib bo?lmadi"
+        ) from exc
+
+    try:
+        body = json.loads(
+            raw.decode("utf-8")
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise ActivationRequestError(
+            "Server javobi noto?g?ri"
+        ) from exc
+
+    if (
+        not isinstance(
+            body,
+            dict,
+        )
+        or body.get("success") is not True
+    ):
+        raise ActivationRequestError(
+            str(
+                body.get(
+                    "message",
+                    "Login provisioning "
+                    "muvaffaqiyatsiz",
+                )
+                if isinstance(body, dict)
+                else
+                "Login provisioning "
+                "muvaffaqiyatsiz"
+            )
+        )
+
+    returned_uuid = _required_text(
+        body.get(
+            "installation_uuid"
+        ),
+        field_name="installation_uuid",
+    )
+
+    if returned_uuid != normalized_uuid:
+        raise ActivationRequestError(
+            "Server installation_uuid mos emas"
+        )
+
+    credential = _required_text(
+        body.get(
+            "device_credential"
+        ),
+        field_name="device_credential",
+    )
+
+    return ProvisioningState(
+        base_url=normalized_url,
+        installation_uuid=returned_uuid,
+        device_credential=credential,
+    )
+
+
 def activate_device(
     *,
     base_url: str,
@@ -309,6 +492,61 @@ def write_provisioning_state(
     return path
 
 
+def write_offline_environment(
+    *,
+    data_directory: str | Path,
+    state: ProvisioningState,
+    sync_interval: int = 15,
+    sync_limit: int = 50,
+) -> Path:
+    root = (
+        Path(data_directory)
+        .expanduser()
+        .resolve()
+    )
+
+    root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    path = (
+        root
+        / "offline.env"
+    )
+
+    payload = (
+        f"OFFLINE_SYNC_URL={state.base_url}\n"
+        f"OFFLINE_SYNC_TOKEN="
+        f"{state.device_credential}\n"
+        f"OFFLINE_DEVICE_UUID="
+        f"{state.installation_uuid}\n"
+        f"OFFLINE_SYNC_INTERVAL="
+        f"{int(sync_interval)}\n"
+        f"OFFLINE_SYNC_LIMIT="
+        f"{int(sync_limit)}\n"
+    )
+
+    temporary = (
+        path.with_name(
+            path.name + ".tmp"
+        )
+    )
+
+    temporary.write_text(
+        payload,
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    os.replace(
+        temporary,
+        path,
+    )
+
+    return path
+
+
 def load_provisioning_state(
     data_directory: str | Path,
 ) -> ProvisioningState | None:
@@ -378,6 +616,8 @@ __all__ = [
     "ProvisioningStateError",
     "activate_device",
     "load_provisioning_state",
+    "login_provision_device",
     "provisioning_path",
+    "write_offline_environment",
     "write_provisioning_state",
 ]

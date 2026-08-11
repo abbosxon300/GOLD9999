@@ -33,6 +33,9 @@ from services.offline.provisioning import (
     provision_device,
     validate_device_credential,
 )
+from services.offline.saas_provisioning import (
+    resolve_device_identity,
+)
 
 
 def _bearer_token() -> str | None:
@@ -51,6 +54,84 @@ def _bearer_token() -> str | None:
     token = authorization[len(prefix):].strip()
 
     return token or None
+
+
+def _offline_request_tenant_identity(
+    app: Flask,
+    db,
+) -> tuple[bool, int | None, int | None]:
+    supplied_token = _bearer_token()
+
+    if supplied_token is None:
+        return False, None, None
+
+    expected_token = str(
+        app.config.get(
+            "OFFLINE_SYNC_TOKEN",
+            "",
+        )
+    ).strip()
+
+    if (
+        expected_token
+        and hmac.compare_digest(
+            supplied_token,
+            expected_token,
+        )
+    ):
+        return True, None, None
+
+    installation_uuid = str(
+        request.headers.get(
+            "X-Gold9999-Installation-UUID",
+            "",
+        )
+    ).strip()
+
+    if not installation_uuid:
+        return False, None, None
+
+    try:
+        identity = resolve_device_identity(
+            db,
+            installation_uuid=installation_uuid,
+            credential=supplied_token,
+        )
+
+        if identity is not None:
+            db.commit()
+
+            tenant_id, user_id = identity
+
+            return (
+                True,
+                int(tenant_id),
+                int(user_id),
+            )
+
+        valid = validate_device_credential(
+            db,
+            installation_uuid=installation_uuid,
+            credential=supplied_token,
+        )
+
+        if valid:
+            db.commit()
+            return True, None, None
+
+        return False, None, None
+
+    except (
+        ProvisioningError,
+        TypeError,
+        ValueError,
+    ):
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        return False, None, None
 
 
 def _offline_request_authorized(
@@ -187,10 +268,16 @@ def register_offline_api_routes(
     def offline_bootstrap():
         db = get_db()
 
-        if not _offline_request_authorized(
+        (
+            authorized,
+            tenant_id,
+            authenticated_user_id,
+        ) = _offline_request_tenant_identity(
             app,
             db,
-        ):
+        )
+
+        if not authorized:
             return jsonify({
                 "success": False,
                 "message": "Unauthorized",
@@ -209,8 +296,16 @@ def register_offline_api_routes(
                     is_active,
                     created_at
                 FROM users
+                WHERE (
+                    ? IS NULL
+                    OR tenant_id=?
+                )
                 ORDER BY id
-                """
+                """,
+                (
+                    tenant_id,
+                    tenant_id,
+                ),
             ).fetchall()
 
             agents = db.execute(
@@ -221,8 +316,16 @@ def register_offline_api_routes(
                     phone,
                     is_active
                 FROM agents
+                WHERE (
+                    ? IS NULL
+                    OR tenant_id=?
+                )
                 ORDER BY id
-                """
+                """,
+                (
+                    tenant_id,
+                    tenant_id,
+                ),
             ).fetchall()
 
             categories = db.execute(
@@ -236,8 +339,16 @@ def register_offline_api_routes(
                     created_at
                 FROM categories
                 WHERE entity_uuid IS NOT NULL
+                  AND (
+                      ? IS NULL
+                      OR tenant_id=?
+                  )
                 ORDER BY sort_order, id
-                """
+                """,
+                (
+                    tenant_id,
+                    tenant_id,
+                ),
             ).fetchall()
 
             products = db.execute(
@@ -255,8 +366,22 @@ def register_offline_api_routes(
                   ON c.id=p.category_id
                 WHERE p.entity_uuid IS NOT NULL
                   AND c.entity_uuid IS NOT NULL
+                  AND (
+                      ? IS NULL
+                      OR p.tenant_id=?
+                  )
+                  AND (
+                      ? IS NULL
+                      OR c.tenant_id=?
+                  )
                 ORDER BY p.id
-                """
+                """,
+                (
+                    tenant_id,
+                    tenant_id,
+                    tenant_id,
+                    tenant_id,
+                ),
             ).fetchall()
 
             database_uuid = (

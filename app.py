@@ -95,6 +95,18 @@ try:
 except Exception:
     register_offline_api_routes = None
 try:
+    from routes.saas_provisioning_api import (
+        register_saas_provisioning_routes,
+    )
+except Exception:
+    register_saas_provisioning_routes = None
+try:
+    from routes.desktop_first_install import (
+        register_desktop_first_install_routes,
+    )
+except Exception:
+    register_desktop_first_install_routes = None
+try:
     from routes.offline_status import (
         register_offline_status_routes,
     )
@@ -436,6 +448,18 @@ if register_sales_routes:
 
 if register_offline_api_routes is not None:
     register_offline_api_routes(
+        app,
+        get_db=get_db,
+    )
+
+if register_saas_provisioning_routes is not None:
+    register_saas_provisioning_routes(
+        app,
+        get_db=get_db,
+    )
+
+if register_desktop_first_install_routes is not None:
+    register_desktop_first_install_routes(
         app,
         get_db=get_db,
     )
