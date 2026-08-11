@@ -1,9 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 
 
-APP_VERSION = "1.0.22"
+APP_VERSION = "1.0.23"
 
 _VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\."
