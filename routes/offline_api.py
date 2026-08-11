@@ -24,6 +24,14 @@ from services.offline.push_service import (
     apply_push_batch,
     sync_result_to_dict,
 )
+from services.offline.provisioning import (
+    ExpiredActivationCodeError,
+    InvalidActivationCodeError,
+    ProvisioningError,
+    RevokedActivationCodeError,
+    UsedActivationCodeError,
+    provision_device,
+)
 
 
 def _bearer_token() -> str | None:
@@ -339,6 +347,107 @@ def register_offline_api_routes(
                 }
                 for row in products
             ],
+        })
+
+
+    @app.post("/api/offline/activate")
+    def offline_activate():
+        if not request.is_json:
+            return jsonify({
+                "success": False,
+                "message": (
+                    "Content-Type application/json "
+                    "bo?lishi kerak"
+                ),
+            }), 415
+
+        body = request.get_json(
+            silent=True
+        )
+
+        if not isinstance(body, dict):
+            return jsonify({
+                "success": False,
+                "message": (
+                    "Request body JSON object "
+                    "bo?lishi kerak"
+                ),
+            }), 400
+
+        expected_fields = {
+            "activation_code",
+            "installation_uuid",
+        }
+
+        if set(body) != expected_fields:
+            return jsonify({
+                "success": False,
+                "message": (
+                    "Request faqat activation_code "
+                    "va installation_uuid "
+                    "maydonlariga ega bo?lishi kerak"
+                ),
+            }), 400
+
+        try:
+            db = get_db()
+
+            device = provision_device(
+                db,
+                activation_code=body[
+                    "activation_code"
+                ],
+                installation_uuid=body[
+                    "installation_uuid"
+                ],
+            )
+
+            db.commit()
+
+        except (
+            InvalidActivationCodeError,
+            ExpiredActivationCodeError,
+            UsedActivationCodeError,
+            RevokedActivationCodeError,
+            ProvisioningError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+            return jsonify({
+                "success": False,
+                "message": str(exc),
+            }), 400
+
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+            app.logger.exception(
+                "Offline activation endpoint failed"
+            )
+
+            return jsonify({
+                "success": False,
+                "message": (
+                    "Offline activation server xatosi"
+                ),
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "installation_uuid": (
+                device.installation_uuid
+            ),
+            "device_credential": (
+                device.credential
+            ),
         })
 
 
