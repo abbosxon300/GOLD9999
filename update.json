@@ -1,6 +1,6 @@
 {
-  "version": "1.0.22",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.22/Gold9999Setup.exe",
-  "sha256": "3c387a8688f623d4e1716e5922e4cd87b1935a640e9bc97a3298f8bad7817e32",
-  "release_notes": "Yangi kompyuterlar uchun avtomatik birinchi o‘rnatish tayyorlandi.\n\n- Yangi kompyuterda serverdan xodimlar avtomatik yuklanadi\n- Kategoriyalar va mahsulotlar lokal bazaga avtomatik tushadi\n- Ma’lumotlar AppData\\Local\\Gold9999 ichida saqlanadi\n- Birinchi yuklash tugagach tizim internetsiz ham ishlaydi\n- Qayta ochilganda boshlang‘ich yuklash takrorlanmaydi\n- Offline sync, “Meni eslab qol” va tez startup saqlanib qoldi"
+  "version": "1.0.23",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.23/Gold9999Setup.exe",
+  "sha256": "1a91f722530779313fe65c42ea07801b49b997b5c428c0f04000d08e0fac443b",
+  "release_notes": "SaaS login orqali yangi kompyuterni avtomatik ulash, tenant bootstrap va offline ishlash tayyorlandi."
 }
