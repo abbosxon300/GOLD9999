@@ -8,7 +8,11 @@ from typing import Any
 
 from services.offline.constants import OPERATION_CREATE
 from services.offline.models import SyncRecord
-from services.offline.sqlite_queue import SQLiteSyncQueue
+from services.offline.sqlite_queue import (
+    SQLiteSyncQueue,
+    utc_now_iso,
+)
+from services.offline.serializer import serialize_payload
 
 
 @dataclass(frozen=True)
@@ -16,6 +20,7 @@ class LegacyMasterDataRecoveryResult:
     categories_recovered: int
     products_recovered: int
     queue_created: int
+    queue_repaired: int
 
 
 def _device_uuid(connection: sqlite3.Connection) -> str:
@@ -91,27 +96,109 @@ def _successful_push_exists(
     return row is not None
 
 
-def _enqueue_create_if_required(
+def _ensure_create_queue(
     connection: sqlite3.Connection,
     *,
     entity_type: str,
     entity_uuid: str,
     payload: dict[str, Any],
     device_uuid: str,
-) -> bool:
-    if _queue_exists(
-        connection,
-        entity_type=entity_type,
-        entity_uuid=entity_uuid,
-    ):
-        return False
-
+) -> tuple[bool, bool]:
     if _successful_push_exists(
         connection,
         entity_type=entity_type,
         entity_uuid=entity_uuid,
     ):
-        return False
+        return False, False
+
+    synced = connection.execute(
+        """
+        SELECT 1
+        FROM sync_queue
+        WHERE entity_type=?
+          AND entity_uuid=?
+          AND status='synced'
+        LIMIT 1
+        """,
+        (
+            entity_type,
+            entity_uuid,
+        ),
+    ).fetchone()
+
+    if synced is not None:
+        return False, False
+
+    existing = connection.execute(
+        """
+        SELECT
+            id,
+            operation,
+            payload_json,
+            device_uuid,
+            status,
+            attempt_count,
+            next_attempt_at,
+            last_error,
+            synced_at
+        FROM sync_queue
+        WHERE entity_type=?
+          AND entity_uuid=?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (
+            entity_type,
+            entity_uuid,
+        ),
+    ).fetchone()
+
+    if existing is not None:
+        expected_payload = serialize_payload(payload)
+
+        already_ready = (
+            existing["operation"] == "create"
+            and existing["payload_json"] == expected_payload
+            and existing["device_uuid"] == device_uuid
+            and existing["status"] == "pending"
+            and int(existing["attempt_count"]) == 0
+            and existing["next_attempt_at"] is None
+            and existing["last_error"] is None
+            and existing["synced_at"] is None
+        )
+
+        if already_ready:
+            return False, False
+
+        now = utc_now_iso()
+
+        connection.execute(
+            """
+            UPDATE sync_queue
+            SET
+                operation='create',
+                payload_json=?,
+                device_uuid=?,
+                status='pending',
+                attempt_count=0,
+                next_attempt_at=NULL,
+                last_error=NULL,
+                synced_at=NULL,
+                updated_at=?
+            WHERE entity_type=?
+              AND entity_uuid=?
+              AND status<>'synced'
+            """,
+            (
+                expected_payload,
+                device_uuid,
+                now,
+                entity_type,
+                entity_uuid,
+            ),
+        )
+
+        return False, True
 
     queue = SQLiteSyncQueue(
         lambda: connection
@@ -131,7 +218,7 @@ def _enqueue_create_if_required(
         connection=connection,
     )
 
-    return True
+    return True, False
 
 
 def _category_payload(
@@ -188,6 +275,7 @@ def recover_legacy_master_data(
     categories_recovered = 0
     products_recovered = 0
     queue_created = 0
+    queue_repaired = 0
 
     connection.execute(
         "SAVEPOINT legacy_master_data_recovery"
@@ -242,31 +330,35 @@ def recover_legacy_master_data(
                 categories_recovered += 1
                 recovered = True
 
-            if recovered:
-                fresh = connection.execute(
-                    """
-                    SELECT
-                        id,
-                        name,
-                        sort_order,
-                        is_active,
-                        created_at,
-                        entity_uuid,
-                        sync_version
-                    FROM categories
-                    WHERE id=?
-                    """,
-                    (row["id"],),
-                ).fetchone()
+            fresh = connection.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    sort_order,
+                    is_active,
+                    created_at,
+                    entity_uuid,
+                    sync_version
+                FROM categories
+                WHERE id=?
+                """,
+                (row["id"],),
+            ).fetchone()
 
-                if _enqueue_create_if_required(
-                    connection,
-                    entity_type="category",
-                    entity_uuid=entity_uuid,
-                    payload=_category_payload(fresh),
-                    device_uuid=device_uuid,
-                ):
-                    queue_created += 1
+            created, repaired = _ensure_create_queue(
+                connection,
+                entity_type="category",
+                entity_uuid=entity_uuid,
+                payload=_category_payload(fresh),
+                device_uuid=device_uuid,
+            )
+
+            if created:
+                queue_created += 1
+
+            if repaired:
+                queue_repaired += 1
 
         products = connection.execute(
             """
@@ -320,35 +412,39 @@ def recover_legacy_master_data(
                 products_recovered += 1
                 recovered = True
 
-            if recovered:
-                fresh = connection.execute(
-                    """
-                    SELECT
-                        p.id,
-                        p.name,
-                        p.category_id,
-                        p.sell_price_default_uzs,
-                        p.is_active,
-                        p.created_at,
-                        p.entity_uuid,
-                        p.sync_version,
-                        c.entity_uuid AS category_uuid
-                    FROM products p
-                    JOIN categories c
-                      ON c.id=p.category_id
-                    WHERE p.id=?
-                    """,
-                    (row["id"],),
-                ).fetchone()
+            fresh = connection.execute(
+                """
+                SELECT
+                    p.id,
+                    p.name,
+                    p.category_id,
+                    p.sell_price_default_uzs,
+                    p.is_active,
+                    p.created_at,
+                    p.entity_uuid,
+                    p.sync_version,
+                    c.entity_uuid AS category_uuid
+                FROM products p
+                JOIN categories c
+                  ON c.id=p.category_id
+                WHERE p.id=?
+                """,
+                (row["id"],),
+            ).fetchone()
 
-                if _enqueue_create_if_required(
-                    connection,
-                    entity_type="product",
-                    entity_uuid=entity_uuid,
-                    payload=_product_payload(fresh),
-                    device_uuid=device_uuid,
-                ):
-                    queue_created += 1
+            created, repaired = _ensure_create_queue(
+                connection,
+                entity_type="product",
+                entity_uuid=entity_uuid,
+                payload=_product_payload(fresh),
+                device_uuid=device_uuid,
+            )
+
+            if created:
+                queue_created += 1
+
+            if repaired:
+                queue_repaired += 1
 
         connection.execute(
             "RELEASE SAVEPOINT legacy_master_data_recovery"
@@ -367,6 +463,7 @@ def recover_legacy_master_data(
         categories_recovered=categories_recovered,
         products_recovered=products_recovered,
         queue_created=queue_created,
+        queue_repaired=queue_repaired,
     )
 
 

@@ -792,6 +792,7 @@ def run_desktop(
                         f"categories={recovery_result.categories_recovered}",
                         f"products={recovery_result.products_recovered}",
                         f"queue={recovery_result.queue_created}",
+                        f"repaired={recovery_result.queue_repaired}",
                         flush=True,
                     )
 
