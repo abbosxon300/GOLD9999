@@ -143,9 +143,8 @@ def write_manifest(
     payload = {
         "version": version,
         "installer_url": (
-            "https://github.com/"
-            f"{REPOSITORY}/releases/download/"
-            f"v{version}/Gold9999Setup.exe"
+            "https://gold9999.pythonanywhere.com/"
+            "downloads/Gold9999Setup.exe"
         ),
         "sha256": digest,
         "release_notes": notes,
