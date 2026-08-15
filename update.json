@@ -1,6 +1,6 @@
 {
-  "version": "1.0.23",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.23/Gold9999Setup.exe",
-  "sha256": "1a91f722530779313fe65c42ea07801b49b997b5c428c0f04000d08e0fac443b",
-  "release_notes": "SaaS login orqali yangi kompyuterni avtomatik ulash, tenant bootstrap va offline ishlash tayyorlandi."
+  "version": "1.0.24",
+  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.24/Gold9999Setup.exe",
+  "sha256": "eee24c4a19219898613a3a459ab1b4ea80d2005b184d60443e56529e849a6cdc",
+  "release_notes": "Kategoriya va mahsulotlarning desktop-server sinxronizatsiyasi tuzatildi."
 }
