@@ -152,6 +152,9 @@ def _category_payload(
         "created_at": str(
             row["created_at"]
         ),
+        "sync_version": int(
+            row["sync_version"]
+        ),
     }
 
 
@@ -210,6 +213,9 @@ def _product_payload(
         ),
         "created_at": str(
             row["created_at"]
+        ),
+        "sync_version": int(
+            row["sync_version"]
         ),
     }
 
