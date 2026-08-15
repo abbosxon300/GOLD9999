@@ -16,6 +16,15 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash
 
+from services.business_writes.master_data import (
+    create_category,
+    create_product,
+    set_category_active,
+    set_product_active,
+    update_category,
+    update_product,
+)
+
 
 def register_settings_routes(
     app,
@@ -64,16 +73,9 @@ def register_settings_routes(
         sort_order = int(next_sort_row["next_sort"])
 
         try:
-            exec_sql(
-                """
-                INSERT INTO categories(
-                    name,
-                    sort_order,
-                    is_active
-                )
-                VALUES (?, ?, 1)
-                """,
-                (name, sort_order),
+            create_category(
+                name=name,
+                sort_order=sort_order,
             )
             flash("Kategoriya qo‘shildi ✅", "success")
         except sqlite3.IntegrityError:
@@ -91,7 +93,10 @@ def register_settings_routes(
             flash("Topilmadi", "danger")
             return redirect(url_for("settings_categories"))
         new_val = 0 if int(row["is_active"]) == 1 else 1
-        exec_sql("UPDATE categories SET is_active=? WHERE id=?", (new_val, cat_id))
+        set_category_active(
+            cat_id,
+            is_active=new_val,
+        )
         flash("O‘zgardi ✅", "success")
         return redirect(url_for("settings_categories"))
 
@@ -142,13 +147,10 @@ def register_settings_routes(
             flash("Bu nomli kategoriya mavjud", "danger")
             return redirect(url_for("settings_categories"))
 
-        exec_sql(
-            """
-            UPDATE categories
-            SET name=?, sort_order=?
-            WHERE id=?
-            """,
-            (name, sort_order, cat_id),
+        update_category(
+            cat_id,
+            name=name,
+            sort_order=sort_order,
         )
 
         flash("Kategoriya yangilandi ✅", "success")
@@ -184,10 +186,13 @@ def register_settings_routes(
             flash("Default sotuv narxi shart (so‘m)", "danger")
             return redirect(url_for("settings_products"))
         try:
-            exec_sql("""
-              INSERT INTO products(name, category_id, sell_price_default_uzs, is_active)
-              VALUES(?,?,?,1)
-            """, (name, category_id, float(sell_default)))
+            create_product(
+                name=name,
+                category_id=category_id,
+                sell_price_default_uzs=float(
+                    sell_default
+                ),
+            )
             flash("Mahsulot qo‘shildi ✅", "success")
         except sqlite3.IntegrityError:
             flash("Bu nom band", "danger")
@@ -264,19 +269,12 @@ def register_settings_routes(
             flash("Bu nomli mahsulot mavjud", "danger")
             return redirect(url_for("settings_products"))
 
-        exec_sql(
-            """
-            UPDATE products
-            SET name=?,
-                category_id=?,
-                sell_price_default_uzs=?
-            WHERE id=?
-            """,
-            (
-                name,
-                category_id,
-                float(sell_price),
-                product_id,
+        update_product(
+            product_id,
+            name=name,
+            category_id=category_id,
+            sell_price_default_uzs=float(
+                sell_price
             ),
         )
 
@@ -294,7 +292,10 @@ def register_settings_routes(
             flash("Topilmadi", "danger")
             return redirect(url_for("settings_products"))
         new_val = 0 if int(row["is_active"]) == 1 else 1
-        exec_sql("UPDATE products SET is_active=? WHERE id=?", (new_val, product_id))
+        set_product_active(
+            product_id,
+            is_active=new_val,
+        )
         flash("O‘zgardi ✅", "success")
         return redirect(url_for("settings_products"))
 

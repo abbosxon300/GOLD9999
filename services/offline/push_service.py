@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import services.offline.master_data_adapters  # noqa: F401
 import services.offline.sales_aggregate_adapter  # noqa: F401
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
