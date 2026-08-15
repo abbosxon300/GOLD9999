@@ -31,6 +31,11 @@ MANIFEST_PATH = PROJECT_ROOT / "update.json"
 
 REPOSITORY = "abbosxon300/GOLD9999"
 
+PYTHONANYWHERE_DEPLOY_URL = (
+    "https://gold9999.pythonanywhere.com/"
+    "api/releases/deploy-installer"
+)
+
 
 def run(
     arguments: list[str],
@@ -614,6 +619,102 @@ def publish_release(
         published.get("html_url"),
     )
 
+
+def deploy_installer_to_pythonanywhere(
+    *,
+    version: str,
+    digest: str,
+) -> None:
+    token = str(
+        os.environ.get(
+            "GOLD9999_RELEASE_DEPLOY_TOKEN",
+            "",
+        )
+    ).strip()
+
+    if not token:
+        raise RuntimeError(
+            "GOLD9999_RELEASE_DEPLOY_TOKEN "
+            "topilmadi"
+        )
+
+    payload = json.dumps(
+        {
+            "version": version,
+            "sha256": digest,
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        PYTHONANYWHERE_DEPLOY_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": (
+                f"Bearer {token}"
+            ),
+            "Content-Type": (
+                "application/json"
+            ),
+            "User-Agent": (
+                "Gold9999-Release-Tool/1"
+            ),
+        },
+    )
+
+    print(
+        "PYTHONANYWHERE DEPLOY:",
+        version,
+    )
+
+    with urllib.request.urlopen(
+        request,
+        timeout=180,
+    ) as response:
+        body = response.read().decode(
+            "utf-8"
+        )
+
+        if int(response.status) != 200:
+            raise RuntimeError(
+                "PythonAnywhere deploy HTTP "
+                f"{response.status}"
+            )
+
+    result = json.loads(body)
+
+    if result.get("success") is not True:
+        raise RuntimeError(
+            "PythonAnywhere deploy failed: "
+            f"{result}"
+        )
+
+    if (
+        str(result.get("sha256") or "")
+        .strip()
+        .lower()
+        != digest.lower()
+    ):
+        raise RuntimeError(
+            "PythonAnywhere deployed SHA256 "
+            "mos emas"
+        )
+
+    if int(result.get("size") or 0) != (
+        SETUP_PATH.stat().st_size
+    ):
+        raise RuntimeError(
+            "PythonAnywhere deployed size "
+            "mos emas"
+        )
+
+    print(
+        "PYTHONANYWHERE DEPLOY OK:",
+        result.get("size"),
+        "bytes",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -677,6 +778,11 @@ def main() -> int:
         publish_release(
             version=version,
             notes=notes,
+        )
+
+        deploy_installer_to_pythonanywhere(
+            version=version,
+            digest=digest,
         )
 
     print("RELEASE PIPELINE COMPLETE")
