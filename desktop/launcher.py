@@ -762,6 +762,42 @@ def run_desktop(
             )
 
             if bootstrap_ready:
+                from services.offline.legacy_master_data_recovery import (
+                    recover_legacy_master_data,
+                )
+
+                database_path = (
+                    Path(data_directory)
+                    / "data.db"
+                )
+
+                recovery_connection = sqlite3.connect(
+                    database_path
+                )
+                recovery_connection.row_factory = sqlite3.Row
+                recovery_connection.execute(
+                    "PRAGMA foreign_keys=ON"
+                )
+
+                try:
+                    recovery_result = (
+                        recover_legacy_master_data(
+                            recovery_connection
+                        )
+                    )
+                    recovery_connection.commit()
+
+                    print(
+                        "LEGACY MASTER DATA RECOVERY:",
+                        f"categories={recovery_result.categories_recovered}",
+                        f"products={recovery_result.products_recovered}",
+                        f"queue={recovery_result.queue_created}",
+                        flush=True,
+                    )
+
+                finally:
+                    recovery_connection.close()
+
                 start_sync_worker()
                 window.load_url(
                     login_url
