@@ -1,6 +1,6 @@
 {
-    "version":  "1.0.25",
-    "installer_url":  "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-    "sha256":  "2bda25feaf57a92882c96238f0f3f0ea5cfae89828c9cc455bb8771e91f3a29d",
-    "release_notes":  "Kategoriya va mahsulot sinxronizatsiyasida sync_version yuborilishi tuzatildi."
+  "version": "1.0.26",
+  "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
+  "sha256": "d270a0ad878935c8bb9fb5a507f81de1ca37d8f5438e7b4cdabb0116ce222e6a",
+  "release_notes": "Eski kategoriya va mahsulotlarni avtomatik tiklash va serverga sinxronlash qo‘shildi."
 }
