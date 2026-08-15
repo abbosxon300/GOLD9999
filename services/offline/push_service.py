@@ -173,6 +173,19 @@ def _record_to_change(
         field_name="record.payload.sync_version",
     )
 
+    if _required_text(
+        record["entity_type"],
+        field_name="record.entity_type",
+    ).strip().lower() in {
+        "category",
+        "product",
+    }:
+        payload = dict(payload)
+        payload.pop(
+            "sync_version",
+            None,
+        )
+
     return RemoteChange(
         entity_type=_required_text(
             record["entity_type"],
