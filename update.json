@@ -1,6 +1,6 @@
 {
-  "version": "1.0.27",
+  "version": "1.0.28",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "89321eaa7310d38819bb2da8235ee9352cc64c33a2b2f822adce419a81c6a0e5",
-  "release_notes": "Startup recovery qotishi va eski master-data tiklash xatolari tuzatildi."
+  "sha256": "89662320b6ccc3bf49e97c828e395ac1ada65904e49a943c349aa99c3ee8cf37",
+  "release_notes": "Desktop startupdagi sqlite3 import xatosi tuzatildi."
 }
