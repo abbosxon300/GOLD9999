@@ -1,6 +1,6 @@
 {
-  "version": "1.0.26",
+  "version": "1.0.27",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "d270a0ad878935c8bb9fb5a507f81de1ca37d8f5438e7b4cdabb0116ce222e6a",
-  "release_notes": "Eski kategoriya va mahsulotlarni avtomatik tiklash va serverga sinxronlash qo‘shildi."
+  "sha256": "89321eaa7310d38819bb2da8235ee9352cc64c33a2b2f822adce419a81c6a0e5",
+  "release_notes": "Startup recovery qotishi va eski master-data tiklash xatolari tuzatildi."
 }
