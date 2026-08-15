@@ -113,6 +113,13 @@ try:
 except Exception:
     register_offline_status_routes = None
 
+try:
+    from routes.downloads import (
+        register_download_routes,
+    )
+except Exception:
+    register_download_routes = None
+
 
 # --- /routes registration ---
 ensure_runtime_directories()
@@ -469,6 +476,11 @@ if register_offline_status_routes is not None:
         app,
         login_required=login_required,
         db_path=DB_PATH,
+    )
+
+if register_download_routes is not None:
+    register_download_routes(
+        app,
     )
 
 # Auto DB init on import (init sahifa yo'q, methods=["GET", "POST"])
