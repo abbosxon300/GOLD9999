@@ -310,6 +310,8 @@ def _conflict_result(
 def apply_push_record(
     connection: sqlite3.Connection,
     raw_record: object,
+    *,
+    tenant_id: int | None = None,
 ) -> SyncResult:
     if not isinstance(
         connection,
@@ -332,6 +334,7 @@ def apply_push_record(
             applied = apply_remote_change(
                 connection,
                 change,
+                tenant_id=tenant_id,
             )
 
         except Exception:
@@ -414,6 +417,8 @@ def apply_push_record(
 def apply_push_batch(
     connection: sqlite3.Connection,
     records: Sequence[object],
+    *,
+    tenant_id: int | None = None,
 ) -> tuple[SyncResult, ...]:
     if not isinstance(
         connection,
@@ -445,6 +450,7 @@ def apply_push_batch(
         apply_push_record(
             connection,
             raw_record,
+            tenant_id=tenant_id,
         )
         for raw_record in records
     )

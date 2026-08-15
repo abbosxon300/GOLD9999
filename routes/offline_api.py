@@ -601,10 +601,16 @@ def register_offline_api_routes(
     def offline_push():
         db = get_db()
 
-        if not _offline_request_authorized(
+        (
+            authorized,
+            tenant_id,
+            authenticated_user_id,
+        ) = _offline_request_tenant_identity(
             app,
             db,
-        ):
+        )
+
+        if not authorized:
             return jsonify({
                 "success": False,
                 "message": "Unauthorized",
@@ -647,6 +653,7 @@ def register_offline_api_routes(
             results = apply_push_batch(
                 db,
                 body["records"],
+                tenant_id=tenant_id,
             )
 
         except InvalidPushRequestError as exc:

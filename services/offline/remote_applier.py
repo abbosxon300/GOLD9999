@@ -71,6 +71,7 @@ class RemoteApplyContext:
     payload: Mapping[str, Any]
     remote_version: int
     existing: EntityIdentity | None
+    tenant_id: int | None = None
 
 
 RemoteEntityHandler = Callable[
@@ -209,6 +210,8 @@ def get_remote_handler(
 def apply_remote_change(
     connection: sqlite3.Connection,
     change: RemoteChange,
+    *,
+    tenant_id: int | None = None,
 ) -> RemoteApplyResult:
     if not isinstance(
         connection,
@@ -279,6 +282,7 @@ def apply_remote_change(
         payload=payload,
         remote_version=remote_version,
         existing=existing,
+        tenant_id=tenant_id,
     )
 
     result = handler(context)

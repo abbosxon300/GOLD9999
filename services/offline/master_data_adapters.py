@@ -276,9 +276,10 @@ def apply_category_remote(
                     is_active,
                     created_at,
                     entity_uuid,
-                    sync_version
+                    sync_version,
+                    tenant_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload["name"],
@@ -287,6 +288,7 @@ def apply_category_remote(
                     payload["created_at"],
                     context.entity_uuid,
                     context.remote_version,
+                    context.tenant_id,
                 ),
             )
         except sqlite3.IntegrityError as exc:
@@ -577,9 +579,10 @@ def apply_product_remote(
                     created_at,
                     stock_qty,
                     entity_uuid,
-                    sync_version
+                    sync_version,
+                    tenant_id
                 )
-                VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
                 ''',
                 (
                     payload["name"],
@@ -591,6 +594,7 @@ def apply_product_remote(
                     payload["created_at"],
                     context.entity_uuid,
                     context.remote_version,
+                    context.tenant_id,
                 ),
             )
         except sqlite3.IntegrityError as exc:
