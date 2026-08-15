@@ -1,6 +1,6 @@
 {
-  "version": "1.0.25",
-  "installer_url": "https://github.com/abbosxon300/GOLD9999/releases/download/v1.0.25/Gold9999Setup.exe",
-  "sha256": "2bda25feaf57a92882c96238f0f3f0ea5cfae89828c9cc455bb8771e91f3a29d",
-  "release_notes": "Kategoriya va mahsulot sinxronizatsiyasida sync_version yuborilishi tuzatildi."
+    "version":  "1.0.25",
+    "installer_url":  "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
+    "sha256":  "2bda25feaf57a92882c96238f0f3f0ea5cfae89828c9cc455bb8771e91f3a29d",
+    "release_notes":  "Kategoriya va mahsulot sinxronizatsiyasida sync_version yuborilishi tuzatildi."
 }
