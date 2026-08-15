@@ -23,29 +23,71 @@ class LegacyMasterDataRecoveryResult:
     queue_repaired: int
 
 
-def _device_uuid(connection: sqlite3.Connection) -> str:
-    row = connection.execute(
-        """
-        SELECT device_uuid
-        FROM device_id
-        ORDER BY id ASC
-        LIMIT 1
-        """
-    ).fetchone()
+def _device_uuid(
+    connection: sqlite3.Connection,
+) -> str:
+    tables = {
+        str(row[0])
+        for row in connection.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type='table'
+            """
+        ).fetchall()
+    }
 
-    if row is None:
-        raise RuntimeError(
-            "Offline device UUID topilmadi"
-        )
+    if "app_installations" in tables:
+        row = connection.execute(
+            """
+            SELECT installation_uuid
+            FROM app_installations
+            WHERE is_active=1
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
 
-    value = str(row["device_uuid"] or "").strip()
+        if row is None:
+            row = connection.execute(
+                """
+                SELECT installation_uuid
+                FROM app_installations
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
 
-    if not value:
-        raise RuntimeError(
-            "Offline device UUID topilmadi"
-        )
+        if row is not None:
+            value = str(
+                row["installation_uuid"] or ""
+            ).strip()
 
-    return value
+            if value:
+                return value
+
+    # Eski/test bazalar bilan backward compatibility.
+    if "device_id" in tables:
+        row = connection.execute(
+            """
+            SELECT device_uuid
+            FROM device_id
+            ORDER BY id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if row is not None:
+            value = str(
+                row["device_uuid"] or ""
+            ).strip()
+
+            if value:
+                return value
+
+    raise RuntimeError(
+        "Offline installation UUID topilmadi"
+    )
 
 
 def _queue_exists(
@@ -346,19 +388,29 @@ def recover_legacy_master_data(
                 (row["id"],),
             ).fetchone()
 
-            created, repaired = _ensure_create_queue(
-                connection,
-                entity_type="category",
-                entity_uuid=entity_uuid,
-                payload=_category_payload(fresh),
-                device_uuid=device_uuid,
+            should_sync = (
+                recovered
+                or _queue_exists(
+                    connection,
+                    entity_type="category",
+                    entity_uuid=entity_uuid,
+                )
             )
 
-            if created:
-                queue_created += 1
+            if should_sync:
+                created, repaired = _ensure_create_queue(
+                    connection,
+                    entity_type="category",
+                    entity_uuid=entity_uuid,
+                    payload=_category_payload(fresh),
+                    device_uuid=device_uuid,
+                )
 
-            if repaired:
-                queue_repaired += 1
+                if created:
+                    queue_created += 1
+
+                if repaired:
+                    queue_repaired += 1
 
         products = connection.execute(
             """
@@ -432,19 +484,29 @@ def recover_legacy_master_data(
                 (row["id"],),
             ).fetchone()
 
-            created, repaired = _ensure_create_queue(
-                connection,
-                entity_type="product",
-                entity_uuid=entity_uuid,
-                payload=_product_payload(fresh),
-                device_uuid=device_uuid,
+            should_sync = (
+                recovered
+                or _queue_exists(
+                    connection,
+                    entity_type="product",
+                    entity_uuid=entity_uuid,
+                )
             )
 
-            if created:
-                queue_created += 1
+            if should_sync:
+                created, repaired = _ensure_create_queue(
+                    connection,
+                    entity_type="product",
+                    entity_uuid=entity_uuid,
+                    payload=_product_payload(fresh),
+                    device_uuid=device_uuid,
+                )
 
-            if repaired:
-                queue_repaired += 1
+                if created:
+                    queue_created += 1
+
+                if repaired:
+                    queue_repaired += 1
 
         connection.execute(
             "RELEASE SAVEPOINT legacy_master_data_recovery"

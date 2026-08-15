@@ -796,6 +796,18 @@ def run_desktop(
                         flush=True,
                     )
 
+                except Exception as exc:
+                    try:
+                        recovery_connection.rollback()
+                    except Exception:
+                        pass
+
+                    print(
+                        "LEGACY MASTER DATA RECOVERY ERROR:",
+                        repr(exc),
+                        flush=True,
+                    )
+
                 finally:
                     recovery_connection.close()
 
