@@ -1,6 +1,6 @@
 {
-  "version": "1.0.28",
+  "version": "1.0.29",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "89662320b6ccc3bf49e97c828e395ac1ada65904e49a943c349aa99c3ee8cf37",
-  "release_notes": "Desktop startupdagi sqlite3 import xatosi tuzatildi."
+  "sha256": "e82f80425fc2ef64b305dbb54daa307fc942d69019e4f16c0f26500e93751c55",
+  "release_notes": "Sync inventory movements from desktop"
 }
