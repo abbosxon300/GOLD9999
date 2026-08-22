@@ -1,10 +1,79 @@
 from __future__ import annotations
 
 import math
+import os
 import sqlite3
+import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
+
+from services.db import get_db
+from services.device_identity import (
+    get_device_identity,
+)
+from services.offline.constants import (
+    OPERATION_CREATE,
+)
+from services.offline.models import SyncRecord
+from services.offline.sqlite_queue import (
+    SQLiteSyncQueue,
+)
+
+
+def _desktop_sync_enabled() -> bool:
+    return bool(
+        str(
+            os.environ.get(
+                "GOLD9999_DATA_DIR",
+                "",
+            )
+        ).strip()
+    )
+
+
+def _device_uuid(
+    connection: sqlite3.Connection,
+) -> str:
+    env_value = str(
+        os.environ.get(
+            "OFFLINE_DEVICE_UUID",
+            "",
+        )
+    ).strip()
+
+    if env_value:
+        return env_value
+
+    identity = get_device_identity(
+        connection
+    )
+
+    if identity is None:
+        raise RuntimeError(
+            "Offline device identity topilmadi"
+        )
+
+    value = str(
+        getattr(
+            identity,
+            "installation_uuid",
+            "",
+        )
+        or getattr(
+            identity,
+            "device_uuid",
+            "",
+        )
+        or ""
+    ).strip()
+
+    if not value:
+        raise RuntimeError(
+            "Offline device UUID topilmadi"
+        )
+
+    return value
 
 
 VALID_INVENTORY_MOVE_TYPES = frozenset(
@@ -406,9 +475,11 @@ def record_inventory_move(
             unit_cost_uzs,
             note,
             source_type,
-            source_id
+            source_id,
+            entity_uuid,
+            sync_version
         )
-        VALUES(?,?,?,?,?,?,?,?)
+        VALUES(?,?,?,?,?,?,?,?,?,?)
         """,
         (
             normalized_date,
@@ -419,6 +490,8 @@ def record_inventory_move(
             normalized_note,
             normalized_source_type,
             normalized_source_id,
+            str(uuid.uuid4()),
+            1,
         ),
     )
 
@@ -430,6 +503,107 @@ def record_inventory_move(
     if result is None:
         raise RuntimeError(
             "Ombor harakati yaratilmadi"
+        )
+
+    if _desktop_sync_enabled():
+        row = connection.execute(
+            """
+            SELECT
+                im.entity_uuid,
+                im.sync_version,
+                im.move_date,
+                im.move_type,
+                p.entity_uuid AS product_uuid,
+                im.qty,
+                im.unit_cost_uzs,
+                im.note,
+                im.source_type,
+                im.source_id,
+                im.created_at
+            FROM inventory_moves im
+            JOIN products p
+              ON p.id=im.product_id
+            WHERE im.id=?
+            """,
+            (result.id,),
+        ).fetchone()
+
+        if row is None:
+            raise RuntimeError(
+                "Inventory sync row topilmadi"
+            )
+
+        entity_uuid = str(
+            row["entity_uuid"] or ""
+        ).strip()
+
+        product_uuid = str(
+            row["product_uuid"] or ""
+        ).strip()
+
+        if not entity_uuid:
+            raise RuntimeError(
+                "Inventory entity_uuid mavjud emas"
+            )
+
+        if not product_uuid:
+            raise RuntimeError(
+                "Mahsulot entity_uuid mavjud emas"
+            )
+
+        payload = {
+            "move_date": str(
+                row["move_date"]
+            ),
+            "move_type": str(
+                row["move_type"]
+            ),
+            "product_uuid": product_uuid,
+            "qty": float(
+                row["qty"]
+            ),
+            "unit_cost_uzs": float(
+                row["unit_cost_uzs"] or 0
+            ),
+            "note": str(
+                row["note"] or ""
+            ),
+            "source_type": (
+                str(row["source_type"])
+                if row["source_type"] is not None
+                else None
+            ),
+            "source_id": (
+                int(row["source_id"])
+                if row["source_id"] is not None
+                else None
+            ),
+            "created_at": str(
+                row["created_at"]
+            ),
+            "sync_version": int(
+                row["sync_version"]
+            ),
+        }
+
+        queue = SQLiteSyncQueue(
+            lambda: get_db()
+        )
+
+        queue.enqueue(
+            SyncRecord(
+                entity_type="inventory_move",
+                entity_uuid=entity_uuid,
+                operation=OPERATION_CREATE,
+                payload=payload,
+                device_uuid=_device_uuid(
+                    connection
+                ),
+                occurred_at=datetime.now(
+                    timezone.utc
+                ),
+            ),
+            connection=connection,
         )
 
     return result

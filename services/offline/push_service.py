@@ -179,6 +179,7 @@ def _record_to_change(
     ).strip().lower() in {
         "category",
         "product",
+        "inventory_move",
     }:
         payload = dict(payload)
         payload.pop(
