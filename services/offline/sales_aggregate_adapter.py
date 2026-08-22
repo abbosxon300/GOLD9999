@@ -236,7 +236,16 @@ def _aggregate_matches(
         else None
     )
 
-    if stored_agent_id != agent_id:
+    # Legacy desktop sotuvlarida agent_username
+    # mavjud bo'lmasligi mumkin. Bunday holatda agent
+    # idempotency tekshiruvining bir qismi emas.
+    #
+    # Agar username aniq yuborilgan bo'lsa, agent
+    # avvalgidek qat'iy tekshiriladi.
+    if (
+        aggregate.agent_username is not None
+        and stored_agent_id != agent_id
+    ):
         return False
 
     if not _float_equal(

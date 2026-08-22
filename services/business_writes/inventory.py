@@ -505,7 +505,13 @@ def record_inventory_move(
             "Ombor harakati yaratilmadi"
         )
 
-    if _desktop_sync_enabled():
+    # Sotuvning OUT harakati alohida inventory sync
+    # qilinmaydi. sales_aggregate server tomonida
+    # consume_stock() orqali aynan shu harakatni yaratadi.
+    if (
+        _desktop_sync_enabled()
+        and normalized_source_type != "sale_item"
+    ):
         row = connection.execute(
             """
             SELECT
@@ -691,6 +697,82 @@ def consume_stock(
         qty,
         error_message="Miqdor noto‘g‘ri",
     )
+
+    normalized_date = _normalize_move_date(
+        move_date
+    )
+
+    normalized_cost = _normalize_non_negative_number(
+        unit_cost_uzs,
+        error_message="Tannarx noto‘g‘ri",
+    )
+
+    (
+        normalized_source_type,
+        normalized_source_id,
+    ) = _normalize_source(
+        source_type,
+        source_id,
+    )
+
+    # Source key mavjud bo'lsa, oldingi sync yoki retry
+    # aynan shu OUT harakatini yaratgan bo'lishi mumkin.
+    #
+    # Mos harakat topilsa qoldiqni ikkinchi marta
+    # kamaytirmaymiz. Mos kelmasa bu haqiqiy collision.
+    if (
+        normalized_source_type is not None
+        and normalized_source_id is not None
+    ):
+        existing = connection.execute(
+            """
+            SELECT
+                id,
+                move_date,
+                move_type,
+                product_id,
+                qty,
+                unit_cost_uzs,
+                note,
+                source_type,
+                source_id
+            FROM inventory_moves
+            WHERE source_type=?
+              AND source_id=?
+            """,
+            (
+                normalized_source_type,
+                normalized_source_id,
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            matches = (
+                str(existing["move_type"]) == "OUT"
+                and str(existing["move_date"])
+                    == normalized_date
+                and int(existing["product_id"])
+                    == normalized_product_id
+                and abs(
+                    float(existing["qty"])
+                    - normalized_qty
+                ) < 1e-9
+                and abs(
+                    float(existing["unit_cost_uzs"])
+                    - normalized_cost
+                ) < 1e-9
+            )
+
+            if not matches:
+                raise RuntimeError(
+                    "Inventory source collision: "
+                    f"{normalized_source_type}/"
+                    f"{normalized_source_id}"
+                )
+
+            return _row_to_result(
+                existing
+            )
 
     product = _require_product(
         connection,
