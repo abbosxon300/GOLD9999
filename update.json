@@ -1,6 +1,6 @@
 {
-  "version": "1.0.29",
+  "version": "1.0.30",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "e82f80425fc2ef64b305dbb54daa307fc942d69019e4f16c0f26500e93751c55",
-  "release_notes": "Sync inventory movements from desktop"
+  "sha256": "d94a5e572470069d1aa10195ee7150c17b23cffb82952af49fcc7f1339196080",
+  "release_notes": "Recover legacy desktop sales and inventory"
 }
