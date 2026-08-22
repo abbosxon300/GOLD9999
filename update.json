@@ -1,6 +1,6 @@
 {
-  "version": "1.0.30",
+  "version": "1.0.31",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "d94a5e572470069d1aa10195ee7150c17b23cffb82952af49fcc7f1339196080",
-  "release_notes": "Recover legacy desktop sales and inventory"
+  "sha256": "961b3bed3de784d33c1be87e0a3b9139261a8d7c102a8006794052657a2f2a9a",
+  "release_notes": "Harden legacy sales sync idempotency"
 }
