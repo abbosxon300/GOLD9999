@@ -792,6 +792,8 @@ def run_desktop(
                         "LEGACY MASTER DATA RECOVERY:",
                         f"categories={recovery_result.categories_recovered}",
                         f"products={recovery_result.products_recovered}",
+                        f"inventory={recovery_result.inventory_recovered}",
+                        f"sales={recovery_result.sales_recovered}",
                         f"queue={recovery_result.queue_created}",
                         f"repaired={recovery_result.queue_repaired}",
                         flush=True,
