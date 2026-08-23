@@ -1,6 +1,6 @@
 {
-  "version": "1.0.31",
+  "version": "1.0.32",
   "installer_url": "https://gold9999.pythonanywhere.com/downloads/Gold9999Setup.exe",
-  "sha256": "961b3bed3de784d33c1be87e0a3b9139261a8d7c102a8006794052657a2f2a9a",
-  "release_notes": "Harden legacy sales sync idempotency"
+  "sha256": "661101c6c6f4059d33a53115a21998aa695db0b1f65368d2007bee054b09486f",
+  "release_notes": "Add POS discounts and improve category navigation"
 }
