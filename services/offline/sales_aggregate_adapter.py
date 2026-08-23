@@ -202,6 +202,10 @@ def _existing_items(
             si.sell_total_uzs,
             si.cost_total_uzs,
             si.profit_uzs,
+            si.list_price_uzs,
+            si.discount_type,
+            si.discount_value,
+            si.discount_total_uzs,
             p.entity_uuid AS product_uuid
         FROM sale_items si
         JOIN products p
@@ -312,6 +316,29 @@ def _aggregate_matches(
             return False
 
         if not _float_equal(
+            row["list_price_uzs"],
+            item.list_price_uzs,
+        ):
+            return False
+
+        if str(
+            row["discount_type"] or "none"
+        ) != item.discount_type:
+            return False
+
+        if not _float_equal(
+            row["discount_value"],
+            item.discount_value,
+        ):
+            return False
+
+        if not _float_equal(
+            row["discount_total_uzs"],
+            item.discount_total_uzs,
+        ):
+            return False
+
+        if not _float_equal(
             row["sell_total_uzs"],
             item.sell_total_uzs,
         ):
@@ -412,9 +439,16 @@ def _insert_sale(
                         cost_total_uzs,
                         profit_uzs,
                         entity_uuid,
-                        sync_version
+                        sync_version,
+                        list_price_uzs,
+                        discount_type,
+                        discount_value,
+                        discount_total_uzs
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?
+                    )
                     """,
                     (
                         sale_id,
@@ -426,6 +460,10 @@ def _insert_sale(
                         item.profit_uzs,
                         item.entity_uuid,
                         item.sync_version,
+                        item.list_price_uzs,
+                        item.discount_type,
+                        item.discount_value,
+                        item.discount_total_uzs,
                     ),
                 )
             )

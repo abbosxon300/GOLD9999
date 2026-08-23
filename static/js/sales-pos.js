@@ -197,37 +197,75 @@
             value="${Number(product.id)}"
           >
 
-          <div class="pos-fields">
-            <label class="pos-field">
-              <span>Miqdor</span>
-              <input
-                class="pos-qty-input"
-                name="qty"
-                type="number"
-                inputmode="decimal"
-                min="0.01"
-                step="any"
-                value="1"
-                required
-              >
-            </label>
-
-            <label class="pos-field">
-              <span>Sotuv narxi</span>
-              <div class="pos-money">
+            <div class="pos-fields">
+              <label class="pos-field">
+                <span>Miqdor</span>
                 <input
-                  name="price_uzs"
-                  inputmode="numeric"
-                  value="${money(product.sell_default)}"
+                  class="pos-qty-input"
+                  name="qty"
+                  type="number"
+                  inputmode="decimal"
+                  min="0.01"
+                  step="any"
+                  value="1"
                   required
-                  data-money-input
                 >
-                <small>so‘m</small>
-              </div>
-            </label>
-          </div>
+              </label>
 
-          <button
+              <label class="pos-field">
+                <span>Asl narx</span>
+                <div class="pos-money">
+                  <input
+                    name="list_price_uzs"
+                    inputmode="numeric"
+                    value="${money(product.sell_default)}"
+                    required
+                    data-money-input
+                    data-list-price
+                  >
+                  <small>so?m</small>
+                </div>
+              </label>
+            </div>
+
+            <div class="pos-discount-row">
+              <label class="pos-field">
+                <span>Skidka</span>
+                <select name="discount_type" data-discount-type>
+                  <option value="none">Yo?q</option>
+                  <option value="percent">%</option>
+                  <option value="amount">So?m</option>
+                </select>
+              </label>
+
+              <label class="pos-field">
+                <span>Miqdori</span>
+                <input
+                  name="discount_value"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value="0"
+                  data-discount-value
+                  disabled
+                >
+              </label>
+
+              <label class="pos-field">
+                <span>Sotuv narxi</span>
+                <div class="pos-money">
+                  <input
+                    name="price_uzs"
+                    value="${money(product.sell_default)}"
+                    readonly
+                    required
+                    data-final-price
+                  >
+                  <small>so?m</small>
+                </div>
+              </label>
+            </div>
+
             class="pos-add"
             type="submit"
             ${disabled ? "disabled" : ""}
@@ -278,6 +316,32 @@
       .join("");
 
     applySearch();
+  };
+
+  const refreshDiscountPrice = (form) => {
+    const list = form.querySelector("[data-list-price]");
+    const type = form.querySelector("[data-discount-type]");
+    const value = form.querySelector("[data-discount-value]");
+    const final = form.querySelector("[data-final-price]");
+
+    if (!list || !type || !value || !final) return;
+
+    const base = Number(
+      String(list.value || "").replace(/\D/g, "")
+    );
+    const amount = Math.max(0, Number(value.value || 0));
+
+    value.disabled = type.value === "none";
+
+    let result = base;
+
+    if (type.value === "percent") {
+      result = base * (1 - Math.min(100, amount) / 100);
+    } else if (type.value === "amount") {
+      result = Math.max(0, base - amount);
+    }
+
+    final.value = money(result);
   };
 
   const cartItemTemplate = (item) => {
@@ -484,6 +548,20 @@
   );
 
   productsNode.addEventListener(
+    "change",
+    (event) => {
+      const control = event.target.closest(
+        "[data-discount-type], [data-discount-value]"
+      );
+
+      if (!control) return;
+
+      const form = control.closest("[data-add-form]");
+      if (form) refreshDiscountPrice(form);
+    }
+  );
+
+  productsNode.addEventListener(
     "input",
     (event) => {
       const input = event.target.closest(
@@ -524,6 +602,18 @@
       values.price_uzs = String(
         values.price_uzs || ""
       ).replace(/\D/g, "");
+
+      values.list_price_uzs = String(
+        values.list_price_uzs || ""
+      ).replace(/\D/g, "");
+
+      values.discount_type = String(
+        values.discount_type || "none"
+      );
+
+      values.discount_value = String(
+        values.discount_value || "0"
+      ).replace(",", ".");
 
       setBusy(true);
 

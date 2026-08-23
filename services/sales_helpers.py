@@ -16,6 +16,9 @@ def cart_get() -> dict[str, Any]:
                 "name": str,
                 "qty": float,
                 "price": float,
+                "list_price": float,
+                "discount_type": str,
+                "discount_value": float,
             }
         }
     }

@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from uuid import UUID
 
 
-SALE_AGGREGATE_SCHEMA_VERSION = 1
+SALE_AGGREGATE_SCHEMA_VERSION = 2
 
 
 class InvalidSaleAggregatePayloadError(ValueError):
@@ -165,6 +165,10 @@ class SaleAggregateItem:
     qty: float
     sell_price_uzs: float
     unit_cost_uzs: float
+    list_price_uzs: float
+    discount_type: str
+    discount_value: float
+    discount_total_uzs: float
 
     @classmethod
     def from_payload(
@@ -201,6 +205,34 @@ class SaleAggregateItem:
                 payload.get("unit_cost_uzs"),
                 field_name="item.unit_cost_uzs",
             ),
+            list_price_uzs=_positive_number(
+                payload.get(
+                    "list_price_uzs",
+                    payload.get("sell_price_uzs"),
+                ),
+                field_name="item.list_price_uzs",
+            ),
+            discount_type=str(
+                payload.get(
+                    "discount_type",
+                    "none",
+                )
+                or "none"
+            ).strip().lower(),
+            discount_value=_non_negative_number(
+                payload.get(
+                    "discount_value",
+                    0,
+                ),
+                field_name="item.discount_value",
+            ),
+            discount_total_uzs=_non_negative_number(
+                payload.get(
+                    "discount_total_uzs",
+                    0,
+                ),
+                field_name="item.discount_total_uzs",
+            ),
         )
 
     @property
@@ -223,6 +255,10 @@ class SaleAggregateItem:
             "qty": self.qty,
             "sell_price_uzs": self.sell_price_uzs,
             "unit_cost_uzs": self.unit_cost_uzs,
+            "list_price_uzs": self.list_price_uzs,
+            "discount_type": self.discount_type,
+            "discount_value": self.discount_value,
+            "discount_total_uzs": self.discount_total_uzs,
         }
 
 
@@ -250,7 +286,10 @@ class SaleAggregatePayload:
             field_name="schema_version",
         )
 
-        if schema_version != SALE_AGGREGATE_SCHEMA_VERSION:
+        if schema_version not in (
+            1,
+            SALE_AGGREGATE_SCHEMA_VERSION,
+        ):
             raise InvalidSaleAggregatePayloadError(
                 "Sale aggregate schema version "
                 f"qo‘llab-quvvatlanmaydi: {schema_version}"

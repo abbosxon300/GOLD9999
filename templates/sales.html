@@ -243,6 +243,10 @@ window.SALES_POS_INITIAL = {
         name: {{ (item.product_name or item.name)|tojson }},
         qty: {{ (item.qty or 0)|float }},
         price: {{ ((item.price_uzs if item.price_uzs is defined else item.price) or 0)|float }},
+        list_price: {{ ((item.list_price if item.list_price is defined else (item.price_uzs if item.price_uzs is defined else item.price)) or 0)|float }},
+        discount_type: {{ (item.discount_type if item.discount_type is defined else "none")|tojson }},
+        discount_value: {{ ((item.discount_value if item.discount_value is defined else 0) or 0)|float }},
+        discount_total: {{ ((item.discount_total if item.discount_total is defined else 0) or 0)|float }},
         line_total: {{ (item.line_total or 0)|float }}
       }{% if not loop.last %},{% endif %}
       {% endfor %}

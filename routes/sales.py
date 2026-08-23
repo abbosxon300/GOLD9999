@@ -24,6 +24,9 @@ from services.offline.sales_aggregate import (
     SaleAggregatePayload,
 )
 from services.offline.sqlite_queue import SQLiteSyncQueue
+from services.sale_item_pricing import (
+    calculate_sale_item_pricing,
+)
 
 
 def register_sales_routes(
@@ -248,6 +251,19 @@ def register_sales_routes(
             request.form.get("price_uzs") or ""
         )
 
+        list_price = parse_float(
+            request.form.get("list_price_uzs") or ""
+        )
+
+        discount_type = (
+            request.form.get("discount_type")
+            or "none"
+        ).strip().lower()
+
+        discount_value = parse_float(
+            request.form.get("discount_value") or "0"
+        )
+
         if product_id <= 0:
             flash(
                 "Mahsulot tanlanmadi",
@@ -277,6 +293,33 @@ def register_sales_routes(
                     category_id=category_id,
                 )
             )
+
+        if list_price is None or list_price <= 0:
+            list_price = float(price)
+
+        if discount_value is None:
+            discount_value = 0.0
+
+        try:
+            pricing = calculate_sale_item_pricing(
+                qty=float(qty),
+                list_price_uzs=float(list_price),
+                discount_type=discount_type,
+                discount_value=float(discount_value),
+            )
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(
+                url_for(
+                    "sales",
+                    category_id=category_id,
+                )
+            )
+
+        price = pricing.sell_price_uzs
+        list_price = pricing.list_price_uzs
+        discount_type = pricing.discount_type
+        discount_value = pricing.discount_value
 
         product = q1("""
             SELECT
@@ -357,11 +400,23 @@ def register_sales_routes(
             cart["items"][product_key]["price"] = (
                 float(price)
             )
+            cart["items"][product_key]["list_price"] = (
+                float(list_price)
+            )
+            cart["items"][product_key]["discount_type"] = (
+                discount_type
+            )
+            cart["items"][product_key]["discount_value"] = (
+                float(discount_value)
+            )
         else:
             cart["items"][product_key] = {
                 "name": product["name"],
                 "qty": float(qty),
                 "price": float(price),
+                "list_price": float(list_price),
+                "discount_type": discount_type,
+                "discount_value": float(discount_value),
             }
 
         session["cart"] = cart
@@ -469,6 +524,41 @@ def register_sales_routes(
                         item["price"]
                     )
 
+                    list_price = float(
+                        item.get(
+                            "list_price",
+                            price,
+                        )
+                    )
+
+                    discount_type = str(
+                        item.get(
+                            "discount_type",
+                            "none",
+                        )
+                    )
+
+                    discount_value = float(
+                        item.get(
+                            "discount_value",
+                            0,
+                        )
+                    )
+
+                    pricing = calculate_sale_item_pricing(
+                        qty=qty,
+                        list_price_uzs=list_price,
+                        discount_type=discount_type,
+                        discount_value=discount_value,
+                    )
+
+                    if abs(
+                        pricing.sell_price_uzs - price
+                    ) > 1e-6:
+                        raise ValueError(
+                            "Savat narxi skidka hisobiga mos emas"
+                        )
+
                     if qty <= 0 or price <= 0:
                         raise ValueError(
                             "Savatda noto‘g‘ri "
@@ -486,7 +576,11 @@ def register_sales_routes(
                             f"(Bor: {available:.2f})"
                         )
 
-                    sell_total = qty * price
+                    sell_total = pricing.sell_total_uzs
+                    discount_total = (
+                        pricing.discount_total_uzs
+                    )
+
                     unit_cost = product_avg_cost(
                         pid
                     )
@@ -532,9 +626,13 @@ def register_sales_routes(
                             cost_total_uzs,
                             profit_uzs,
                             entity_uuid,
-                            sync_version
+                            sync_version,
+                            list_price_uzs,
+                            discount_type,
+                            discount_value,
+                            discount_total_uzs
                         )
-                        VALUES(?,?,?,?,?,?,?,?,?)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                         """,
                         (
                             sale_id,
@@ -546,6 +644,10 @@ def register_sales_routes(
                             profit,
                             item_uuid,
                             item_sync_version,
+                            pricing.list_price_uzs,
+                            pricing.discount_type,
+                            pricing.discount_value,
+                            discount_total,
                         ),
                     ).lastrowid
 
@@ -558,6 +660,18 @@ def register_sales_routes(
                         "qty": qty,
                         "sell_price_uzs": price,
                         "unit_cost_uzs": unit_cost,
+                        "list_price_uzs": (
+                            pricing.list_price_uzs
+                        ),
+                        "discount_type": (
+                            pricing.discount_type
+                        ),
+                        "discount_value": (
+                            pricing.discount_value
+                        ),
+                        "discount_total_uzs": (
+                            pricing.discount_total_uzs
+                        ),
                     })
 
                     consume_stock(
@@ -752,6 +866,48 @@ def register_sales_routes(
                 "name": name,
                 "qty": qty,
                 "price": price,
+                "list_price": float(
+                    item.get(
+                        "list_price",
+                        existing.get(
+                            "list_price",
+                            price,
+                        ),
+                    )
+                    if isinstance(item, dict)
+                    else existing.get(
+                        "list_price",
+                        price,
+                    )
+                ),
+                "discount_type": str(
+                    item.get(
+                        "discount_type",
+                        existing.get(
+                            "discount_type",
+                            "none",
+                        ),
+                    )
+                    if isinstance(item, dict)
+                    else existing.get(
+                        "discount_type",
+                        "none",
+                    )
+                ),
+                "discount_value": float(
+                    item.get(
+                        "discount_value",
+                        existing.get(
+                            "discount_value",
+                            0,
+                        ),
+                    )
+                    if isinstance(item, dict)
+                    else existing.get(
+                        "discount_value",
+                        0,
+                    )
+                ),
             }
 
         session["cart"] = cart
@@ -771,11 +927,42 @@ def register_sales_routes(
             qty = float(item.get("qty") or 0)
             price = float(item.get("price") or 0)
 
+            list_price = float(
+                item.get(
+                    "list_price",
+                    price,
+                )
+            )
+
+            discount_type = str(
+                item.get(
+                    "discount_type",
+                    "none",
+                )
+            )
+
+            discount_value = float(
+                item.get(
+                    "discount_value",
+                    0,
+                )
+            )
+
             items.append({
                 "product_id": int(product_id),
                 "name": str(item.get("name") or ""),
                 "qty": qty,
                 "price": price,
+                "list_price": list_price,
+                "discount_type": discount_type,
+                "discount_value": discount_value,
+                "discount_total": (
+                    qty
+                    * max(
+                        0.0,
+                        list_price - price,
+                    )
+                ),
                 "line_total": qty * price,
             })
 
