@@ -1200,3 +1200,98 @@ body.dark-mode .pos-field input {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+
+/* ===== POS GLOBAL CART DISCOUNT ===== */
+
+.pos-global-discount {
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid var(--pos-line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.pos-global-discount-head,
+.pos-global-payable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pos-global-discount-head span,
+.pos-global-payable span {
+  color: var(--pos-muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.pos-global-discount-head strong {
+  color: #d92d20;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.pos-global-discount-controls {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pos-global-discount-controls select,
+.pos-global-discount-controls input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--pos-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--pos-text);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  outline: none;
+}
+
+.pos-global-discount-controls input:disabled {
+  background: #f2f4f7;
+  color: var(--pos-muted);
+}
+
+.pos-global-payable {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--pos-line);
+}
+
+.pos-global-payable strong {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pos-global-payable b {
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -.025em;
+}
+
+.pos-global-payable small {
+  color: var(--pos-muted);
+  font-size: 9px;
+}
+
+body.dark-mode .pos-global-discount,
+body.dark-mode .pos-global-discount-controls select,
+body.dark-mode .pos-global-discount-controls input {
+  border-color: var(--pos-line);
+  background: var(--pos-card);
+  color: var(--pos-text);
+}
+
+body.dark-mode .pos-global-discount-controls input:disabled {
+  background: #0d1524;
+}

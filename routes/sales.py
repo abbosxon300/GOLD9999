@@ -471,6 +471,50 @@ def register_sales_routes(
                 url_for("sales")
             )
 
+        global_discount_type = (
+            request.form.get("global_discount_type")
+            or "none"
+        ).strip().lower()
+
+        global_discount_value = parse_float(
+            request.form.get("global_discount_value")
+            or "0"
+        )
+
+        if global_discount_value is None:
+            global_discount_value = 0.0
+
+        cart_base_total = 0.0
+
+        try:
+            for item in cart["items"].values():
+                qty = float(item.get("qty") or 0)
+                base_price = float(
+                    item.get("price") or 0
+                )
+
+                if qty <= 0 or base_price <= 0:
+                    raise ValueError(
+                        "Savatda noto‘g‘ri qiymat bor"
+                    )
+
+                cart_base_total += qty * base_price
+
+            global_pricing = calculate_sale_item_pricing(
+                qty=1.0,
+                list_price_uzs=cart_base_total,
+                discount_type=global_discount_type,
+                discount_value=float(global_discount_value),
+            )
+
+        except (TypeError, ValueError) as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("sales"))
+
+        global_discount_total = float(
+            global_pricing.discount_total_uzs
+        )
+
         db = get_db()
 
         try:
@@ -509,9 +553,16 @@ def register_sales_routes(
                 total_profit = 0.0
                 aggregate_items = []
 
-                for product_id, item in (
+                cart_entries = list(
                     cart["items"].items()
-                ):
+                )
+
+                allocated_discount = 0.0
+
+                for item_index, (
+                    product_id,
+                    item,
+                ) in enumerate(cart_entries):
                     pid = int(
                         product_id
                     )
@@ -520,44 +571,74 @@ def register_sales_routes(
                         item["qty"]
                     )
 
-                    price = float(
+                    base_price = float(
                         item["price"]
                     )
 
-                    list_price = float(
-                        item.get(
-                            "list_price",
-                            price,
-                        )
+                    base_line_total = (
+                        qty * base_price
                     )
 
-                    discount_type = str(
-                        item.get(
-                            "discount_type",
-                            "none",
-                        )
-                    )
+                    item_discount_type = "none"
+                    item_discount_value = 0.0
 
-                    discount_value = float(
-                        item.get(
-                            "discount_value",
-                            0,
-                        )
-                    )
+                    if global_discount_total > 0:
+                        if (
+                            global_discount_type
+                            == "percent"
+                        ):
+                            item_discount_type = "percent"
+                            item_discount_value = float(
+                                global_discount_value
+                            )
+
+                        elif (
+                            global_discount_type
+                            == "amount"
+                        ):
+                            item_discount_type = "amount"
+
+                            is_last = (
+                                item_index
+                                == len(cart_entries) - 1
+                            )
+
+                            if is_last:
+                                line_discount = max(
+                                    0.0,
+                                    global_discount_total
+                                    - allocated_discount,
+                                )
+                            else:
+                                line_discount = (
+                                    global_discount_total
+                                    * base_line_total
+                                    / cart_base_total
+                                )
+
+                            line_discount = min(
+                                base_line_total,
+                                line_discount,
+                            )
+
+                            allocated_discount += (
+                                line_discount
+                            )
+
+                            item_discount_value = (
+                                line_discount / qty
+                            )
 
                     pricing = calculate_sale_item_pricing(
                         qty=qty,
-                        list_price_uzs=list_price,
-                        discount_type=discount_type,
-                        discount_value=discount_value,
+                        list_price_uzs=base_price,
+                        discount_type=item_discount_type,
+                        discount_value=item_discount_value,
                     )
 
-                    if abs(
-                        pricing.sell_price_uzs - price
-                    ) > 1e-6:
-                        raise ValueError(
-                            "Savat narxi skidka hisobiga mos emas"
-                        )
+                    price = float(
+                        pricing.sell_price_uzs
+                    )
 
                     if qty <= 0 or price <= 0:
                         raise ValueError(
@@ -593,7 +674,9 @@ def register_sales_routes(
 
                     product_row = tx.execute(
                         """
-                        SELECT entity_uuid
+                        SELECT
+                            entity_uuid,
+                            sell_price_default_uzs
                         FROM products
                         WHERE id=?
                           AND is_active=1
@@ -611,6 +694,24 @@ def register_sales_routes(
                             "Mahsulot offline UUID topilmadi: "
                             f"{item['name']}"
                         )
+
+                    if session.get("role") == "agent":
+                        default_price = float(
+                            product_row[
+                                "sell_price_default_uzs"
+                            ] or 0
+                        )
+
+                        if (
+                            price + 1e-9
+                            < default_price
+                        ):
+                            raise ValueError(
+                                "Chegirmadan keyingi narx "
+                                "default narxdan past "
+                                "bo‘lmasin: "
+                                f"{item['name']}"
+                            )
 
                     item_uuid = str(uuid.uuid4())
                     item_sync_version = 1

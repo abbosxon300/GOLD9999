@@ -103,6 +103,49 @@
           </div>
         </div>
 
+        <div class="pos-global-discount" id="pos-global-discount">
+          <div class="pos-global-discount-head">
+            <span>Chegirma</span>
+
+            <strong id="pos-global-discount-total">
+              0 so‘m
+            </strong>
+          </div>
+
+          <div class="pos-global-discount-controls">
+            <select
+              id="pos-global-discount-type"
+              name="global_discount_type"
+              form="pos-checkout-form"
+              aria-label="Chegirma turi"
+            >
+              <option value="none">Yo‘q</option>
+              <option value="percent">%</option>
+              <option value="amount">So‘m</option>
+            </select>
+
+            <input
+              id="pos-global-discount-value"
+              name="global_discount_value"
+              form="pos-checkout-form"
+              type="number"
+              min="0"
+              step="any"
+              value="0"
+              disabled
+              aria-label="Chegirma qiymati"
+            />
+          </div>
+
+          <div class="pos-global-payable">
+            <span>To‘lanadi</span>
+            <strong>
+              <b id="pos-global-payable">0</b>
+              <small>so‘m</small>
+            </strong>
+          </div>
+        </div>
+
         <form
           id="pos-checkout-form"
           method="post"

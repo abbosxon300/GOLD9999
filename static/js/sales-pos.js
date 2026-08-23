@@ -15,6 +15,18 @@
   const cartCount = document.getElementById("pos-cart-count");
   const cartQty = document.getElementById("pos-cart-qty");
   const cartTotal = document.getElementById("pos-cart-total");
+  const globalDiscountType = document.getElementById(
+    "pos-global-discount-type"
+  );
+  const globalDiscountValue = document.getElementById(
+    "pos-global-discount-value"
+  );
+  const globalDiscountTotal = document.getElementById(
+    "pos-global-discount-total"
+  );
+  const globalPayable = document.getElementById(
+    "pos-global-payable"
+  );
   const checkoutButton = document.getElementById("pos-checkout");
   const clearButton = document.getElementById("pos-clear");
   const searchInput = document.getElementById("pos-search");
@@ -42,6 +54,50 @@
     const numeric = Number(value || 0);
 
     return Math.round(numeric).toLocaleString("ru-RU");
+  };
+
+  const globalDiscountState = {
+    type: "none",
+    value: 0,
+  };
+
+  const calculateGlobalDiscount = (total) => {
+    const base = Math.max(0, Number(total || 0));
+    const value = Math.max(
+      0,
+      Number(globalDiscountState.value || 0)
+    );
+
+    let discount = 0;
+
+    if (globalDiscountState.type === "percent") {
+      discount = base * Math.min(100, value) / 100;
+    } else if (globalDiscountState.type === "amount") {
+      discount = Math.min(base, value);
+    }
+
+    return {
+      discount,
+      payable: Math.max(0, base - discount),
+    };
+  };
+
+  const renderGlobalDiscount = (total) => {
+    const result = calculateGlobalDiscount(total);
+
+    if (globalDiscountTotal) {
+      globalDiscountTotal.textContent =
+        `− ${money(result.discount)} so‘m`;
+    }
+
+    if (globalPayable) {
+      globalPayable.textContent = money(result.payable);
+    }
+
+    if (globalDiscountValue) {
+      globalDiscountValue.disabled =
+        globalDiscountState.type === "none";
+    }
   };
 
   const qtyText = (value) => {
@@ -213,59 +269,37 @@
               </label>
 
               <label class="pos-field">
-                <span>Asl narx</span>
-                <div class="pos-money">
-                  <input
-                    name="list_price_uzs"
-                    inputmode="numeric"
-                    value="${money(product.sell_default)}"
-                    required
-                    data-money-input
-                    data-list-price
-                  >
-                  <small>so?m</small>
-                </div>
-              </label>
-            </div>
-
-            <div class="pos-discount-row">
-              <label class="pos-field">
-                <span>Skidka</span>
-                <select name="discount_type" data-discount-type>
-                  <option value="none">Yo?q</option>
-                  <option value="percent">%</option>
-                  <option value="amount">So?m</option>
-                </select>
-              </label>
-
-              <label class="pos-field">
-                <span>Miqdori</span>
-                <input
-                  name="discount_value"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value="0"
-                  data-discount-value
-                  disabled
-                >
-              </label>
-
-              <label class="pos-field">
                 <span>Sotuv narxi</span>
                 <div class="pos-money">
                   <input
                     name="price_uzs"
+                    inputmode="numeric"
                     value="${money(product.sell_default)}"
-                    readonly
                     required
-                    data-final-price
+                    data-money-input
                   >
                   <small>so?m</small>
                 </div>
               </label>
             </div>
 
+            <input
+              type="hidden"
+              name="list_price_uzs"
+              value="${Number(product.sell_default)}"
+            >
+            <input
+              type="hidden"
+              name="discount_type"
+              value="none"
+            >
+            <input
+              type="hidden"
+              name="discount_value"
+              value="0"
+            >
+
+          <button
             class="pos-add"
             type="submit"
             ${disabled ? "disabled" : ""}
@@ -318,38 +352,24 @@
     applySearch();
   };
 
-  const refreshDiscountPrice = (form) => {
-    const list = form.querySelector("[data-list-price]");
-    const type = form.querySelector("[data-discount-type]");
-    const value = form.querySelector("[data-discount-value]");
-    const final = form.querySelector("[data-final-price]");
-
-    if (!list || !type || !value || !final) return;
-
-    const base = Number(
-      String(list.value || "").replace(/\D/g, "")
-    );
-    const amount = Math.max(0, Number(value.value || 0));
-
-    value.disabled = type.value === "none";
-
-    let result = base;
-
-    if (type.value === "percent") {
-      result = base * (1 - Math.min(100, amount) / 100);
-    } else if (type.value === "amount") {
-      result = Math.max(0, base - amount);
-    }
-
-    final.value = money(result);
-  };
-
   const cartItemTemplate = (item) => {
     const productId = Number(item.product_id);
     const qty = Number(item.qty || 0);
     const price = Number(item.price || 0);
     const lineTotal = Number(
       item.line_total ?? qty * price
+    );
+    const listPrice = Number(
+      item.list_price ?? price
+    );
+    const discountType = String(
+      item.discount_type || "none"
+    );
+    const discountValue = Number(
+      item.discount_value || 0
+    );
+    const discountTotal = Number(
+      item.discount_total || 0
     );
 
     return `
@@ -454,6 +474,7 @@
     cartCount.textContent = `${itemCount} ta`;
     cartQty.textContent = `${qtyText(totalQty)} dona`;
     cartTotal.textContent = money(total);
+    renderGlobalDiscount(total);
 
     const empty = itemCount === 0;
 
@@ -542,23 +563,39 @@
       );
     });
 
+  globalDiscountType?.addEventListener(
+    "change",
+    () => {
+      globalDiscountState.type =
+        globalDiscountType.value || "none";
+
+      if (globalDiscountState.type === "none") {
+        globalDiscountState.value = 0;
+
+        if (globalDiscountValue) {
+          globalDiscountValue.value = "0";
+        }
+      }
+
+      renderCart();
+    }
+  );
+
+  globalDiscountValue?.addEventListener(
+    "input",
+    () => {
+      globalDiscountState.value = Math.max(
+        0,
+        Number(globalDiscountValue.value || 0)
+      );
+
+      renderCart();
+    }
+  );
+
   searchInput?.addEventListener(
     "input",
     applySearch
-  );
-
-  productsNode.addEventListener(
-    "change",
-    (event) => {
-      const control = event.target.closest(
-        "[data-discount-type], [data-discount-value]"
-      );
-
-      if (!control) return;
-
-      const form = control.closest("[data-add-form]");
-      if (form) refreshDiscountPrice(form);
-    }
   );
 
   productsNode.addEventListener(
@@ -603,17 +640,12 @@
         values.price_uzs || ""
       ).replace(/\D/g, "");
 
-      values.list_price_uzs = String(
-        values.list_price_uzs || ""
-      ).replace(/\D/g, "");
-
-      values.discount_type = String(
-        values.discount_type || "none"
-      );
-
-      values.discount_value = String(
-        values.discount_value || "0"
-      ).replace(",", ".");
+      // Product cardda item-level skidka yo‘q.
+      // Kiritilgan sotuv narxi global skidkagacha
+      // bo‘lgan canonical narx hisoblanadi.
+      values.list_price_uzs = values.price_uzs;
+      values.discount_type = "none";
+      values.discount_value = "0";
 
       setBusy(true);
 
