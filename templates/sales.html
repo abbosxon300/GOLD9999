@@ -380,7 +380,8 @@ window.SALES_POS_INITIAL = {
     add: {{ url_for('sales_add')|tojson }},
     clear: {{ url_for('sales_clear')|tojson }},
     cart: {{ url_for('sales_api_cart')|tojson }},
-    products: {{ url_for('sales_api_products')|tojson }}
+    products: {{ url_for('sales_api_products')|tojson }},
+    checkout: {{ url_for('sales_checkout')|tojson }}
   }
 };
 </script>

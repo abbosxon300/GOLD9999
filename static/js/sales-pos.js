@@ -1038,7 +1038,56 @@
     );
 
     paymentModal.hidden = true;
-    checkoutForm.submit();
+    setBusy(true);
+
+    const checkoutValues = Object.fromEntries(
+      new FormData(checkoutForm).entries()
+    );
+
+    postForm(initial.urls.checkout, checkoutValues)
+      .then(async (response) => {
+        const result = await response.json();
+
+        if (!result.ok) {
+          throw new Error(
+            result.error || "Sotuvni yakunlab bo‘lmadi."
+          );
+        }
+
+        globalDiscountState.type = "none";
+        globalDiscountState.value = 0;
+
+        if (globalDiscountType) {
+          globalDiscountType.value = "none";
+        }
+
+        if (globalDiscountValue) {
+          globalDiscountValue.value = "0";
+          globalDiscountValue.disabled = true;
+        }
+
+        await Promise.all([
+          loadCart(),
+          activeCategoryId > 0
+            ? loadProducts(activeCategoryId)
+            : Promise.resolve(),
+        ]);
+
+        showToast(
+          `Sotuv #${result.sale_id} yakunlandi.`
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+
+        showToast(
+          error.message || "Sotuvni yakunlab bo‘lmadi.",
+          true
+        );
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   });
 
   clearButton.addEventListener(

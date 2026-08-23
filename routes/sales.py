@@ -944,6 +944,17 @@ def register_sales_routes(
                 "danger",
             )
 
+        if (
+            request.headers.get("X-Requested-With")
+            == "XMLHttpRequest"
+        ):
+            from flask import jsonify
+
+            return jsonify({
+                "ok": True,
+                "sale_id": sale_id,
+            })
+
         return redirect(
             url_for("sales")
         )
