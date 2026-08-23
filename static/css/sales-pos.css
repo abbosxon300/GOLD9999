@@ -1295,3 +1295,110 @@ body.dark-mode .pos-global-discount-controls input {
 body.dark-mode .pos-global-discount-controls input:disabled {
   background: #0d1524;
 }
+
+
+/* ===== KASSA MODE — GOLDEN RULE FINAL ===== */
+
+.pos-kassa-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pos-text);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.pos-kassa-toggle svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pos-kassa-toggle.is-active {
+  border-color: #101828;
+  background: #101828;
+  color: #fff;
+}
+
+@media (min-width: 981px) {
+  body.pos-kassa-mode {
+    overflow: hidden;
+  }
+
+  body.pos-kassa-mode .app-sidebar,
+  body.pos-kassa-mode .app-topbar,
+  body.pos-kassa-mode .bottom-nav {
+    display: none !important;
+  }
+
+  body.pos-kassa-mode .app-main,
+  body.pos-kassa-mode.sidebar-collapsed .app-main {
+    min-height: 100vh;
+    margin-left: 0 !important;
+  }
+
+  body.pos-kassa-mode .app-content {
+    width: 100vw;
+    height: 100vh;
+    min-height: 100vh;
+    padding: 12px !important;
+    overflow: hidden;
+  }
+
+  body.pos-kassa-mode .pos {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+  }
+
+  body.pos-kassa-mode .pos-toolbar {
+    margin-bottom: 10px;
+  }
+
+  body.pos-kassa-mode .pos-layout {
+    height: calc(100vh - 76px);
+    min-height: 0;
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(360px, 28vw);
+    gap: 12px;
+  }
+
+  body.pos-kassa-mode .pos-catalog,
+  body.pos-kassa-mode .pos-cart {
+    min-height: 0;
+    height: 100%;
+  }
+
+  body.pos-kassa-mode .pos-cart {
+    position: static;
+    top: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.pos-kassa-mode .pos-cart-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  body.pos-kassa-mode .pos-products {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}

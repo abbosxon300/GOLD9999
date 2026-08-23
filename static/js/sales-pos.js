@@ -30,6 +30,9 @@
   const checkoutButton = document.getElementById("pos-checkout");
   const clearButton = document.getElementById("pos-clear");
   const searchInput = document.getElementById("pos-search");
+  const kassaToggle = document.getElementById(
+    "pos-kassa-toggle"
+  );
   const toast = document.getElementById("pos-toast");
   const confirmModal = document.getElementById("pos-clear-confirm");
   const confirmClear = document.getElementById(
@@ -49,6 +52,64 @@
 
   let activeCategoryId = Number(initial.categoryId || 0);
   let toastTimer = null;
+  let kassaModeActive = false;
+
+  const applyKassaMode = (active) => {
+    kassaModeActive = Boolean(active);
+
+    document.body.classList.toggle(
+      "pos-kassa-mode",
+      kassaModeActive
+    );
+
+    if (kassaToggle) {
+      kassaToggle.classList.toggle(
+        "is-active",
+        kassaModeActive
+      );
+
+      const label = kassaToggle.querySelector("span");
+
+      if (label) {
+        label.textContent = kassaModeActive
+          ? "Chiqish"
+          : "Kassa rejimi";
+      }
+    }
+  };
+
+  const enterKassaMode = async () => {
+    applyKassaMode(true);
+
+    try {
+      if (
+        !document.fullscreenElement &&
+        document.documentElement.requestFullscreen
+      ) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (error) {
+      console.info(
+        "Fullscreen API mavjud emas, shell-only mode ishlaydi.",
+        error
+      );
+    }
+  };
+
+  const exitKassaMode = async () => {
+    try {
+      if (
+        document.fullscreenElement &&
+        document.exitFullscreen
+      ) {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.info("Fullscreen exit failed.", error);
+    }
+
+    applyKassaMode(false);
+  };
 
   const money = (value) => {
     const numeric = Number(value || 0);
@@ -590,6 +651,29 @@
       );
 
       renderCart();
+    }
+  );
+
+  kassaToggle?.addEventListener(
+    "click",
+    async () => {
+      if (kassaModeActive) {
+        await exitKassaMode();
+      } else {
+        await enterKassaMode();
+      }
+    }
+  );
+
+  document.addEventListener(
+    "fullscreenchange",
+    () => {
+      if (
+        kassaModeActive &&
+        !document.fullscreenElement
+      ) {
+        applyKassaMode(false);
+      }
     }
   );
 
