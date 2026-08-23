@@ -223,6 +223,55 @@ def get_sale_payment_summary(
     )
 
 
+def _existing_sale_click_move(
+    connection: sqlite3.Connection,
+    sale_id: int,
+) -> sqlite3.Row | None:
+    return connection.execute(
+        """
+        SELECT
+            id,
+            move_date,
+            direction,
+            amount_uzs,
+            note,
+            sale_id
+        FROM click_moves
+        WHERE sale_id=?
+          AND direction='IN'
+        LIMIT 1
+        """,
+        (sale_id,),
+    ).fetchone()
+
+
+def _create_sale_click_move(
+    connection: sqlite3.Connection,
+    *,
+    sale_id: int,
+    move_date: str,
+    amount_uzs: float,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO click_moves(
+            move_date,
+            direction,
+            amount_uzs,
+            note,
+            sale_id
+        )
+        VALUES(?, 'IN', ?, ?, ?)
+        """,
+        (
+            move_date,
+            amount_uzs,
+            f"Auto CLICK sale #{sale_id}",
+            sale_id,
+        ),
+    )
+
+
 def _existing_sale_cash_move(
     connection: sqlite3.Connection,
     sale_id: int,
@@ -303,6 +352,42 @@ def _assert_existing_state_matches(
     elif cash_move is not None:
         raise ValueError(
             "CLICK-only sotuvda Naqd kassa "
+            "yozuvi mavjud"
+        )
+
+    click_move = _existing_sale_click_move(
+        connection,
+        sale_id,
+    )
+
+    if click_uzs > PAYMENT_TOLERANCE:
+        if click_move is None:
+            raise ValueError(
+                "Click payment bor, lekin "
+                "Click kassa yozuvi topilmadi"
+            )
+
+        direction = str(
+            click_move["direction"]
+        ).upper()
+
+        amount = float(
+            click_move["amount_uzs"]
+        )
+
+        if (
+            direction != "IN"
+            or abs(amount - click_uzs)
+            > PAYMENT_TOLERANCE
+        ):
+            raise ValueError(
+                "Click payment va Click kassa "
+                "yozuvi bir-biriga mos emas"
+            )
+
+    elif click_move is not None:
+        raise ValueError(
+            "CASH-only sotuvda Click kassa "
             "yozuvi mavjud"
         )
 
@@ -433,6 +518,19 @@ def record_sale_payments(
                 normalized_sale_id,
                 normalized_click,
             ),
+        )
+
+        normalized_date = (
+            str(move_date).strip()
+            if move_date is not None
+            else date.today().isoformat()
+        )
+
+        _create_sale_click_move(
+            connection,
+            sale_id=normalized_sale_id,
+            move_date=normalized_date,
+            amount_uzs=normalized_click,
         )
 
     result = get_sale_payment_summary(

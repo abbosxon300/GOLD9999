@@ -285,7 +285,7 @@ def product_avg_cost(product_id: int) -> float:
 def build_home_context():
     if session.get("role") == "agent":
         return redirect(url_for("sales"))
-    # Bosh panel: Kassa / Umumiy sotuv / Umumiy to‘lov
+    # Bosh panel: Naqd kassa / Click kassa / Umumiy sotuv
     init_db()
     import sqlite3
     conn = sqlite3.connect(_db_path())
@@ -297,20 +297,25 @@ def build_home_context():
             col_candidates=["total_sell_uzs","total_uzs","jami_uzs","total","jami","sum_uzs","summa_uzs","amount_uzs","amount"]
         )
 
-        # 2) Umumiy to‘lov
-        payments_total_uzs = _sum_first_match(
-            conn,
-            table_names=["payments","client_payments","payment_moves","cash_payments","ledger","money_moves"],
-            col_candidates=["total_sell_uzs","amount_uzs","summa_uzs","amount","summa","paid_uzs","tolov_uzs"]
-        )
-
-        # 3) Kassa (professional): faqat cash_moves IN-OUT saldosi
+        # 3) Naqd kassa: cash_moves IN - OUT
+        # 4) Click kassa: click_moves IN - OUT
 
         kassa_uzs = 0.0
+        click_kassa_uzs = 0.0
 
-        if "cash_moves" in set(_tables(conn)):
+        tables = set(_tables(conn))
 
-            kassa_uzs = _sum_in_out(conn, "cash_moves")
+        if "cash_moves" in tables:
+            kassa_uzs = _sum_in_out(
+                conn,
+                "cash_moves",
+            )
+
+        if "click_moves" in tables:
+            click_kassa_uzs = _sum_in_out(
+                conn,
+                "click_moves",
+            )
 
     finally:
         conn.close()
@@ -319,14 +324,16 @@ def build_home_context():
 
     kassa_fmt = _fmt_uzs(kassa_uzs)
 
-    sales_total_fmt = _fmt_uzs(sales_total_uzs)
+    click_kassa_fmt = _fmt_uzs(
+        click_kassa_uzs
+    )
 
-    paid_total_fmt = _fmt_uzs(payments_total_uzs)
+    sales_total_fmt = _fmt_uzs(sales_total_uzs)
 
     return {
         "kassa_fmt": kassa_fmt,
+        "click_kassa_fmt": click_kassa_fmt,
         "sales_total_fmt": sales_total_fmt,
-        "paid_total_fmt": paid_total_fmt,
     }
 
 if register_auth_routes:

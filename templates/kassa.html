@@ -1,107 +1,531 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="padding:18px;">
-  <h2 style="margin:0 0 16px 0;">Kassa (IN / OUT)</h2>
-  <form method="get" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:0 0 14px 0;">
-    <div>
-      <div style="font-size:12px; opacity:.7; margin-bottom:4px;">From</div>
-      <input type="date" name="from" value="{{ from_date or '' }}" style="padding:10px; border:1px solid #e5e7eb; border-radius:10px;">
-    </div>
-    <div>
-      <div style="font-size:12px; opacity:.7; margin-bottom:4px;">To</div>
-      <input type="date" name="to" value="{{ to_date or '' }}" style="padding:10px; border:1px solid #e5e7eb; border-radius:10px;">
-    </div>
-    <button type="submit" class="btn" style="height:42px;">Filter</button>
-    <a href="{{ url_for('kassa') }}" class="btn" style="height:42px; display:inline-flex; align-items:center; text-decoration:none;">Reset</a>
-  </form>
 
-  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:14px;">
-    <div style="background:#1e293b; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; color:#fff;">
-      <div style="font-size:13px; opacity:.75;">Joriy balans</div>
-      <div style="font-size:30px; font-weight:800; margin-top:8px;">{{ kassa_fmt }}</div>
-      <div style="font-size:12px; opacity:.6; margin-top:8px;">cash_moves (IN - OUT)</div>
-    </div>
+<style>
+.kh-page {
+  max-width: 1500px;
+  margin: 0 auto;
+}
 
-    <div style="background:#0f172a; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px; color:#fff;">
-      <div style="font-size:13px; opacity:.75; margin-bottom:10px;">Yangi harakat qo‘shish</div>
+.kh-head {
+  margin-bottom: 18px;
+}
 
-      <form method="POST" style="display:grid; gap:10px;">
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <select name="direction" required style="flex:1; min-width:140px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;">
-            <option value="IN">IN (kirish)</option>
-            <option value="OUT">OUT (chiqish)</option>
-          </select>
+.kh-head h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 900;
+}
 
-          <input name="amount_uzs" inputmode="numeric" placeholder="Summa (UZS)" required
-                 style="flex:2; min-width:180px; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;" />
-        </div>
+.kh-head p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
 
-        <input name="note" placeholder="Izoh (ixtiyoriy)"
-               style="padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#111827; color:#fff;" />
+.kh-filter {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1fr)
+    minmax(160px, 1fr)
+    auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  margin-bottom: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
 
-        <button type="submit"
-                style="padding:10px 12px; border-radius:12px; border:0; background:#2563eb; color:#fff; font-weight:700; cursor:pointer;">
-          Saqlash
-        </button>
-      </form>
-    </div>
+.kh-field span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kh-field input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 11px;
+  background: #fff;
+  color: #0f172a;
+  outline: none;
+}
+
+.kh-filter button {
+  height: 42px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 11px;
+  background: #3157e8;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kh-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kh-stat {
+  padding: 15px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+}
+
+.kh-stat span {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.kh-stat strong {
+  color: #0f172a;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.kh-manual {
+  margin-bottom: 14px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.kh-manual-title {
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.kh-manual form {
+  display: grid;
+  grid-template-columns:
+    minmax(140px, .6fr)
+    minmax(180px, 1fr)
+    minmax(220px, 2fr)
+    auto;
+  gap: 9px;
+}
+
+.kh-manual select,
+.kh-manual input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 11px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.kh-manual button {
+  height: 42px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 11px;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kh-list {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 17px;
+}
+
+.kh-list-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.kh-list-head strong {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.kh-list-head span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.kh-table-wrap {
+  overflow-x: auto;
+}
+
+.kh-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kh-table th {
+  padding: 10px 16px;
+  background: #f8fafc;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.kh-table td {
+  padding: 13px 16px;
+  color: #172033;
+  border-bottom: 1px solid #f0f3f7;
+  font-size: 13px;
+}
+
+.kh-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.kh-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.kh-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.kh-badge.in {
+  background: #eaf8ef;
+  color: #168044;
+}
+
+.kh-badge.out {
+  background: #fff0f0;
+  color: #d13d3d;
+}
+
+.kh-source {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.kh-sale-link {
+  color: #3157e8;
+  font-weight: 800;
+}
+
+.kh-actions {
+  white-space: nowrap;
+}
+
+.kh-actions a,
+.kh-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 31px;
+  height: 31px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #0f172a;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.kh-empty {
+  padding: 34px 20px;
+  color: #64748b;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .kh-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kh-manual form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .kh-filter,
+  .kh-summary,
+  .kh-manual form {
+    grid-template-columns: 1fr;
+  }
+
+  .kh-head h1 {
+    font-size: 23px;
+  }
+}
+</style>
+
+<div class="kh-page">
+
+  <div class="kh-head">
+    <h1>{{ page_title }}</h1>
+    <p>{{ page_subtitle }}</p>
   </div>
 
-  <div style="background:#ffffff; border:1px solid rgba(15,23,42,.12); border-radius:14px; overflow:hidden;">
-    <div style="padding:12px 14px; font-weight:700;">Oxirgi harakatlar</div>
-    <div style="overflow:auto;">
-      <table style="width:100%; border-collapse:collapse;">
+  <form
+    method="get"
+    class="kh-filter"
+  >
+    <label class="kh-field">
+      <span>Boshlanish</span>
+      <input
+        type="date"
+        name="from"
+        value="{{ from_date }}"
+      >
+    </label>
+
+    <label class="kh-field">
+      <span>Tugash</span>
+      <input
+        type="date"
+        name="to"
+        value="{{ to_date }}"
+      >
+    </label>
+
+    <button type="submit">
+      Ko‘rsat
+    </button>
+  </form>
+
+  <div class="kh-summary">
+
+    <div class="kh-stat">
+      <span>Joriy balans</span>
+      <strong>
+        {{ money(balance) }} so‘m
+      </strong>
+    </div>
+
+    <div class="kh-stat">
+      <span>Kirim</span>
+      <strong>
+        {{ money(total_in) }} so‘m
+      </strong>
+    </div>
+
+    <div class="kh-stat">
+      <span>Chiqim</span>
+      <strong>
+        {{ money(total_out) }} so‘m
+      </strong>
+    </div>
+
+    <div class="kh-stat">
+      <span>Harakatlar</span>
+      <strong>
+        {{ moves_count }}
+      </strong>
+    </div>
+
+  </div>
+
+  {% if allow_manual %}
+  <div class="kh-manual">
+
+    <div class="kh-manual-title">
+      Yangi naqd harakat
+    </div>
+
+    <form method="post">
+
+      <select
+        name="direction"
+        required
+      >
+        <option value="IN">
+          Kirim
+        </option>
+        <option value="OUT">
+          Chiqim
+        </option>
+      </select>
+
+      <input
+        name="amount_uzs"
+        inputmode="numeric"
+        placeholder="Summa"
+        required
+      >
+
+      <input
+        name="note"
+        placeholder="Izoh"
+      >
+
+      <button type="submit">
+        Saqlash
+      </button>
+
+    </form>
+
+  </div>
+  {% endif %}
+
+  <div class="kh-list">
+
+    <div class="kh-list-head">
+      <strong>
+        Harakatlar tarixi
+      </strong>
+
+      <span>
+        {{ from_date }} — {{ to_date }}
+      </span>
+    </div>
+
+    {% if rows %}
+    <div class="kh-table-wrap">
+
+      <table class="kh-table">
+
         <thead>
-          <tr style="background:#f1f5f9; text-align:left;">
-            <th style="padding:10px; font-size:12px; color:#334155;">Sana</th>
-            <th style="padding:10px; font-size:12px; color:#334155;">Turi</th>
-            <th style="padding:10px; font-size:12px; color:#334155;">Summa</th>
-            <th style="padding:10px; font-size:12px; color:#334155;">Izoh</th>
-          <th style="padding:10px; text-align:left; font-size:13px; color:#94a3b8;">Amallar</th>
-</tr>
+          <tr>
+            <th>Sana</th>
+            <th>Turi</th>
+            <th>Manba</th>
+            <th>Izoh</th>
+            <th class="num">Summa</th>
+
+            {% if ledger_type == "cash" %}
+            <th>Amallar</th>
+            {% endif %}
+          </tr>
         </thead>
+
         <tbody>
-          {% for r in rows %}
-          <tr style="border-top:1px solid rgba(15,23,42,.08);">
-            <td style="padding:10px; font-size:13px;">{{ r.move_date }}</td>
-            <td style="padding:10px; font-size:13px; font-weight:700;">
-              {% if r.direction == 'IN' %}
-                <span style="color:#16a34a;">IN</span>
+
+        {% for r in rows %}
+          <tr>
+
+            <td>
+              {{ r.move_date }}
+            </td>
+
+            <td>
+              {% if r.direction == "IN" %}
+                <span class="kh-badge in">
+                  Kirim
+                </span>
               {% else %}
-                <span style="color:#dc2626;">OUT</span>
+                <span class="kh-badge out">
+                  Chiqim
+                </span>
               {% endif %}
             </td>
-            <td style="padding:10px; font-size:13px;">{{ '{:,.0f}'.format(r.amount_uzs or 0).replace(',', ' ') }}</td>
-            <td style="padding:10px; font-size:13px; color:#334155;">{{ r.note }}</td>
-          
-            <td style="padding:10px; font-size:13px;">
-              <div style="display:flex; gap:8px; align-items:center;">
-                <a href="{{ url_for('kassa_edit', move_id=r.id) }}"
-                   style="text-decoration:none; padding:6px 10px; border-radius:10px; background:#0b1220; border:1px solid rgba(255,255,255,.12); color:#fff;">
-                  ✏️
-                </a>
 
-                {% if not r.sale_id %}
-                  <form method="POST" action="{{ url_for('kassa_delete', move_id=r.id) }}" onsubmit="return confirm('O‘chirasizmi?');" style="margin:0;">
-                    <button type="submit"
-                            style="padding:6px 10px; border-radius:10px; background:rgba(239,68,68,.18); border:1px solid rgba(239,68,68,.35); color:#fff; cursor:pointer;">
-                      🗑
-                    </button>
-                  </form>
-                {% else %}
-                  <span title="Auto sale: o‘chirish taqiqlangan" style="opacity:.5;">🗑</span>
-                {% endif %}
-              </div>
+            <td>
+              {% if r.sale_id %}
+                <span class="kh-sale-link">
+                  Sotuv #{{ r.sale_id }}
+                </span>
+              {% else %}
+                <span class="kh-source">
+                  Qo‘lda
+                </span>
+              {% endif %}
             </td>
-</tr>
-          {% endfor %}
-          {% if rows|length == 0 %}
-          <tr><td colspan="4" style="padding:12px; color:#64748b;">Hali kassa harakati yo‘q.</td></tr>
-          {% endif %}
+
+            <td class="kh-source">
+              {{ r.note or "—" }}
+            </td>
+
+            <td class="num">
+              {% if r.direction == "OUT" %}
+                −
+              {% endif %}
+              {{ money(r.amount_uzs) }} so‘m
+            </td>
+
+            {% if ledger_type == "cash" %}
+            <td class="kh-actions">
+
+              <a
+                href="{{ url_for(
+                  'kassa_edit',
+                  move_id=r.id
+                ) }}"
+                title="Tahrirlash"
+              >
+                ✏️
+              </a>
+
+              {% if not r.sale_id %}
+              <form
+                method="post"
+                action="{{ url_for(
+                  'kassa_delete',
+                  move_id=r.id
+                ) }}"
+                style="display:inline;"
+                onsubmit="return confirm(
+                  'O‘chirasizmi?'
+                );"
+              >
+                <button
+                  type="submit"
+                  title="O‘chirish"
+                >
+                  🗑
+                </button>
+              </form>
+              {% endif %}
+
+            </td>
+            {% endif %}
+
+          </tr>
+        {% endfor %}
+
         </tbody>
+
       </table>
+
     </div>
+
+    {% else %}
+
+    <div class="kh-empty">
+      Tanlangan davrda harakat yo‘q.
+    </div>
+
+    {% endif %}
+
   </div>
 
 </div>
+
 {% endblock %}
