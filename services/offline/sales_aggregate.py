@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from uuid import UUID
 
 
-SALE_AGGREGATE_SCHEMA_VERSION = 2
+SALE_AGGREGATE_SCHEMA_VERSION = 3
 
 
 class InvalidSaleAggregatePayloadError(ValueError):
@@ -263,6 +263,47 @@ class SaleAggregateItem:
 
 
 @dataclass(frozen=True, slots=True)
+class SaleAggregatePayment:
+    payment_method: str
+    amount_uzs: float
+
+    @classmethod
+    def from_payload(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "SaleAggregatePayment":
+        if not isinstance(payload, Mapping):
+            raise InvalidSaleAggregatePayloadError(
+                "Sale payment Mapping bo‘lishi kerak"
+            )
+
+        method = _required_text(
+            payload.get("payment_method"),
+            field_name="payment.payment_method",
+        ).upper()
+
+        if method not in ("CASH", "CLICK"):
+            raise InvalidSaleAggregatePayloadError(
+                "payment_method CASH yoki CLICK "
+                "bo‘lishi kerak"
+            )
+
+        return cls(
+            payment_method=method,
+            amount_uzs=_positive_number(
+                payload.get("amount_uzs"),
+                field_name="payment.amount_uzs",
+            ),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "payment_method": self.payment_method,
+            "amount_uzs": self.amount_uzs,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SaleAggregatePayload:
     schema_version: int
     entity_uuid: str
@@ -270,6 +311,7 @@ class SaleAggregatePayload:
     sale_date: str
     agent_username: str | None
     items: tuple[SaleAggregateItem, ...]
+    payments: tuple[SaleAggregatePayment, ...]
 
     @classmethod
     def from_payload(
@@ -288,6 +330,7 @@ class SaleAggregatePayload:
 
         if schema_version not in (
             1,
+            2,
             SALE_AGGREGATE_SCHEMA_VERSION,
         ):
             raise InvalidSaleAggregatePayloadError(
@@ -324,6 +367,70 @@ class SaleAggregatePayload:
                 "item UUID mavjud"
             )
 
+        items_total = sum(
+            item.sell_total_uzs
+            for item in items
+        )
+
+        if schema_version >= 3:
+            raw_payments = payload.get("payments")
+
+            if not isinstance(
+                raw_payments,
+                (list, tuple),
+            ):
+                raise InvalidSaleAggregatePayloadError(
+                    "payments ro‘yxat bo‘lishi kerak"
+                )
+
+            if not raw_payments:
+                raise InvalidSaleAggregatePayloadError(
+                    "Sale aggregate ichida kamida "
+                    "bitta payment bo‘lishi kerak"
+                )
+
+            payments = tuple(
+                SaleAggregatePayment.from_payload(
+                    payment
+                )
+                for payment in raw_payments
+            )
+
+            methods = [
+                payment.payment_method
+                for payment in payments
+            ]
+
+            if len(methods) != len(set(methods)):
+                raise InvalidSaleAggregatePayloadError(
+                    "Bir xil payment_method "
+                    "takrorlangan"
+                )
+
+            payments_total = sum(
+                payment.amount_uzs
+                for payment in payments
+            )
+
+            if abs(
+                payments_total - items_total
+            ) > 0.000001:
+                raise InvalidSaleAggregatePayloadError(
+                    "Payment jami sotuv jami "
+                    "bilan teng emas"
+                )
+
+        else:
+            # Legacy schema v1/v2 payment ma’lumotini
+            # olib yurmagan. Ular tarixiy ravishda
+            # 100% CASH sifatida ishlagan.
+            payments = (
+                SaleAggregatePayment(
+                    payment_method="CASH",
+                    amount_uzs=items_total,
+                ),
+            )
+
         return cls(
             schema_version=schema_version,
             entity_uuid=_entity_uuid(
@@ -342,6 +449,7 @@ class SaleAggregatePayload:
                 field_name="agent_username",
             ),
             items=items,
+            payments=payments,
         )
 
     @property
@@ -349,6 +457,29 @@ class SaleAggregatePayload:
         return sum(
             item.sell_total_uzs
             for item in self.items
+        )
+
+    @property
+    def total_payment_uzs(self) -> float:
+        return sum(
+            payment.amount_uzs
+            for payment in self.payments
+        )
+
+    @property
+    def cash_uzs(self) -> float:
+        return sum(
+            payment.amount_uzs
+            for payment in self.payments
+            if payment.payment_method == "CASH"
+        )
+
+    @property
+    def click_uzs(self) -> float:
+        return sum(
+            payment.amount_uzs
+            for payment in self.payments
+            if payment.payment_method == "CLICK"
         )
 
     @property
@@ -376,6 +507,10 @@ class SaleAggregatePayload:
                 item.to_payload()
                 for item in self.items
             ],
+            "payments": [
+                payment.to_payload()
+                for payment in self.payments
+            ],
         }
 
 
@@ -389,6 +524,7 @@ __all__ = [
     "InvalidSaleAggregatePayloadError",
     "SALE_AGGREGATE_SCHEMA_VERSION",
     "SaleAggregateItem",
+    "SaleAggregatePayment",
     "SaleAggregatePayload",
     "parse_sale_aggregate_payload",
 ]

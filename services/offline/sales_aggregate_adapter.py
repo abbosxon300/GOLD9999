@@ -5,7 +5,7 @@ from typing import Any
 
 from services.business_writes import (
     consume_stock,
-    ensure_sale_cash_move,
+    record_sale_payments,
 )
 from services.offline.entity_lookup import (
     find_local_entity,
@@ -356,7 +356,62 @@ def _aggregate_matches(
         ):
             return False
 
+    if not _payments_match(
+        connection,
+        sale_id=sale_id,
+        aggregate=aggregate,
+    ):
+        return False
+
     return True
+
+
+def _payments_match(
+    connection: sqlite3.Connection,
+    *,
+    sale_id: int,
+    aggregate: SaleAggregatePayload,
+) -> bool:
+    # Legacy v1/v2 aggregate payment contractni
+    # saqlamagan. Ular uchun eski idempotency
+    # xulqini saqlab qolamiz.
+    if aggregate.schema_version < 3:
+        return True
+
+    rows = connection.execute(
+        """
+        SELECT
+            payment_method,
+            amount_uzs
+        FROM sale_payments
+        WHERE sale_id=?
+        ORDER BY payment_method
+        """,
+        (sale_id,),
+    ).fetchall()
+
+    stored = {
+        str(row["payment_method"]): float(
+            row["amount_uzs"]
+        )
+        for row in rows
+    }
+
+    expected = {
+        payment.payment_method: payment.amount_uzs
+        for payment in aggregate.payments
+    }
+
+    if set(stored) != set(expected):
+        return False
+
+    return all(
+        _float_equal(
+            stored[method],
+            amount,
+        )
+        for method, amount in expected.items()
+    )
 
 
 def _assert_item_uuid_available(
@@ -483,12 +538,12 @@ def _insert_sale(
                 source_id=sale_item_id,
             )
 
-        ensure_sale_cash_move(
+        record_sale_payments(
             context.connection,
             sale_id=sale_id,
+            cash_uzs=aggregate.cash_uzs,
+            click_uzs=aggregate.click_uzs,
             move_date=aggregate.sale_date,
-            amount_uzs=aggregate.total_sell_uzs,
-            note=f"Auto remote sale #{sale_id}",
         )
 
     except sqlite3.IntegrityError as exc:

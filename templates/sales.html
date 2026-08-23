@@ -198,6 +198,113 @@
 
   <div class="pos-toast" id="pos-toast" hidden></div>
 
+  <div class="pos-payment-modal" id="pos-payment-modal" hidden>
+    <button
+      class="pos-payment-backdrop"
+      type="button"
+      data-payment-cancel
+      aria-label="Yopish"
+    ></button>
+
+    <div
+      class="pos-payment-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pos-payment-title"
+    >
+      <div class="pos-payment-head">
+        <div>
+          <span>To‘lov</span>
+          <h3 id="pos-payment-title">Sotuvni yakunlash</h3>
+        </div>
+
+        <strong>
+          <b id="pos-payment-total">0</b>
+          <small>so‘m</small>
+        </strong>
+      </div>
+
+      <div class="pos-payment-methods">
+        <button
+          type="button"
+          class="is-active"
+          data-payment-method="CASH"
+        >
+          Naqd
+        </button>
+
+        <button
+          type="button"
+          data-payment-method="CLICK"
+        >
+          Click
+        </button>
+
+        <button
+          type="button"
+          data-payment-method="MIXED"
+        >
+          Aralash
+        </button>
+      </div>
+
+      <div class="pos-payment-mixed" id="pos-payment-mixed" hidden>
+        <label>
+          <span>Naqd</span>
+          <div>
+            <input
+              id="pos-payment-cash"
+              type="text"
+              value="0"
+              inputmode="numeric"
+              autocomplete="off"
+            >
+            <small>so‘m</small>
+          </div>
+        </label>
+
+        <label>
+          <span>Click</span>
+          <div>
+            <input
+              id="pos-payment-click"
+              type="text"
+              value="0"
+              inputmode="numeric"
+              autocomplete="off"
+            >
+            <small>so‘m</small>
+          </div>
+        </label>
+
+        <div class="pos-payment-balance">
+          <span id="pos-payment-balance-label">Qoldi</span>
+          <strong id="pos-payment-remaining">0 so‘m</strong>
+        </div>
+      </div>
+
+      <p
+        class="pos-payment-error"
+        id="pos-payment-error"
+        hidden
+      ></p>
+
+      <div class="pos-payment-actions">
+        <button type="button" data-payment-cancel>
+          Bekor qilish
+        </button>
+
+        <button
+          type="button"
+          class="is-primary"
+          id="pos-payment-submit"
+        >
+          Sotuvni tasdiqlash
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="pos-confirm" id="pos-clear-confirm" hidden>
     <button
       class="pos-confirm-backdrop"

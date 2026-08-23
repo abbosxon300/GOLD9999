@@ -4,7 +4,7 @@ import uuid
 from services.business_writes import (
     business_transaction,
     consume_stock,
-    ensure_sale_cash_move,
+    record_sale_payments,
 )
 
 from flask import (
@@ -515,6 +515,38 @@ def register_sales_routes(
             global_pricing.discount_total_uzs
         )
 
+        payment_method = (
+            request.form.get("payment_method")
+            or "CASH"
+        ).strip().upper()
+
+        if payment_method not in (
+            "CASH",
+            "CLICK",
+            "MIXED",
+        ):
+            flash(
+                "To‘lov turi noto‘g‘ri",
+                "danger",
+            )
+            return redirect(url_for("sales"))
+
+        requested_cash_uzs = parse_float(
+            request.form.get("cash_uzs")
+            or "0"
+        )
+
+        requested_click_uzs = parse_float(
+            request.form.get("click_uzs")
+            or "0"
+        )
+
+        if requested_cash_uzs is None:
+            requested_cash_uzs = 0.0
+
+        if requested_click_uzs is None:
+            requested_click_uzs = 0.0
+
         db = get_db()
 
         try:
@@ -803,12 +835,28 @@ def register_sales_routes(
                     ),
                 )
 
-                ensure_sale_cash_move(
+                if payment_method == "CASH":
+                    cash_uzs = total_sell
+                    click_uzs = 0.0
+
+                elif payment_method == "CLICK":
+                    cash_uzs = 0.0
+                    click_uzs = total_sell
+
+                else:
+                    cash_uzs = float(
+                        requested_cash_uzs
+                    )
+                    click_uzs = float(
+                        requested_click_uzs
+                    )
+
+                payment_summary = record_sale_payments(
                     tx,
                     sale_id=sale_id,
+                    cash_uzs=cash_uzs,
+                    click_uzs=click_uzs,
                     move_date=sale_date,
-                    amount_uzs=total_sell,
-                    note=f"Auto sale #{sale_id}",
                 )
 
                 aggregate = SaleAggregatePayload.from_payload({
@@ -822,6 +870,18 @@ def register_sales_routes(
                         session.get("username")
                     ),
                     "items": aggregate_items,
+                    "payments": [
+                        {
+                            "payment_method": (
+                                payment.payment_method
+                            ),
+                            "amount_uzs": (
+                                payment.amount_uzs
+                            ),
+                        }
+                        for payment
+                        in payment_summary.payments
+                    ],
                 })
 
                 identity = get_device_identity(tx)

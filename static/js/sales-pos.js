@@ -28,6 +28,20 @@
     "pos-global-payable"
   );
   const checkoutButton = document.getElementById("pos-checkout");
+  const checkoutForm = document.getElementById("pos-checkout-form");
+  const paymentModal = document.getElementById("pos-payment-modal");
+  const paymentTotal = document.getElementById("pos-payment-total");
+  const paymentMixed = document.getElementById("pos-payment-mixed");
+  const paymentCash = document.getElementById("pos-payment-cash");
+  const paymentClick = document.getElementById("pos-payment-click");
+  const paymentRemaining = document.getElementById(
+    "pos-payment-remaining"
+  );
+  const paymentBalanceLabel = document.getElementById(
+    "pos-payment-balance-label"
+  );
+  const paymentError = document.getElementById("pos-payment-error");
+  const paymentSubmit = document.getElementById("pos-payment-submit");
   const clearButton = document.getElementById("pos-clear");
   const searchInput = document.getElementById("pos-search");
   const kassaToggle = document.getElementById(
@@ -115,6 +129,20 @@
     const numeric = Number(value || 0);
 
     return Math.round(numeric).toLocaleString("ru-RU");
+  };
+
+  const parseMoneyInput = (value) => {
+    const digits = String(value || "")
+      .replace(/\D/g, "");
+
+    return digits ? Number(digits) : 0;
+  };
+
+  const formatMoneyInput = (value) => {
+    const numeric = Math.max(0, Number(value || 0));
+
+    return Math.round(numeric)
+      .toLocaleString("ru-RU");
   };
 
   const globalDiscountState = {
@@ -811,6 +839,207 @@
       }
     }
   );
+
+  let paymentMethod = "CASH";
+
+  const currentPayable = () => {
+    const total = Number(cart.cart_total || 0);
+    return calculateGlobalDiscount(total).payable;
+  };
+
+  const setCheckoutField = (name, value) => {
+    let input = checkoutForm.querySelector(
+      `input[name="${name}"]`
+    );
+
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      checkoutForm.appendChild(input);
+    }
+
+    input.value = String(value);
+  };
+
+  const renderPaymentModal = () => {
+    const payable = currentPayable();
+
+    paymentTotal.textContent = money(payable);
+
+    document
+      .querySelectorAll("[data-payment-method]")
+      .forEach((button) => {
+        button.classList.toggle(
+          "is-active",
+          button.dataset.paymentMethod === paymentMethod
+        );
+      });
+
+    paymentMixed.hidden = paymentMethod !== "MIXED";
+    paymentError.hidden = true;
+
+    let cash = 0;
+    let click = 0;
+
+    if (paymentMethod === "CASH") {
+      cash = payable;
+    } else if (paymentMethod === "CLICK") {
+      click = payable;
+    } else {
+      cash = parseMoneyInput(paymentCash.value);
+      click = parseMoneyInput(paymentClick.value);
+    }
+
+    const paid = cash + click;
+    const difference = payable - paid;
+    const mismatch = Math.abs(difference) > 0.01;
+
+    if (paymentBalanceLabel) {
+      paymentBalanceLabel.textContent =
+        difference < -0.01
+          ? "Ortiqcha"
+          : "Qoldi";
+    }
+
+    if (paymentRemaining) {
+      paymentRemaining.textContent =
+        `${money(Math.abs(difference))} so‘m`;
+    }
+
+    paymentSubmit.disabled =
+      paymentMethod === "MIXED" &&
+      mismatch;
+  };
+
+  const openPaymentModal = () => {
+    const payable = currentPayable();
+
+    paymentMethod = "CASH";
+    paymentCash.value = formatMoneyInput(payable);
+    paymentClick.value = "0";
+
+    renderPaymentModal();
+    paymentModal.hidden = false;
+  };
+
+  const closePaymentModal = () => {
+    paymentModal.hidden = true;
+  };
+
+  checkoutForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (paymentModal.hidden) {
+      openPaymentModal();
+    }
+  });
+
+  document
+    .querySelectorAll("[data-payment-method]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        paymentMethod = button.dataset.paymentMethod;
+
+        const payable = currentPayable();
+
+        if (paymentMethod === "MIXED") {
+          paymentCash.value = formatMoneyInput(payable);
+          paymentClick.value = "0";
+        }
+
+        renderPaymentModal();
+      });
+    });
+
+  paymentCash.addEventListener("input", () => {
+    if (paymentMethod !== "MIXED") {
+      return;
+    }
+
+    const payable = currentPayable();
+    const cash = Math.min(
+      payable,
+      parseMoneyInput(paymentCash.value)
+    );
+
+    const click = Math.max(
+      0,
+      payable - cash
+    );
+
+    paymentCash.value = formatMoneyInput(cash);
+    paymentClick.value = formatMoneyInput(click);
+
+    renderPaymentModal();
+  });
+
+  paymentClick.addEventListener("input", () => {
+    if (paymentMethod !== "MIXED") {
+      return;
+    }
+
+    const payable = currentPayable();
+    const click = Math.min(
+      payable,
+      parseMoneyInput(paymentClick.value)
+    );
+
+    const cash = Math.max(
+      0,
+      payable - click
+    );
+
+    paymentClick.value = formatMoneyInput(click);
+    paymentCash.value = formatMoneyInput(cash);
+
+    renderPaymentModal();
+  });
+
+  paymentModal
+    .querySelectorAll("[data-payment-cancel]")
+    .forEach((button) => {
+      button.addEventListener("click", closePaymentModal);
+    });
+
+  paymentSubmit.addEventListener("click", () => {
+    const payable = currentPayable();
+
+    let cash = 0;
+    let click = 0;
+
+    if (paymentMethod === "CASH") {
+      cash = payable;
+    } else if (paymentMethod === "CLICK") {
+      click = payable;
+    } else {
+      cash = parseMoneyInput(paymentCash.value);
+      click = parseMoneyInput(paymentClick.value);
+    }
+
+    if (Math.abs((cash + click) - payable) > 0.01) {
+      paymentError.textContent =
+        "Naqd + Click summasi to‘lanadigan summaga teng bo‘lishi kerak.";
+      paymentError.hidden = false;
+      return;
+    }
+
+    setCheckoutField(
+      "payment_method",
+      paymentMethod
+    );
+    setCheckoutField(
+      "cash_uzs",
+      cash
+    );
+    setCheckoutField(
+      "click_uzs",
+      click
+    );
+
+    paymentModal.hidden = true;
+    checkoutForm.submit();
+  });
 
   clearButton.addEventListener(
     "click",

@@ -1402,3 +1402,231 @@ body.dark-mode .pos-global-discount-controls input:disabled {
       repeat(3, minmax(0, 1fr));
   }
 }
+
+/* ===== POS PAYMENT MODAL ===== */
+
+.pos-payment-modal[hidden] {
+  display: none;
+}
+
+.pos-payment-modal {
+  position: fixed;
+  z-index: 1500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.pos-payment-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, .48);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.pos-payment-dialog {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--pos-card, #fff);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, .28);
+}
+
+.pos-payment-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.pos-payment-head span {
+  color: var(--pos-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.pos-payment-head h3 {
+  margin: 3px 0 0;
+  font-size: 20px;
+  font-weight: 950;
+}
+
+.pos-payment-head > strong {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pos-payment-head b {
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.pos-payment-head small {
+  margin-left: 3px;
+  color: var(--pos-muted);
+  font-size: 10px;
+}
+
+.pos-payment-methods {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.pos-payment-methods button {
+  min-height: 48px;
+  border: 1px solid var(--pos-line);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--pos-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pos-payment-methods button.is-active {
+  border-color: var(--pos-blue);
+  background: var(--pos-blue);
+  color: #fff;
+}
+
+.pos-payment-mixed {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--pos-line);
+  border-radius: 13px;
+  background: #f8fafc;
+}
+
+.pos-payment-mixed[hidden] {
+  display: none;
+}
+
+.pos-payment-mixed label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--pos-muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.pos-payment-mixed label > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-payment-mixed input {
+  width: 100%;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pos-text);
+  outline: none;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.pos-payment-mixed input:focus {
+  border-color: var(--pos-blue);
+  box-shadow: 0 0 0 3px rgba(49, 87, 232, .10);
+}
+
+.pos-payment-mixed small {
+  color: var(--pos-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.pos-payment-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 9px;
+  border-top: 1px solid var(--pos-line);
+  font-size: 11px;
+}
+
+.pos-payment-balance strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.pos-payment-error {
+  margin: 11px 0 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fff0ef;
+  color: var(--pos-red);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.pos-payment-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.pos-payment-actions button {
+  min-height: 44px;
+  border: 1px solid var(--pos-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pos-text);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.pos-payment-actions button.is-primary {
+  border-color: var(--pos-gold);
+  background: var(--pos-gold);
+  color: #fff;
+}
+
+.pos-payment-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+body.dark-mode .pos-payment-dialog {
+  background: var(--pos-card);
+  color: var(--pos-text);
+}
+
+body.dark-mode .pos-payment-methods button,
+body.dark-mode .pos-payment-mixed input,
+body.dark-mode .pos-payment-actions button {
+  border-color: var(--pos-line);
+  background: #111827;
+  color: var(--pos-text);
+}
+
+body.dark-mode .pos-payment-methods button.is-active {
+  border-color: var(--pos-blue);
+  background: var(--pos-blue);
+  color: #fff;
+}
+
+body.dark-mode .pos-payment-mixed {
+  background: #0d1524;
+}
+
+body.dark-mode .pos-payment-actions button.is-primary {
+  border-color: var(--pos-gold);
+  background: var(--pos-gold);
+  color: #fff;
+}
