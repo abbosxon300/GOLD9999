@@ -14,52 +14,7 @@
   data-clear-url="{{ url_for('sales_clear') }}"
   data-checkout-url="{{ url_for('sales_checkout') }}"
 >
-  <header class="pos-top">
-    <div class="pos-title">
-      <div>
-        <span class="pos-kicker">Savdo oynasi</span>
-        <h1>Sotuv</h1>
-      </div>
 
-      <div class="pos-today">
-        <span>Bugun</span>
-        <strong>{{ today }}</strong>
-      </div>
-    </div>
-
-    <div class="pos-stats">
-      <div class="pos-stat">
-        <span>Bugungi sotuv</span>
-        <strong>
-          {{ "{:,.0f}".format(sum_sell or 0).replace(",", " ") }}
-          <small>so‘m</small>
-        </strong>
-      </div>
-
-      {% if session.get("role") == "admin" %}
-      <div class="pos-stat">
-        <span>Tannarx</span>
-        <strong>
-          {{ "{:,.0f}".format(sum_cost or 0).replace(",", " ") }}
-          <small>so‘m</small>
-        </strong>
-      </div>
-
-      <div class="pos-stat">
-        <span>Foyda</span>
-        <strong>
-          {{ "{:,.0f}".format(sum_profit or 0).replace(",", " ") }}
-          <small>so‘m</small>
-        </strong>
-      </div>
-      {% endif %}
-
-      <a class="pos-history" href="/sales/history">
-        Mening sotuvlarim
-        <span aria-hidden="true">→</span>
-      </a>
-    </div>
-  </header>
 
   <section class="pos-toolbar">
     <div class="pos-categories" id="pos-categories">

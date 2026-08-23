@@ -1029,3 +1029,174 @@ body.dark-mode .pos-field input {
     text-align: left;
   }
 }
+
+/* =========================================================
+   SALES POS V2 — PROFESSIONAL DESKTOP DENSITY
+   ========================================================= */
+
+@media (min-width: 981px) {
+  .pos {
+    max-width: 1600px;
+  }
+
+  .pos-top {
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+
+  .pos-title h1 {
+    font-size: 30px;
+  }
+
+  .pos-stat {
+    min-width: 120px;
+    padding: 8px 11px;
+    border-radius: 12px;
+  }
+
+  .pos-history {
+    min-height: 48px;
+  }
+
+  .pos-toolbar {
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  .pos-category {
+    min-height: 34px;
+    padding: 0 13px;
+  }
+
+  .pos-search {
+    flex-basis: 250px;
+    min-height: 34px;
+  }
+
+  .pos-layout {
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: 12px;
+  }
+
+  .pos-catalog {
+    padding: 13px;
+    border-radius: 16px;
+  }
+
+  .pos-section-head {
+    margin-bottom: 10px;
+  }
+
+  .pos-section-head h2,
+  .pos-cart-head h2 {
+    font-size: 19px;
+  }
+
+  .pos-products {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .pos-product {
+    padding: 10px;
+    border-radius: 13px;
+  }
+
+  .pos-product-name h3 {
+    font-size: 13px;
+  }
+
+  .pos-stock {
+    min-height: 22px;
+    padding: 0 7px;
+  }
+
+  .pos-product-price {
+    margin: 9px 0 8px;
+    padding: 8px 9px;
+    border-radius: 9px;
+  }
+
+  .pos-product-price strong {
+    font-size: 15px;
+  }
+
+  .pos-fields {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .pos-field span {
+    margin-bottom: 4px;
+  }
+
+  .pos-field input {
+    height: 35px;
+    border-radius: 9px;
+  }
+
+  .pos-add {
+    min-height: 37px;
+    margin-top: 7px;
+    border-radius: 9px;
+  }
+
+  .pos-cart {
+    top: 76px;
+    border-radius: 16px;
+  }
+
+  .pos-cart-head {
+    padding: 13px 14px;
+  }
+
+  .pos-cart-body {
+    min-height: 190px;
+    max-height: calc(100vh - 330px);
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .pos-cart-item {
+    padding: 9px;
+    border-radius: 11px;
+  }
+
+  .pos-cart-footer {
+    padding: 11px 13px 13px;
+  }
+
+  .pos-cart-summary {
+    margin-bottom: 9px;
+  }
+
+  .pos-checkout {
+    min-height: 43px;
+  }
+
+  .pos-clear {
+    min-height: 37px;
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1450px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .pos-products {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1451px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+
+  .pos-products {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
