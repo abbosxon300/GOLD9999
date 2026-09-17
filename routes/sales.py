@@ -1021,10 +1021,6 @@ def register_sales_routes(
             "sales_receipt.html",
             sale=sale,
             items=items,
-            autoprint=(
-                request.args.get("autoprint")
-                == "1"
-            ),
         )
 
     @app.route(

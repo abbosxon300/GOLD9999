@@ -224,36 +224,6 @@
     }, 2200);
   };
 
-  const printSaleReceipt = (saleId) => {
-    document
-      .getElementById("pos-receipt-print-frame")
-      ?.remove();
-
-    const frame = document.createElement("iframe");
-
-    frame.id = "pos-receipt-print-frame";
-    frame.src =
-      `/sales/receipt/${encodeURIComponent(saleId)}?autoprint=1`;
-
-    Object.assign(frame.style, {
-      position: "fixed",
-      left: "-10000px",
-      top: "0",
-      width: "400px",
-      height: "700px",
-      border: "0",
-    });
-
-    frame.setAttribute("aria-hidden", "true");
-
-    document.body.appendChild(frame);
-
-    window.setTimeout(
-      () => frame.remove(),
-      60000
-    );
-  };
-
   const setBusy = (busy) => {
     root.classList.toggle("is-busy", busy);
   };
@@ -1354,8 +1324,6 @@
             ? loadProducts(activeCategoryId)
             : Promise.resolve(),
         ]);
-
-        printSaleReceipt(result.sale_id);
 
         showToast(
           `Sotuv #${result.sale_id} yakunlandi.`
