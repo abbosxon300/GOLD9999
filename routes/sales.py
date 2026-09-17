@@ -939,6 +939,17 @@ def register_sales_routes(
             )
 
         except Exception as exc:
+            if (
+                request.headers.get("X-Requested-With")
+                == "XMLHttpRequest"
+            ):
+                from flask import jsonify
+
+                return jsonify({
+                    "ok": False,
+                    "error": str(exc),
+                })
+
             flash(
                 str(exc),
                 "danger",
