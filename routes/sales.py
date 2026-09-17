@@ -1017,33 +1017,14 @@ def register_sales_routes(
             ORDER BY si.id
         """, (sale_id,))
 
-        if request.args.get("format") == "json":
-            from flask import jsonify
-
-            return jsonify({
-                "business_name": "GOLD 9999",
-                "sale_id": sale["id"],
-                "sale_date": sale["sale_date"],
-                "total_uzs": sale["total_sell_uzs"],
-                "items": [
-                    {
-                        "name": item["name"],
-                        "qty": item["qty"],
-                        "unit_price_uzs": (
-                            item["sell_price_uzs"]
-                        ),
-                        "line_total_uzs": (
-                            item["sell_total_uzs"]
-                        ),
-                    }
-                    for item in items
-                ],
-            })
-
         return render_template(
             "sales_receipt.html",
             sale=sale,
             items=items,
+            autoprint=(
+                request.args.get("autoprint")
+                == "1"
+            ),
         )
 
     @app.route(

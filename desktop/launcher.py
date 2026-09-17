@@ -18,13 +18,10 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 STARTUP_TIMEOUT_SECONDS = 20.0
 SINGLE_INSTANCE_MUTEX_NAME = "Local\\Gold9999DesktopSingleInstance"
-PRINT_HELPER_MUTEX_NAME = "Local\\Gold9999PrintHelperSingleInstance"
 ERROR_ALREADY_EXISTS = 183
 
 
-def _acquire_single_instance_mutex(
-    mutex_name: str = SINGLE_INSTANCE_MUTEX_NAME,
-):
+def _acquire_single_instance_mutex():
     if sys.platform != "win32":
         return object()
 
@@ -35,7 +32,7 @@ def _acquire_single_instance_mutex(
     mutex_handle = kernel32.CreateMutexW(
         None,
         False,
-        mutex_name,
+        SINGLE_INSTANCE_MUTEX_NAME,
     )
 
     if not mutex_handle:
@@ -977,15 +974,6 @@ def _argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--print-helper",
-        action="store_true",
-        help=(
-            "Lokal printer helperni "
-            "ishga tushiradi."
-        ),
-    )
-
-    parser.add_argument(
         "--data-dir",
         type=Path,
         default=None,
@@ -1013,17 +1001,7 @@ def main() -> int:
     arguments = _argument_parser().parse_args()
     mutex_handle = None
 
-    if arguments.print_helper:
-        mutex_handle = (
-            _acquire_single_instance_mutex(
-                PRINT_HELPER_MUTEX_NAME
-            )
-        )
-
-        if mutex_handle is None:
-            return 0
-
-    elif (
+    if (
         not arguments.check
         and not arguments.server_smoke
     ):
@@ -1049,14 +1027,6 @@ def main() -> int:
             "DESKTOP DATA DIRECTORY:",
             data_directory,
         )
-
-        if arguments.print_helper:
-            from desktop.print_helper import (
-                run_print_helper,
-            )
-
-            run_print_helper()
-            return 0
 
         if arguments.check:
             run_contract_check()

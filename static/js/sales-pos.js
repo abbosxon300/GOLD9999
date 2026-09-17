@@ -224,59 +224,34 @@
     }, 2200);
   };
 
-  const printSaleReceipt = async (saleId) => {
-    const receiptResponse = await fetch(
-      `/sales/receipt/${encodeURIComponent(saleId)}?format=json`,
-      {
-        headers: {
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        credentials: "same-origin",
-      }
+  const printSaleReceipt = (saleId) => {
+    document
+      .getElementById("pos-receipt-print-frame")
+      ?.remove();
+
+    const frame = document.createElement("iframe");
+
+    frame.id = "pos-receipt-print-frame";
+    frame.src =
+      `/sales/receipt/${encodeURIComponent(saleId)}?autoprint=1`;
+
+    Object.assign(frame.style, {
+      position: "fixed",
+      left: "-10000px",
+      top: "0",
+      width: "400px",
+      height: "700px",
+      border: "0",
+    });
+
+    frame.setAttribute("aria-hidden", "true");
+
+    document.body.appendChild(frame);
+
+    window.setTimeout(
+      () => frame.remove(),
+      60000
     );
-
-    if (!receiptResponse.ok) {
-      throw new Error(
-        `Receipt HTTP ${receiptResponse.status}`
-      );
-    }
-
-    const receipt = await receiptResponse.json();
-
-    const controller = new AbortController();
-
-    const timeoutId = window.setTimeout(
-      () => controller.abort(),
-      5000
-    );
-
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:8766/print",
-        {
-          method: "POST",
-          mode: "cors",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Gold9999-Print": "1",
-          },
-          body: JSON.stringify(receipt),
-          signal: controller.signal,
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.ok) {
-        throw new Error(
-          result.error || "Printer xatosi"
-        );
-      }
-
-      return result;
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
   };
 
   const setBusy = (busy) => {
@@ -1380,18 +1355,11 @@
             : Promise.resolve(),
         ]);
 
+        printSaleReceipt(result.sale_id);
+
         showToast(
           `Sotuv #${result.sale_id} yakunlandi.`
         );
-
-        void printSaleReceipt(
-          result.sale_id
-        ).catch((error) => {
-          console.warn(
-            "AUTO PRINT:",
-            error
-          );
-        });
       })
       .catch((error) => {
         console.error(error);
