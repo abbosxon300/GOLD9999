@@ -224,6 +224,61 @@
     }, 2200);
   };
 
+  const printSaleReceipt = async (saleId) => {
+    const receiptResponse = await fetch(
+      `/sales/receipt/${encodeURIComponent(saleId)}?format=json`,
+      {
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      }
+    );
+
+    if (!receiptResponse.ok) {
+      throw new Error(
+        `Receipt HTTP ${receiptResponse.status}`
+      );
+    }
+
+    const receipt = await receiptResponse.json();
+
+    const controller = new AbortController();
+
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      5000
+    );
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8766/print",
+        {
+          method: "POST",
+          mode: "cors",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Gold9999-Print": "1",
+          },
+          body: JSON.stringify(receipt),
+          signal: controller.signal,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(
+          result.error || "Printer xatosi"
+        );
+      }
+
+      return result;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  };
+
   const setBusy = (busy) => {
     root.classList.toggle("is-busy", busy);
   };
@@ -1328,6 +1383,15 @@
         showToast(
           `Sotuv #${result.sale_id} yakunlandi.`
         );
+
+        void printSaleReceipt(
+          result.sale_id
+        ).catch((error) => {
+          console.warn(
+            "AUTO PRINT:",
+            error
+          );
+        });
       })
       .catch((error) => {
         console.error(error);

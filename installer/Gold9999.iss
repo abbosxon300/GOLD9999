@@ -79,7 +79,14 @@ Name: "{autodesktop}\{#MyAppName}"; \
     IconIndex: 0; \
     Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Gold9999PrintHelper"; ValueData: """{app}\{#MyAppExeName}"" --print-helper"; Flags: uninsdeletevalue
+
 [Run]
+Filename: "{app}\{#MyAppExeName}"; \
+    Parameters: "--print-helper"; \
+    Description: "Gold9999 Print Helper"; \
+    Flags: nowait runascurrentuser
 Filename: "{app}\{#MyAppExeName}"; \
     Description: "Запустить {#MyAppName}"; \
     Flags: nowait runascurrentuser

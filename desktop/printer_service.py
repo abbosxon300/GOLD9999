@@ -202,6 +202,137 @@ def build_test_receipt_lines(
     return lines
 
 
+def _receipt_money(value: object) -> str:
+    try:
+        amount = round(float(value or 0))
+    except (TypeError, ValueError):
+        amount = 0
+
+    return f"{amount:,}".replace(",", " ")
+
+
+def _receipt_qty(value: object) -> str:
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        number = 0.0
+
+    if number.is_integer():
+        return str(int(number))
+
+    return (
+        f"{number:.3f}"
+        .rstrip("0")
+        .rstrip(".")
+    )
+
+
+def build_receipt_lines(
+    payload: Mapping[str, object],
+    settings: Mapping[str, object],
+) -> list[str]:
+    width = _paper_width_mm(settings)
+    columns = receipt_columns(width)
+    separator = "-" * columns
+
+    business_name = str(
+        payload.get("business_name")
+        or "GOLD 9999"
+    ).strip()
+
+    sale_id = str(
+        payload.get("sale_id")
+        or ""
+    ).strip()
+
+    sale_date = str(
+        payload.get("sale_date")
+        or ""
+    ).strip()
+
+    lines = [
+        _center(business_name, columns),
+        _center(
+            f"CHEK #{sale_id}",
+            columns,
+        ),
+    ]
+
+    if sale_date:
+        lines.append(
+            _center(
+                sale_date,
+                columns,
+            )
+        )
+
+    lines.append(separator)
+
+    items = payload.get("items")
+
+    if not isinstance(items, list):
+        items = []
+
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+
+        name = str(
+            item.get("name")
+            or ""
+        ).strip()
+
+        lines.extend(
+            _wrap(
+                name,
+                columns,
+            )
+        )
+
+        qty = _receipt_qty(
+            item.get("qty")
+        )
+
+        unit_price = _receipt_money(
+            item.get("unit_price_uzs")
+        )
+
+        line_total = _receipt_money(
+            item.get("line_total_uzs")
+        )
+
+        lines.extend(
+            _wrap(
+                f"{qty} x {unit_price} = {line_total}",
+                columns,
+            )
+        )
+
+    lines.append(separator)
+
+    total = _receipt_money(
+        payload.get("total_uzs")
+    )
+
+    lines.extend(
+        _wrap(
+            f"JAMI: {total} so'm",
+            columns,
+        )
+    )
+
+    lines.append(separator)
+
+    lines.append(
+        _center(
+            "Xaridingiz uchun rahmat!",
+            columns,
+        )
+    )
+
+    return lines
+
+
 def _load_windows_modules():
     if sys.platform != "win32":
         raise RuntimeError(
@@ -444,6 +575,57 @@ def _print_lines_windows(
             pass
 
 
+def print_receipt(
+    payload: Mapping[str, object],
+    settings: Mapping[str, object],
+) -> dict[str, Any]:
+    printer_name = _required_printer_name(
+        settings
+    )
+
+    width = _paper_width_mm(
+        settings
+    )
+
+    try:
+        copies = int(
+            settings.get("copies", 1)
+            or 1
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Nusxa soni noto‘g‘ri"
+        ) from exc
+
+    lines = build_receipt_lines(
+        payload,
+        settings,
+    )
+
+    sale_id = str(
+        payload.get("sale_id")
+        or ""
+    ).strip()
+
+    result = _print_lines_windows(
+        printer_name=printer_name,
+        paper_width_mm=width,
+        lines=lines,
+        copies=copies,
+        job_name=(
+            f"Gold9999 Receipt {sale_id}"
+        ),
+    )
+
+    return {
+        "printer_name": printer_name,
+        "paper_width_mm": width,
+        "copies": copies,
+        "line_count": len(lines),
+        **result,
+    }
+
+
 def print_test_receipt(
     settings: Mapping[str, object],
 ) -> dict[str, Any]:
@@ -477,7 +659,9 @@ def print_test_receipt(
 
 
 __all__ = [
+    "build_receipt_lines",
     "build_test_receipt_lines",
+    "print_receipt",
     "print_test_receipt",
     "receipt_columns",
 ]
