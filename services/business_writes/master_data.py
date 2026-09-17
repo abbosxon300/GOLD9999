@@ -118,6 +118,7 @@ def _category_row(
         """
         SELECT
             id,
+            tenant_id,
             name,
             sort_order,
             is_active,
@@ -166,6 +167,7 @@ def _product_row(
         """
         SELECT
             p.id,
+            p.tenant_id,
             p.name,
             p.category_id,
             p.sell_price_default_uzs,
@@ -190,8 +192,29 @@ def _product_row(
     return row
 
 
+def _product_barcodes(
+    connection: sqlite3.Connection,
+    product_id: int,
+) -> list[str]:
+    rows = connection.execute(
+        """
+        SELECT barcode
+        FROM product_barcodes
+        WHERE product_id=?
+        ORDER BY barcode
+        """,
+        (int(product_id),),
+    ).fetchall()
+
+    return [
+        str(row["barcode"])
+        for row in rows
+    ]
+
+
 def _product_payload(
     row: sqlite3.Row,
+    connection: sqlite3.Connection,
 ) -> dict[str, Any]:
     category_uuid = str(
         row["category_uuid"] or ""
@@ -214,6 +237,10 @@ def _product_payload(
         "created_at": str(
             row["created_at"]
         ),
+        "barcodes": _product_barcodes(
+            connection,
+            int(row["id"]),
+        ),
         "sync_version": int(
             row["sync_version"]
         ),
@@ -224,12 +251,39 @@ def create_category(
     *,
     name: str,
     sort_order: int,
+    tenant_id: int,
     connection: sqlite3.Connection | None = None,
 ) -> int:
     with business_transaction(
         connection
     ) as tx:
-        entity_uuid = str(uuid.uuid4())
+        tenant_id = int(
+            tenant_id
+        )
+
+        if tenant_id <= 0:
+            raise ValueError(
+                "Tenant ID musbat bo‘lishi kerak"
+            )
+
+        tenant = tx.execute(
+            """
+            SELECT id
+            FROM tenants
+            WHERE id=?
+              AND is_active=1
+            """,
+            (tenant_id,),
+        ).fetchone()
+
+        if tenant is None:
+            raise LookupError(
+                "Faol tenant topilmadi"
+            )
+
+        entity_uuid = str(
+            uuid.uuid4()
+        )
 
         cursor = tx.execute(
             """
@@ -238,14 +292,16 @@ def create_category(
                 sort_order,
                 is_active,
                 entity_uuid,
-                sync_version
+                sync_version,
+                tenant_id
             )
-            VALUES (?, ?, 1, ?, 1)
+            VALUES (?, ?, 1, ?, 1, ?)
             """,
             (
                 name,
                 int(sort_order),
                 entity_uuid,
+                tenant_id,
             ),
         )
 
@@ -403,6 +459,15 @@ def create_product(
             category_id,
         )
 
+        category_tenant_id = int(
+            category["tenant_id"] or 0
+        )
+
+        if category_tenant_id <= 0:
+            raise RuntimeError(
+                "Kategoriya tenant_id mavjud emas"
+            )
+
         category_uuid = str(
             category["entity_uuid"] or ""
         ).strip()
@@ -412,7 +477,9 @@ def create_product(
                 "Kategoriya entity_uuid mavjud emas"
             )
 
-        entity_uuid = str(uuid.uuid4())
+        entity_uuid = str(
+            uuid.uuid4()
+        )
 
         cursor = tx.execute(
             """
@@ -422,9 +489,10 @@ def create_product(
                 sell_price_default_uzs,
                 is_active,
                 entity_uuid,
-                sync_version
+                sync_version,
+                tenant_id
             )
-            VALUES (?, ?, ?, 1, ?, 1)
+            VALUES (?, ?, ?, 1, ?, 1, ?)
             """,
             (
                 name,
@@ -433,6 +501,7 @@ def create_product(
                     sell_price_default_uzs
                 ),
                 entity_uuid,
+                category_tenant_id,
             ),
         )
 
@@ -450,7 +519,7 @@ def create_product(
             entity_type="product",
             entity_uuid=entity_uuid,
             operation=OPERATION_CREATE,
-            payload=_product_payload(row),
+            payload=_product_payload(row, tx),
         )
 
         return product_id
@@ -482,6 +551,31 @@ def update_product(
         ).strip():
             raise RuntimeError(
                 "Kategoriya entity_uuid mavjud emas"
+            )
+
+        current_tenant_id = int(
+            current["tenant_id"] or 0
+        )
+
+        category_tenant_id = int(
+            category["tenant_id"] or 0
+        )
+
+        if (
+            current_tenant_id <= 0
+            or category_tenant_id <= 0
+        ):
+            raise RuntimeError(
+                "Product/category tenant_id mavjud emas"
+            )
+
+        if (
+            current_tenant_id
+            != category_tenant_id
+        ):
+            raise ValueError(
+                "Mahsulotni boshqa tenant "
+                "kategoriyasiga ko‘chirish mumkin emas"
             )
 
         entity_uuid = str(
@@ -530,8 +624,63 @@ def update_product(
             entity_type="product",
             entity_uuid=entity_uuid,
             operation=OPERATION_UPDATE,
-            payload=_product_payload(row),
+            payload=_product_payload(row, tx),
         )
+
+
+def queue_product_related_update(
+    product_id: int,
+    *,
+    connection: sqlite3.Connection,
+) -> None:
+    current = _product_row(
+        connection,
+        product_id,
+    )
+
+    entity_uuid = str(
+        current["entity_uuid"] or ""
+    ).strip()
+
+    if not entity_uuid:
+        entity_uuid = str(
+            uuid.uuid4()
+        )
+
+    cursor = connection.execute(
+        """
+        UPDATE products
+        SET
+            entity_uuid=?,
+            sync_version=sync_version+1
+        WHERE id=?
+        """,
+        (
+            entity_uuid,
+            int(product_id),
+        ),
+    )
+
+    if cursor.rowcount != 1:
+        raise LookupError(
+            "Mahsulot topilmadi"
+        )
+
+    row = _product_row(
+        connection,
+        product_id,
+    )
+
+    _queue_change(
+        connection,
+        entity_type="product",
+        entity_uuid=entity_uuid,
+        operation=OPERATION_UPDATE,
+        payload=_product_payload(
+            row,
+            connection,
+        ),
+    )
 
 
 def set_product_active(
@@ -588,13 +737,14 @@ def set_product_active(
             entity_type="product",
             entity_uuid=entity_uuid,
             operation=OPERATION_UPDATE,
-            payload=_product_payload(row),
+            payload=_product_payload(row, tx),
         )
 
 
 __all__ = [
     "create_category",
     "create_product",
+    "queue_product_related_update",
     "set_category_active",
     "set_product_active",
     "update_category",

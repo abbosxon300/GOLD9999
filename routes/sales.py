@@ -1163,6 +1163,106 @@ def register_sales_routes(
 
         init_db()
 
+        barcode = (
+            request.args.get("barcode")
+            or ""
+        ).strip()
+
+        if barcode:
+            if len(barcode) > 128:
+                return jsonify({
+                    "ok": False,
+                    "error": "Shtrix-kod juda uzun",
+                    "products": [],
+                }), 400
+
+            user_id = parse_int(
+                str(
+                    session.get("user_id")
+                    or "0"
+                )
+            )
+
+            user = q1(
+                """
+                SELECT tenant_id
+                FROM users
+                WHERE id=?
+                """,
+                (user_id,),
+            )
+
+            tenant_id = (
+                int(user["tenant_id"] or 0)
+                if user
+                else 0
+            )
+
+            if tenant_id <= 0:
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        "Foydalanuvchi tenant "
+                        "aniqlanmadi"
+                    ),
+                    "products": [],
+                }), 403
+
+            product = q1(
+                """
+                SELECT
+                    p.id,
+                    p.name,
+                    p.category_id,
+                    p.sell_price_default_uzs
+                        AS sell_default,
+                    COALESCE(
+                        p.stock_qty,
+                        0
+                    ) AS qty
+                FROM product_barcodes pb
+                JOIN products p
+                  ON p.id=pb.product_id
+                 AND p.tenant_id=pb.tenant_id
+                WHERE pb.tenant_id=?
+                  AND pb.barcode=?
+                  AND p.is_active=1
+                LIMIT 1
+                """,
+                (
+                    tenant_id,
+                    barcode,
+                ),
+            )
+
+            products = []
+
+            if product:
+                products.append({
+                    "id": int(
+                        product["id"]
+                    ),
+                    "name": str(
+                        product["name"]
+                    ),
+                    "category_id": int(
+                        product["category_id"]
+                    ),
+                    "sell_default": float(
+                        product["sell_default"]
+                        or 0
+                    ),
+                    "qty": float(
+                        product["qty"]
+                        or 0
+                    ),
+                })
+
+            return jsonify({
+                "ok": True,
+                "products": products,
+            })
+
         category_id = parse_int(
             request.args.get("category_id") or "0"
         )

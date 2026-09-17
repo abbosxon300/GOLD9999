@@ -12,6 +12,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 from werkzeug.security import generate_password_hash
@@ -23,6 +24,13 @@ from services.business_writes.master_data import (
     set_product_active,
     update_category,
     update_product,
+)
+
+
+from services.business_writes.product_barcodes import (
+    add_product_barcode,
+    delete_product_barcode,
+    list_product_barcodes,
 )
 
 
@@ -45,6 +53,47 @@ def register_settings_routes(
     BACKUP_DIR = backup_dir
     DB_PATH = db_path
 
+
+    def _current_tenant_id() -> int:
+        user_id = parse_int(
+            str(
+                session.get("user_id")
+                or "0"
+            )
+        )
+
+        if user_id <= 0:
+            raise RuntimeError(
+                "Login user aniqlanmadi"
+            )
+
+        row = q1(
+            """
+            SELECT
+                u.tenant_id
+            FROM users u
+            JOIN tenants t
+              ON t.id=u.tenant_id
+            WHERE u.id=?
+              AND u.is_active=1
+              AND t.is_active=1
+            """,
+            (user_id,),
+        )
+
+        tenant_id = (
+            int(row["tenant_id"] or 0)
+            if row
+            else 0
+        )
+
+        if tenant_id <= 0:
+            raise RuntimeError(
+                "Faol tenant aniqlanmadi"
+            )
+
+        return tenant_id
+
     @app.route("/settings/categories")
     @login_required
     @admin_required
@@ -58,30 +107,60 @@ def register_settings_routes(
     @admin_required
     def settings_categories_add():
         init_db()
-        name = (request.form.get("name") or "").strip()
+        tenant_id = _current_tenant_id()
+
+        name = (
+            request.form.get("name")
+            or ""
+        ).strip()
 
         if not name:
-            flash("Kategoriya nomi shart", "danger")
-            return redirect(url_for("settings_categories"))
+            flash(
+                "Kategoriya nomi shart",
+                "danger",
+            )
+            return redirect(
+                url_for("settings_categories")
+            )
 
         next_sort_row = q1(
             """
-            SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort
+            SELECT
+                COALESCE(
+                    MAX(sort_order),
+                    0
+                ) + 1 AS next_sort
             FROM categories
-            """
+            WHERE tenant_id=?
+            """,
+            (tenant_id,),
         )
-        sort_order = int(next_sort_row["next_sort"])
+
+        sort_order = int(
+            next_sort_row["next_sort"]
+        )
 
         try:
             create_category(
                 name=name,
                 sort_order=sort_order,
+                tenant_id=tenant_id,
             )
-            flash("Kategoriya qo‘shildi ✅", "success")
-        except sqlite3.IntegrityError:
-            flash("Bu nomli kategoriya bor", "danger")
 
-        return redirect(url_for("settings_categories"))
+            flash(
+                "Kategoriya qo‘shildi ✅",
+                "success",
+            )
+
+        except sqlite3.IntegrityError:
+            flash(
+                "Bu nomli kategoriya bor",
+                "danger",
+            )
+
+        return redirect(
+            url_for("settings_categories")
+        )
 
     @app.route("/settings/categories/toggle/<int:cat_id>", methods=["POST"])
     @login_required
@@ -176,15 +255,72 @@ def register_settings_routes(
     @admin_required
     def settings_products_add():
         init_db()
-        name = (request.form.get("name") or "").strip()
-        category_id = parse_int(request.form.get("category_id") or "0")
-        sell_default = parse_float(request.form.get("sell_price_default_uzs") or "")
-        if not name or category_id <= 0:
-            flash("Nomi va kategoriya shart", "danger")
-            return redirect(url_for("settings_products"))
-        if sell_default is None or sell_default <= 0:
-            flash("Default sotuv narxi shart (so‘m)", "danger")
-            return redirect(url_for("settings_products"))
+        tenant_id = _current_tenant_id()
+
+        name = (
+            request.form.get("name")
+            or ""
+        ).strip()
+
+        category_id = parse_int(
+            request.form.get("category_id")
+            or "0"
+        )
+
+        sell_default = parse_float(
+            request.form.get(
+                "sell_price_default_uzs"
+            )
+            or ""
+        )
+
+        if (
+            not name
+            or category_id <= 0
+        ):
+            flash(
+                "Nomi va kategoriya shart",
+                "danger",
+            )
+            return redirect(
+                url_for("settings_products")
+            )
+
+        if (
+            sell_default is None
+            or sell_default <= 0
+        ):
+            flash(
+                "Default sotuv narxi shart (so‘m)",
+                "danger",
+            )
+            return redirect(
+                url_for("settings_products")
+            )
+
+        category = q1(
+            """
+            SELECT id
+            FROM categories
+            WHERE id=?
+              AND tenant_id=?
+              AND is_active=1
+            """,
+            (
+                category_id,
+                tenant_id,
+            ),
+        )
+
+        if not category:
+            flash(
+                "Faol kategoriya topilmadi",
+                "danger",
+            )
+            return redirect(
+                url_for("settings_products")
+            )
+
         try:
             create_product(
                 name=name,
@@ -193,10 +329,21 @@ def register_settings_routes(
                     sell_default
                 ),
             )
-            flash("Mahsulot qo‘shildi ✅", "success")
+
+            flash(
+                "Mahsulot qo‘shildi ✅",
+                "success",
+            )
+
         except sqlite3.IntegrityError:
-            flash("Bu nom band", "danger")
-        return redirect(url_for("settings_products"))
+            flash(
+                "Bu nom band",
+                "danger",
+            )
+
+        return redirect(
+            url_for("settings_products")
+        )
 
     @app.route(
         "/settings/products/edit/<int:product_id>",
@@ -298,6 +445,135 @@ def register_settings_routes(
         )
         flash("O‘zgardi ✅", "success")
         return redirect(url_for("settings_products"))
+
+
+    @app.route(
+        "/settings/products/<int:product_id>/barcodes"
+    )
+    @login_required
+    @admin_required
+    def settings_product_barcodes(
+        product_id: int,
+    ):
+        init_db()
+
+        product = q1(
+            """
+            SELECT
+                id,
+                name,
+                tenant_id
+            FROM products
+            WHERE id=?
+            """,
+            (product_id,),
+        )
+
+        if not product:
+            flash(
+                "Mahsulot topilmadi",
+                "danger",
+            )
+            return redirect(
+                url_for("settings_products")
+            )
+
+        barcodes = list_product_barcodes(
+            product_id
+        )
+
+        return render_template(
+            "settings_product_barcodes.html",
+            product=product,
+            barcodes=barcodes,
+        )
+
+
+    @app.route(
+        "/settings/products/<int:product_id>"
+        "/barcodes/add",
+        methods=["POST"],
+    )
+    @login_required
+    @admin_required
+    def settings_product_barcode_add(
+        product_id: int,
+    ):
+        init_db()
+
+        barcode = (
+            request.form.get("barcode")
+            or ""
+        ).strip()
+
+        try:
+            add_product_barcode(
+                product_id,
+                barcode=barcode,
+            )
+        except (
+            ValueError,
+            LookupError,
+            RuntimeError,
+            sqlite3.IntegrityError,
+        ) as exc:
+            flash(
+                str(exc),
+                "danger",
+            )
+        else:
+            flash(
+                "Shtrix-kod qo‘shildi ✅",
+                "success",
+            )
+
+        return redirect(
+            url_for(
+                "settings_product_barcodes",
+                product_id=product_id,
+            )
+        )
+
+
+    @app.route(
+        "/settings/products/<int:product_id>"
+        "/barcodes/<int:barcode_id>/delete",
+        methods=["POST"],
+    )
+    @login_required
+    @admin_required
+    def settings_product_barcode_delete(
+        product_id: int,
+        barcode_id: int,
+    ):
+        init_db()
+
+        try:
+            delete_product_barcode(
+                product_id,
+                barcode_id,
+            )
+        except (
+            LookupError,
+            RuntimeError,
+        ) as exc:
+            flash(
+                str(exc),
+                "danger",
+            )
+        else:
+            flash(
+                "Shtrix-kod o‘chirildi ✅",
+                "success",
+            )
+
+        return redirect(
+            url_for(
+                "settings_product_barcodes",
+                product_id=product_id,
+            )
+        )
+
 
     @app.route("/settings/agents")
     @login_required

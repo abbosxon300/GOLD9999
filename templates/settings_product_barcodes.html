@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% set title = "Sozlamalar → Shtrix-kodlar" %}
+
+{% block content %}
+<div class="barcode-settings-page">
+
+  <section class="card barcode-head-card">
+    <div class="barcode-title-row">
+
+      <div>
+        <a
+          class="barcode-back"
+          href="{{ url_for('settings_products') }}">
+          ← Mahsulotlarga qaytish
+        </a>
+
+        <h2>{{ product.name }}</h2>
+
+        <p>
+          Ushbu mahsulotga istalgancha
+          shtrix-kod biriktirish mumkin.
+        </p>
+      </div>
+
+      <span class="barcode-count">
+        {{ barcodes|length }} ta kod
+      </span>
+
+    </div>
+  </section>
+
+  <section class="card barcode-add-card">
+
+    <h3>Shtrix-kod qo‘shish</h3>
+
+    <p class="barcode-help">
+      Kodni yozing yoki scanner bilan o‘qiting.
+    </p>
+
+    <form
+      method="post"
+      action="{{ url_for(
+        'settings_product_barcode_add',
+        product_id=product.id
+      ) }}"
+      class="barcode-add-form">
+
+      <div class="ui-field">
+        <label for="product-barcode">
+          Shtrix-kod
+        </label>
+
+        <input
+          id="product-barcode"
+          name="barcode"
+          type="text"
+          maxlength="128"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Scanner bilan o‘qiting"
+          autofocus
+          required>
+      </div>
+
+      <button
+        class="btn"
+        type="submit">
+        + Qo‘shish
+      </button>
+
+    </form>
+  </section>
+
+  <section class="card barcode-list-card">
+
+    <div class="barcode-list-head">
+      <div>
+        <h3>
+          Biriktirilgan shtrix-kodlar
+        </h3>
+
+        <p>
+          Keraksiz kodni istalgan vaqtda
+          o‘chirishingiz mumkin.
+        </p>
+      </div>
+    </div>
+
+    {% if barcodes %}
+
+      <div class="barcode-list">
+
+        {% for row in barcodes %}
+
+          <div class="barcode-row">
+
+            <div class="barcode-value">
+              <strong>
+                {{ row.barcode }}
+              </strong>
+
+              <small>
+                #{{ row.id }}
+              </small>
+            </div>
+
+            <form
+              method="post"
+              action="{{ url_for(
+                'settings_product_barcode_delete',
+                product_id=product.id,
+                barcode_id=row.id
+              ) }}"
+              onsubmit="
+                return confirm(
+                  'Shtrix-kod o‘chirilsinmi?'
+                );
+              ">
+
+              <button
+                class="btn barcode-delete"
+                type="submit">
+                O‘chirish
+              </button>
+
+            </form>
+
+          </div>
+
+        {% endfor %}
+
+      </div>
+
+    {% else %}
+
+      <div class="barcode-empty">
+        Hozircha shtrix-kod biriktirilmagan.
+      </div>
+
+    {% endif %}
+
+  </section>
+
+</div>
+
+<style>
+  .barcode-settings-page {
+    display: grid;
+    gap: 16px;
+    max-width: 900px;
+  }
+
+  .barcode-title-row,
+  .barcode-list-head,
+  .barcode-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .barcode-back {
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+
+  .barcode-title-row h2,
+  .barcode-list-head h3,
+  .barcode-add-card h3 {
+    margin: 0;
+  }
+
+  .barcode-title-row p,
+  .barcode-list-head p,
+  .barcode-help {
+    margin: 6px 0 0;
+    opacity: .72;
+  }
+
+  .barcode-count {
+    white-space: nowrap;
+    font-weight: 700;
+  }
+
+  .barcode-add-form {
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+    margin-top: 16px;
+  }
+
+  .barcode-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .barcode-row {
+    padding: 12px 14px;
+    border:
+      1px solid rgba(127, 127, 127, .22);
+    border-radius: 12px;
+  }
+
+  .barcode-value {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .barcode-value strong {
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Consolas,
+      monospace;
+
+    overflow-wrap: anywhere;
+  }
+
+  .barcode-value small {
+    opacity: .58;
+  }
+
+  .barcode-delete {
+    white-space: nowrap;
+  }
+
+  .barcode-empty {
+    padding: 18px 0 4px;
+    opacity: .65;
+  }
+
+  @media (max-width: 680px) {
+    .barcode-title-row,
+    .barcode-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .barcode-add-form {
+      grid-template-columns: 1fr;
+    }
+
+    .barcode-count {
+      align-self: flex-start;
+    }
+
+    .barcode-row form,
+    .barcode-delete {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  (() => {
+    const input = document.getElementById(
+      "product-barcode"
+    );
+
+    if (!input) {
+      return;
+    }
+
+    input.addEventListener(
+      "input",
+      () => {
+        input.value = input.value
+          .replace(/\s/g, "");
+      }
+    );
+  })();
+</script>
+
+{% endblock %}

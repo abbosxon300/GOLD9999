@@ -627,6 +627,190 @@
     }
   };
 
+  let barcodeScanBusy = false;
+
+
+  const lookupBarcode = async (
+    barcode
+  ) => {
+    const url = new URL(
+      initial.urls.products,
+      window.location.origin
+    );
+
+    url.searchParams.set(
+      "barcode",
+      barcode
+    );
+
+    const response = await fetch(
+      url,
+      {
+        headers: {
+          "X-Requested-With":
+            "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      }
+    );
+
+    const payload = await response.json();
+
+    if (
+      !response.ok ||
+      !payload.ok
+    ) {
+      throw new Error(
+        payload.error ||
+        `Barcode HTTP ${response.status}`
+      );
+    }
+
+    const matches = Array.isArray(
+      payload.products
+    )
+      ? payload.products
+      : [];
+
+    return matches[0] || null;
+  };
+
+
+  const addScannedProduct = async (
+    product
+  ) => {
+    const productId = Number(
+      product?.id || 0
+    );
+
+    const categoryId = Number(
+      product?.category_id || 0
+    );
+
+    const stockQty = Number(
+      product?.qty || 0
+    );
+
+    const price = Math.round(
+      Number(
+        product?.sell_default || 0
+      )
+    );
+
+    if (
+      productId <= 0 ||
+      categoryId <= 0
+    ) {
+      throw new Error(
+        "Scanner product ma’lumoti noto‘g‘ri"
+      );
+    }
+
+    if (stockQty <= 0) {
+      showToast(
+        "Mahsulot qoldig‘i yo‘q.",
+        true
+      );
+
+      return false;
+    }
+
+    if (price <= 0) {
+      showToast(
+        "Mahsulot sotuv narxi noto‘g‘ri.",
+        true
+      );
+
+      return false;
+    }
+
+    await postForm(
+      initial.urls.add,
+      {
+        category_id: String(
+          categoryId
+        ),
+        product_id: String(
+          productId
+        ),
+        qty: "1",
+        price_uzs: String(
+          price
+        ),
+        list_price_uzs: String(
+          price
+        ),
+        discount_type: "none",
+        discount_value: "0",
+      }
+    );
+
+    await loadCart();
+
+    showToast(
+      `${product.name} savatga qo‘shildi.`
+    );
+
+    return true;
+  };
+
+
+  const scanBarcode = async (
+    rawBarcode
+  ) => {
+    if (barcodeScanBusy) {
+      return;
+    }
+
+    const barcode = String(
+      rawBarcode || ""
+    ).trim();
+
+    if (!barcode) {
+      return;
+    }
+
+    barcodeScanBusy = true;
+    setBusy(true);
+
+    try {
+      const product = await lookupBarcode(
+        barcode
+      );
+
+      if (!product) {
+        showToast(
+          "Shtrix-kod topilmadi.",
+          true
+        );
+
+        return;
+      }
+
+      await addScannedProduct(
+        product
+      );
+    } catch (error) {
+      console.error(error);
+
+      showToast(
+        error?.message ||
+        "Shtrix-kodni o‘qib bo‘lmadi.",
+        true
+      );
+    } finally {
+      if (searchInput) {
+        searchInput.value = "";
+        applySearch();
+        searchInput.focus();
+      }
+
+      setBusy(false);
+      barcodeScanBusy = false;
+    }
+  };
+
+
   document
     .getElementById("pos-categories")
     ?.addEventListener("click", async (event) => {
@@ -708,6 +892,74 @@
   searchInput?.addEventListener(
     "input",
     applySearch
+  );
+
+  searchInput?.addEventListener(
+    "keydown",
+    async (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      const barcode = String(
+        searchInput.value || ""
+      ).trim();
+
+      if (!barcode) {
+        return;
+      }
+
+      event.preventDefault();
+
+      await scanBarcode(
+        barcode
+      );
+    }
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        !searchInput ||
+        barcodeScanBusy ||
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+
+      const editable = Boolean(
+        target &&
+        (
+          target.matches?.(
+            "input, textarea, select"
+          ) ||
+          target.isContentEditable
+        )
+      );
+
+      if (editable) {
+        return;
+      }
+
+      if (
+        typeof event.key !== "string" ||
+        event.key.length !== 1
+      ) {
+        return;
+      }
+
+      searchInput.focus();
+      searchInput.value += event.key;
+      applySearch();
+
+      event.preventDefault();
+    }
   );
 
   productsNode.addEventListener(

@@ -282,8 +282,29 @@ def _category_payload(
     }
 
 
+def _product_barcodes(
+    connection: sqlite3.Connection,
+    product_id: int,
+) -> list[str]:
+    rows = connection.execute(
+        """
+        SELECT barcode
+        FROM product_barcodes
+        WHERE product_id=?
+        ORDER BY barcode
+        """,
+        (int(product_id),),
+    ).fetchall()
+
+    return [
+        str(row["barcode"])
+        for row in rows
+    ]
+
+
 def _product_payload(
     row: sqlite3.Row,
+    connection: sqlite3.Connection,
 ) -> dict[str, Any]:
     category_uuid = str(
         row["category_uuid"] or ""
@@ -302,6 +323,10 @@ def _product_payload(
         ),
         "is_active": int(row["is_active"]),
         "created_at": str(row["created_at"]),
+        "barcodes": _product_barcodes(
+            connection,
+            int(row["id"]),
+        ),
         "sync_version": int(row["sync_version"]),
     }
 
@@ -677,7 +702,7 @@ def recover_legacy_master_data(
                     connection,
                     entity_type="product",
                     entity_uuid=entity_uuid,
-                    payload=_product_payload(fresh),
+                    payload=_product_payload(fresh, connection),
                     device_uuid=device_uuid,
                 )
 

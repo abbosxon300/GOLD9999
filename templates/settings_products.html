@@ -142,6 +142,15 @@
                     ✏️ Tahrirlash
                   </button>
 
+                  <a
+                    class="product-action-btn"
+                    href="{{ url_for(
+                      'settings_product_barcodes',
+                      product_id=r.id
+                    ) }}">
+                    ▥ Shtrix-kodlar
+                  </a>
+
                   <button
                     type="button"
                     class="product-action-btn product-toggle-open {% if r.is_active == 1 %}is-warning{% else %}is-success{% endif %}"

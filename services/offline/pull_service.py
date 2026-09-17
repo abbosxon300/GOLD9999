@@ -166,6 +166,26 @@ def _category_changes(
     ]
 
 
+def _product_barcodes(
+    connection: sqlite3.Connection,
+    product_id: int,
+) -> list[str]:
+    rows = connection.execute(
+        """
+        SELECT barcode
+        FROM product_barcodes
+        WHERE product_id=?
+        ORDER BY barcode
+        """,
+        (int(product_id),),
+    ).fetchall()
+
+    return [
+        str(row["barcode"])
+        for row in rows
+    ]
+
+
 def _product_changes(
     connection: sqlite3.Connection,
     *,
@@ -210,6 +230,10 @@ def _product_changes(
                 ),
                 "is_active": int(row["is_active"]),
                 "created_at": str(row["created_at"]),
+                "barcodes": _product_barcodes(
+                    connection,
+                    int(row["id"]),
+                ),
             },
         )
         for row in rows

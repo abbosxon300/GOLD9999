@@ -372,13 +372,20 @@ def apply_category_remote(
     )
 
 
-PRODUCT_FIELDS = frozenset(
+LEGACY_PRODUCT_FIELDS = frozenset(
     {
         "name",
         "category_uuid",
         "sell_price_default_uzs",
         "is_active",
         "created_at",
+    }
+)
+
+PRODUCT_FIELDS = frozenset(
+    {
+        *LEGACY_PRODUCT_FIELDS,
+        "barcodes",
     }
 )
 
@@ -425,16 +432,70 @@ def _normalize_category_uuid(
         ) from exc
 
 
+def _normalize_product_barcodes(
+    value: Any,
+) -> list[str]:
+    if not isinstance(value, list):
+        raise InvalidRemotePayloadError(
+            "barcodes ro‘yxat bo‘lishi kerak"
+        )
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw in value:
+        if not isinstance(raw, str):
+            raise InvalidRemotePayloadError(
+                "barcode matn bo‘lishi kerak"
+            )
+
+        barcode = raw.strip()
+
+        if not barcode:
+            raise InvalidRemotePayloadError(
+                "barcode bo‘sh bo‘lishi mumkin emas"
+            )
+
+        if len(barcode) > 128:
+            raise InvalidRemotePayloadError(
+                "barcode juda uzun"
+            )
+
+        if any(
+            char.isspace()
+            for char in barcode
+        ):
+            raise InvalidRemotePayloadError(
+                "barcode ichida bo‘sh joy mumkin emas"
+            )
+
+        if barcode in seen:
+            raise InvalidRemotePayloadError(
+                "takroriy barcode mavjud"
+            )
+
+        seen.add(barcode)
+        normalized.append(barcode)
+
+    return sorted(normalized)
+
+
 def _normalize_product_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
+    expected_fields = (
+        PRODUCT_FIELDS
+        if "barcodes" in payload
+        else LEGACY_PRODUCT_FIELDS
+    )
+
     _require_exact_fields(
         payload,
-        PRODUCT_FIELDS,
+        expected_fields,
         entity_type="product",
     )
 
-    return {
+    normalized = {
         "name": _normalize_name(
             payload["name"]
         ),
@@ -457,6 +518,15 @@ def _normalize_product_payload(
             payload["created_at"]
         ),
     }
+
+    if "barcodes" in payload:
+        normalized["barcodes"] = (
+            _normalize_product_barcodes(
+                payload["barcodes"]
+            )
+        )
+
+    return normalized
 
 
 def _get_product_row(
@@ -494,10 +564,11 @@ def _get_product_row(
 
 
 def _product_matches(
+    connection: sqlite3.Connection,
     row: sqlite3.Row,
     payload: Mapping[str, Any],
 ) -> bool:
-    return (
+    base_matches = (
         str(row["name"]) == payload["name"]
         and str(row["category_uuid"])
         == payload["category_uuid"]
@@ -512,6 +583,63 @@ def _product_matches(
         )
         == payload["created_at"]
     )
+
+    if not base_matches:
+        return False
+
+    if "barcodes" not in payload:
+        return True
+
+    current_barcodes = [
+        str(item["barcode"])
+        for item in connection.execute(
+            """
+            SELECT barcode
+            FROM product_barcodes
+            WHERE product_id=?
+            ORDER BY barcode
+            """,
+            (int(row["id"]),),
+        ).fetchall()
+    ]
+
+    return (
+        current_barcodes
+        == payload["barcodes"]
+    )
+
+
+def _replace_product_barcodes(
+    connection: sqlite3.Connection,
+    *,
+    product_id: int,
+    tenant_id: int,
+    barcodes: list[str],
+) -> None:
+    connection.execute(
+        """
+        DELETE FROM product_barcodes
+        WHERE product_id=?
+        """,
+        (int(product_id),),
+    )
+
+    for barcode in barcodes:
+        connection.execute(
+            """
+            INSERT INTO product_barcodes(
+                product_id,
+                tenant_id,
+                barcode
+            )
+            VALUES (?, ?, ?)
+            """,
+            (
+                int(product_id),
+                int(tenant_id),
+                barcode,
+            ),
+        )
 
 
 def _raise_product_integrity_error(
@@ -597,6 +725,17 @@ def apply_product_remote(
                     context.tenant_id,
                 ),
             )
+
+            if "barcodes" in payload:
+                _replace_product_barcodes(
+                    context.connection,
+                    product_id=int(
+                        cursor.lastrowid
+                    ),
+                    tenant_id=context.tenant_id,
+                    barcodes=payload["barcodes"],
+                )
+
         except sqlite3.IntegrityError as exc:
             _raise_product_integrity_error(exc)
 
@@ -620,7 +759,11 @@ def apply_product_remote(
     )
 
     if context.remote_version == previous_version:
-        if not _product_matches(row, payload):
+        if not _product_matches(
+            context.connection,
+            row,
+            payload,
+        ):
             raise StaleRemoteChangeError(
                 "Product bir xil version bilan "
                 "boshqa ma’lumot yubordi"
@@ -668,6 +811,17 @@ def apply_product_remote(
                 context.existing.local_id,
             ),
         )
+
+        if "barcodes" in payload:
+            _replace_product_barcodes(
+                context.connection,
+                product_id=(
+                    context.existing.local_id
+                ),
+                tenant_id=context.tenant_id,
+                barcodes=payload["barcodes"],
+            )
+
     except sqlite3.IntegrityError as exc:
         _raise_product_integrity_error(exc)
 
