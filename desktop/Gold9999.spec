@@ -44,6 +44,14 @@ hiddenimports = [
     "migrations.versions",
 ]
 
+if os.name == "nt":
+    hiddenimports += [
+        "win32con",
+        "win32print",
+        "win32ui",
+        "pywintypes",
+    ]
+
 hiddenimports += collect_submodules(
     "migrations.versions"
 )

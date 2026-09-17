@@ -662,6 +662,18 @@ def run_desktop(
 
     update_api = create_update_api()
 
+    from desktop.api import DesktopApi
+    from desktop.printer_api import (
+        DesktopPrinterApi,
+    )
+
+    printer_api = DesktopPrinterApi()
+
+    desktop_api = DesktopApi(
+        update_api=update_api,
+        printer_api=printer_api,
+    )
+
 
     sync_worker = None
     sync_env_file = (
@@ -714,7 +726,7 @@ def run_desktop(
     window = webview.create_window(
         APP_TITLE,
         html=startup_html,
-        js_api=update_api,
+        js_api=desktop_api,
         width=1440,
         height=900,
         min_size=(1050, 680),

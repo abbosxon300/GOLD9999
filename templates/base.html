@@ -162,6 +162,13 @@
           </a>
 
           <a
+            href="{{ url_for('settings_printer') }}"
+            class="{% if request.path.startswith('/settings/printer') %}active{% endif %}"
+          >
+            Chek printeri
+          </a>
+
+          <a
             href="{{ url_for('settings_backup') }}"
             class="{% if request.path.startswith('/settings/backup') %}active{% endif %}"
           >
@@ -411,6 +418,7 @@
     <a href="{{ url_for('settings_agents') }}">Xodimlar</a>
     <a href="{{ url_for('settings_products') }}">Mahsulotlar</a>
     <a href="{{ url_for('settings_categories') }}">Kategoriyalar</a>
+    <a href="{{ url_for('settings_printer') }}">Chek printeri</a>
     <a href="{{ url_for('settings_backup') }}">Backup</a>
     <a href="{{ url_for('logout') }}" class="danger">Chiqish</a>
 

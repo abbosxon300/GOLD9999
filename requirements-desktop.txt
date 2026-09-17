@@ -3,3 +3,4 @@ waitress
 pywebview
 pyinstaller
 openpyxl
+pywin32; sys_platform == "win32"

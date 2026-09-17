@@ -624,6 +624,15 @@ def register_settings_routes(
         flash("O‘zgardi ✅", "success")
         return redirect(url_for("settings_agents"))
 
+    @app.route("/settings/printer")
+    @login_required
+    @admin_required
+    def settings_printer():
+        return render_template(
+            "settings_printer.html"
+        )
+
+
     def list_backups() -> List[str]:
         os.makedirs(BACKUP_DIR, exist_ok=True)
         files = [f for f in os.listdir(BACKUP_DIR) if f.endswith(".zip")]

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% set title = "Sozlamalar → Chek printeri" %}
+
+{% block content %}
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='css/settings-printer.css') }}"
+>
+
+<div
+  class="printer-settings-page"
+  id="printerSettingsPage"
+>
+
+  <section class="card">
+
+    <div class="printer-settings-head">
+      <div>
+        <h2>Chek printeri</h2>
+
+        <p>
+          Printer sozlamasi faqat shu Windows
+          kompyuterda saqlanadi.
+        </p>
+      </div>
+    </div>
+
+    <div
+      id="printerDesktopStatus"
+      class="printer-desktop-status"
+    >
+      Gold9999 Desktop tekshirilmoqda...
+    </div>
+
+    <div class="printer-settings-fields">
+
+      <label>
+        <span>Windows printer</span>
+
+        <select
+          id="printerName"
+          disabled
+        >
+          <option value="">
+            Printerlar yuklanmoqda...
+          </option>
+        </select>
+      </label>
+
+      <label>
+        <span>Qog‘oz kengligi</span>
+
+        <select
+          id="printerPaperWidth"
+          disabled
+        >
+          <option value="58">
+            58 mm
+          </option>
+
+          <option value="80">
+            80 mm
+          </option>
+        </select>
+      </label>
+
+      <label>
+        <span>Nusxa soni</span>
+
+        <select
+          id="printerCopies"
+          disabled
+        >
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+
+    </div>
+
+    <div class="printer-settings-options">
+
+      <label>
+        <input
+          type="checkbox"
+          id="printerEnabled"
+          disabled
+        >
+
+        <span>
+          Chek printerini yoqish
+        </span>
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          id="printerAutoPrint"
+          disabled
+        >
+
+        <span>
+          Sotuvdan keyin avtomatik chek chiqarish
+        </span>
+      </label>
+
+    </div>
+
+    <div class="printer-settings-actions">
+
+      <button
+        type="button"
+        id="printerRefreshButton"
+        disabled
+      >
+        Yangilash
+      </button>
+
+      <button
+        type="button"
+        id="printerSaveButton"
+        disabled
+      >
+        Saqlash
+      </button>
+
+      <button
+        type="button"
+        id="printerTestButton"
+        disabled
+      >
+        Test chek
+      </button>
+
+    </div>
+
+    <div
+      id="printerResult"
+      hidden
+    ></div>
+
+  </section>
+
+</div>
+
+<script
+  src="{{ url_for('static', filename='js/settings-printer.js') }}"
+></script>
+
+{% endblock %}
