@@ -971,6 +971,63 @@ def register_sales_routes(
         )
 
     @app.route(
+        "/sales/receipt/<int:sale_id>",
+        methods=["GET"],
+    )
+    @login_required
+    def sales_receipt(sale_id: int):
+        init_db()
+
+        if session.get("role") == "agent":
+            sale = q1("""
+                SELECT
+                    id,
+                    sale_date,
+                    total_sell_uzs
+                FROM sales
+                WHERE id=?
+                  AND agent_id=?
+            """, (
+                sale_id,
+                session.get("user_id"),
+            ))
+        else:
+            sale = q1("""
+                SELECT
+                    id,
+                    sale_date,
+                    total_sell_uzs
+                FROM sales
+                WHERE id=?
+            """, (sale_id,))
+
+        if not sale:
+            return "Chek topilmadi", 404
+
+        items = q("""
+            SELECT
+                p.name,
+                si.qty,
+                si.sell_price_uzs,
+                si.sell_total_uzs
+            FROM sale_items si
+            JOIN products p
+              ON p.id=si.product_id
+            WHERE si.sale_id=?
+            ORDER BY si.id
+        """, (sale_id,))
+
+        return render_template(
+            "sales_receipt.html",
+            sale=sale,
+            items=items,
+            autoprint=(
+                request.args.get("autoprint")
+                == "1"
+            ),
+        )
+
+    @app.route(
         "/sales/qty/<int:product_id>/<action>",
         methods=["GET", "POST"],
     )

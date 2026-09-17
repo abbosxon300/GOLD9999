@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <title>Chek #{{ sale.id }}</title>
+
+  <style>
+    @page {
+      margin: 2mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 72mm;
+      margin: 0;
+      padding: 2mm;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: #000;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .meta {
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .line {
+      border-top: 1px dashed #000;
+      margin: 6px 0;
+    }
+
+    .item {
+      margin-bottom: 6px;
+    }
+
+    .item-name {
+      font-weight: 700;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .total {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .thanks {
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>GOLD9999</h1>
+
+  <div class="meta">
+    Chek № {{ sale.id }}<br>
+    {{ sale.sale_date }}
+  </div>
+
+  <div class="line"></div>
+
+  {% for item in items %}
+    <div class="item">
+      <div class="item-name">
+        {{ item.name }}
+      </div>
+
+      <div class="row">
+        <span>
+          {{ item.qty|fmt0 }}
+          ×
+          {{ item.sell_price_uzs|fmt0 }}
+        </span>
+
+        <strong>
+          {{ item.sell_total_uzs|fmt0 }}
+        </strong>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="line"></div>
+
+  <div class="row total">
+    <span>JAMI</span>
+    <span>
+      {{ sale.total_sell_uzs|fmt0 }} so‘m
+    </span>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="thanks">
+    Xaridingiz uchun rahmat!
+  </div>
+
+  {% if autoprint %}
+  <script>
+    window.addEventListener("load", () => {
+      window.setTimeout(
+        () => window.print(),
+        150
+      );
+    });
+  </script>
+  {% endif %}
+</body>
+</html>
