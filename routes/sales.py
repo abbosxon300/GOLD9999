@@ -240,7 +240,9 @@ def register_sales_routes(
             if request.form.get("_pos_cart_json") == "1":
                 from flask import jsonify
                 if category == "success":
-                    return jsonify(_sales_pos_cart_payload())
+                    payload = _sales_pos_cart_payload()
+                    payload["added_product_name"] = str(product["name"])
+                    return jsonify(payload)
                 return jsonify({
                     "ok": False,
                     "error": str(message),
@@ -276,6 +278,35 @@ def register_sales_routes(
             request.form.get("discount_value") or "0"
         )
 
+        product = None
+        if "barcode" in request.form:
+            barcode = (request.form.get("barcode") or "").strip()
+            if not barcode or len(barcode) > 128:
+                return _sales_add_response("Shtrix-kod noto‘g‘ri", "danger")
+
+            # Resolve the barcode and current price within the user's tenant.
+            product = q1("""
+                SELECT p.id, p.name, p.category_id,
+                       p.sell_price_default_uzs
+                FROM product_barcodes pb
+                JOIN products p
+                  ON p.id=pb.product_id AND p.tenant_id=pb.tenant_id
+                JOIN users u ON u.tenant_id=pb.tenant_id
+                WHERE u.id=? AND pb.barcode=? AND p.is_active=1
+                  AND pb.tenant_id > 0
+                LIMIT 1
+            """, (session.get("user_id"), barcode))
+            if product is None:
+                return _sales_add_response("Shtrix-kod topilmadi.", "danger")
+
+            product_id = int(product["id"])
+            category_id = int(product["category_id"] or 0)
+            qty = 1.0
+            price = float(product["sell_price_default_uzs"] or 0)
+            list_price = price
+            discount_type = "none"
+            discount_value = 0.0
+
         if product_id <= 0:
             return _sales_add_response("Mahsulot tanlanmadi", "danger")
 
@@ -306,15 +337,16 @@ def register_sales_routes(
         discount_type = pricing.discount_type
         discount_value = pricing.discount_value
 
-        product = q1("""
-            SELECT
-                p.id,
-                p.name,
-                p.sell_price_default_uzs
-            FROM products p
-            WHERE p.id=?
-              AND p.is_active=1
-        """, (product_id,))
+        if product is None:
+            product = q1("""
+                SELECT
+                    p.id,
+                    p.name,
+                    p.sell_price_default_uzs
+                FROM products p
+                WHERE p.id=?
+                  AND p.is_active=1
+            """, (product_id,))
 
         if not product:
             return _sales_add_response("Mahsulot topilmadi yoki nofaol", "danger")
