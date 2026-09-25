@@ -510,11 +510,12 @@ def register_settings_routes(
             abort(400)
 
         sizes = {
+            "30x20": (30, 20),
             "58x40": (58, 40),
             "50x30": (50, 30),
             "40x30": (40, 30),
         }
-        size = request.args.get("size", "58x40")
+        size = request.args.get("size", "30x20")
         if size not in sizes:
             abort(400)
 

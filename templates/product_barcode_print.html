@@ -26,7 +26,7 @@
   .label {
     width: {{ width }}mm;
     height: {{ height }}mm;
-    padding: 1mm;
+    padding: {{ '0.5' if width == 30 else '1' }}mm;
     margin: 10px auto;
     background: #fff;
     display: flex;
@@ -37,24 +37,24 @@
   }
   .name {
     width: 100%;
-    height: 8mm;
+    height: {{ 5 if height == 20 else 8 }}mm;
     overflow: hidden;
     text-align: center;
-    font-size: 9pt;
-    line-height: 4mm;
+    font-size: {{ 7 if height == 20 else 9 }}pt;
+    line-height: {{ '2.5' if height == 20 else '4' }}mm;
     overflow-wrap: anywhere;
   }
   svg {
     display: block;
     flex: none;
     width: 100%;
-    height: 14mm;
+    height: {{ 10 if height == 20 else 14 }}mm;
   }
   .number {
     font-family: monospace;
-    font-size: 11pt;
-    line-height: 4mm;
-    letter-spacing: .3mm;
+    font-size: {{ 8 if width == 30 else 11 }}pt;
+    line-height: {{ 3 if height == 20 else 4 }}mm;
+    letter-spacing: {{ '0.1' if width == 30 else '0.3' }}mm;
   }
   @page {
     size: {{ width }}mm {{ height }}mm;
