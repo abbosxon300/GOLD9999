@@ -236,8 +236,6 @@ def register_sales_routes(
     @app.route("/sales/add", methods=["POST"])
     @login_required
     def sales_add():
-        init_db()
-
         def _sales_add_response(message, category):
             if request.form.get("_pos_cart_json") == "1":
                 from flask import jsonify
@@ -1178,8 +1176,6 @@ def register_sales_routes(
     @login_required
     def sales_api_products():
         from flask import jsonify
-
-        init_db()
 
         barcode = (
             request.args.get("barcode")
