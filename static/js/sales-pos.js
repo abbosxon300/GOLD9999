@@ -8,9 +8,20 @@
   }
 
   const initial = window.SALES_POS_INITIAL;
-  const productsNode = document.getElementById("pos-products");
-  const productsEmpty = document.getElementById("pos-products-empty");
-  const productCount = document.getElementById("pos-product-count");
+  const searchPanel = document.getElementById("pos-search-panel");
+  const searchResults = document.getElementById("pos-search-results");
+  const searchMessage = document.getElementById("pos-search-message");
+  const editModal = document.getElementById("pos-edit-modal");
+  const editForm = document.getElementById("pos-edit-form");
+  const editQty = document.getElementById("pos-edit-qty");
+  const editPrice = document.getElementById("pos-edit-price");
+  let editProductId = null;
+  let mutationBusy = false;
+  let searchMatches = [];
+  let selectedMatch = -1;
+  let searchTimer = null;
+  let searchAbort = null;
+  let searchVersion = 0;
   const cartBody = document.getElementById("pos-cart-body");
   const cartCount = document.getElementById("pos-cart-count");
   const cartQty = document.getElementById("pos-cart-qty");
@@ -53,10 +64,6 @@
     "pos-clear-confirm-button"
   );
 
-  let products = Array.isArray(initial.products)
-    ? initial.products
-    : [];
-
   let cart = initial.cart || {
     items: [],
     item_count: 0,
@@ -64,7 +71,6 @@
     cart_total: 0,
   };
 
-  let activeCategoryId = Number(initial.categoryId || 0);
   let toastTimer = null;
   let kassaModeActive = false;
 
@@ -255,7 +261,11 @@
   };
 
   const setBusy = (busy) => {
+    mutationBusy = busy;
     root.classList.toggle("is-busy", busy);
+    root.setAttribute("aria-busy", String(busy));
+    checkoutButton.disabled = busy || !cart.items?.length;
+    clearButton.disabled = busy || !cart.items?.length;
   };
 
   const postForm = async (url, values = {}) => {
@@ -305,249 +315,97 @@
     renderCart();
   };
 
-  const stockClass = (qty) => {
-    const numeric = Number(qty || 0);
-
-    if (numeric <= 0) {
-      return "is-out";
-    }
-
-    if (numeric <= 5) {
-      return "is-low";
-    }
-
-    return "is-ready";
+  const closeSearch = () => {
+    clearTimeout(searchTimer);
+    searchAbort?.abort();
+    searchVersion++;
+    searchPanel.hidden = true;
+    searchMatches = [];
+    selectedMatch = -1;
+    searchInput.setAttribute("aria-expanded", "false");
+    searchInput.removeAttribute("aria-activedescendant");
   };
 
-  const stockLabel = (qty) => {
-    const numeric = Number(qty || 0);
-
-    if (numeric <= 0) {
-      return "Tugagan";
-    }
-
-    return `${qtyText(numeric)} dona`;
+  const selectMatch = (index) => {
+    selectedMatch = index;
+    searchResults.querySelectorAll("[data-search-index]").forEach((row, i) => {
+      row.classList.toggle("is-selected", i === index);
+      row.setAttribute("aria-selected", String(i === index));
+      if (i === index) row.scrollIntoView({block: "nearest"});
+    });
+    if (index >= 0) searchInput.setAttribute("aria-activedescendant", `pos-result-${index}`);
+    else searchInput.removeAttribute("aria-activedescendant");
   };
 
-  const productTemplate = (product) => {
-    const stock = Number(product.qty || 0);
-    const disabled = stock <= 0;
-
-    return `
-      <article
-        class="pos-product"
-        data-product-id="${Number(product.id)}"
-        data-product-name="${escapeHtml(
-          String(product.name || "").toLocaleLowerCase("uz")
-        )}"
-      >
-        <div class="pos-product-head">
-          <div class="pos-product-name">
-            <h3>${escapeHtml(product.name)}</h3>
-            <span>ID: ${Number(product.id)}</span>
-          </div>
-
-          <span class="pos-stock ${stockClass(stock)}">
-            ${stockLabel(stock)}
-          </span>
-        </div>
-
-        <div class="pos-product-price">
-          <span>Standart narx</span>
-          <strong>
-            ${money(product.sell_default)}
-            <small>so‘m</small>
-          </strong>
-        </div>
-
-        <form
-          class="pos-product-form"
-          action="${escapeHtml(initial.urls.add)}"
-          method="post"
-          data-add-form
-        >
-          <input
-            type="hidden"
-            name="category_id"
-            value="${activeCategoryId}"
-          >
-          <input
-            type="hidden"
-            name="product_id"
-            value="${Number(product.id)}"
-          >
-
-            <div class="pos-fields">
-              <label class="pos-field">
-                <span>Miqdor</span>
-                <input
-                  class="pos-qty-input"
-                  name="qty"
-                  type="number"
-                  inputmode="decimal"
-                  min="0.01"
-                  step="any"
-                  value="1"
-                  required
-                >
-              </label>
-
-              <label class="pos-field">
-                <span>Sotuv narxi</span>
-                <div class="pos-money">
-                  <input
-                    name="price_uzs"
-                    inputmode="numeric"
-                    value="${money(product.sell_default)}"
-                    required
-                    data-money-input
-                  >
-                  <small>so?m</small>
-                </div>
-              </label>
-            </div>
-
-            <input
-              type="hidden"
-              name="list_price_uzs"
-              value="${Number(product.sell_default)}"
-            >
-            <input
-              type="hidden"
-              name="discount_type"
-              value="none"
-            >
-            <input
-              type="hidden"
-              name="discount_value"
-              value="0"
-            >
-
-          <button
-            class="pos-add"
-            type="submit"
-            ${disabled ? "disabled" : ""}
-          >
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="9" cy="20" r="1.5"></circle>
-              <circle cx="18" cy="20" r="1.5"></circle>
-              <path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.6L21 8H7"></path>
-            </svg>
-            ${disabled ? "Qoldiq yo‘q" : "Savatga qo‘shish"}
-          </button>
-        </form>
-      </article>
-    `;
+  const searchProducts = async (query) => {
+    searchAbort?.abort();
+    const version = ++searchVersion;
+    searchAbort = new AbortController();
+    searchMatches = [];
+    selectedMatch = -1;
+    searchResults.innerHTML = "";
+    searchPanel.hidden = false;
+    searchInput.setAttribute("aria-expanded", "true");
+    searchMessage.textContent = "Qidirilmoqda…";
+    try {
+      const url = new URL(initial.urls.products, window.location.origin);
+      url.searchParams.set("q", query);
+      const response = await fetch(url, {credentials: "same-origin", signal: searchAbort.signal});
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Qidiruv bajarilmadi");
+      if (version !== searchVersion || query !== searchInput.value.trim()) return;
+      searchMatches = Array.isArray(payload.products) ? payload.products : [];
+      searchMessage.textContent = searchMatches.length
+        ? `${searchMatches.length} ta natija · Tanlash uchun bosing${searchMatches.length === 30 ? " · Nomini aniqroq yozing" : ""}`
+        : "Mahsulot topilmadi. Boshqa nom yoki shtrix-kod kiriting.";
+      searchResults.innerHTML = searchMatches.map((product, i) => `
+        <button type="button" role="option" aria-selected="false" id="pos-result-${i}" class="pos-search-result" data-search-index="${i}">
+          <span class="pos-result-icon" aria-hidden="true">＋</span>
+          <span class="pos-result-name"><strong>${escapeHtml(product.name)}</strong><small>ID: ${Number(product.id)} · <span class="${Number(product.qty) <= 0 ? 'is-out' : ''}">${qtyText(product.qty)} dona qoldiq</span></small></span>
+          <span class="pos-result-price">${money(product.sell_default)} <small>so‘m</small></span>
+        </button>`).join("");
+    } catch (error) {
+      if (error.name !== "AbortError" && version === searchVersion) searchMessage.textContent = "Qidiruv yuklanmadi. Qayta urinib ko‘ring.";
+    }
   };
 
   const applySearch = () => {
-    const query = String(searchInput?.value || "")
-      .trim()
-      .toLocaleLowerCase("uz");
-
-    const cards = Array.from(
-      productsNode.querySelectorAll(".pos-product")
-    );
-
-    let visible = 0;
-
-    cards.forEach((card) => {
-      const match = (
-        !query ||
-        String(card.dataset.productName || "").includes(query)
-      );
-
-      card.hidden = !match;
-
-      if (match) {
-        visible += 1;
-      }
-    });
-
-    productsEmpty.hidden = visible !== 0;
-    productCount.textContent = `${visible} ta`;
+    closeSearch();
+    const query = searchInput.value.trim();
+    if (!query) return;
+    // Scanner Enter cancels this timer and adds with a single POST.
+    searchTimer = window.setTimeout(() => searchProducts(query), 220);
   };
 
-  const renderProducts = () => {
-    productsNode.innerHTML = products
-      .map(productTemplate)
-      .join("");
-
-    applySearch();
+  const addSearchProduct = async (product) => {
+    if (mutationBusy) return;
+    if (Number(product.qty) <= 0) return showToast("Mahsulot qoldig‘i yo‘q", true);
+    setBusy(true);
+    closeSearch();
+    try {
+      const response = await postForm(initial.urls.add, {_pos_cart_json: "1", _pos_product_id: String(product.id)});
+      const payload = await response.json();
+      if (!payload.ok) throw new Error(payload.error || "Mahsulot qo‘shilmadi");
+      cart = payload;
+      renderCart();
+      searchInput.value = "";
+      showToast(`${payload.added_product_name || product.name} savatga qo‘shildi.`);
+    } catch (error) { showToast(error.message, true); }
+    finally { setBusy(false); searchInput.focus(); }
   };
 
-  const cartItemTemplate = (item) => {
+  const cartItemTemplate = (item, index) => {
     const productId = Number(item.product_id);
     const qty = Number(item.qty || 0);
     const price = Number(item.price || 0);
-    const lineTotal = Number(
-      item.line_total ?? qty * price
-    );
-    const listPrice = Number(
-      item.list_price ?? price
-    );
-    const discountType = String(
-      item.discount_type || "none"
-    );
-    const discountValue = Number(
-      item.discount_value || 0
-    );
-    const discountTotal = Number(
-      item.discount_total || 0
-    );
-
     return `
       <article class="pos-cart-item">
-        <div class="pos-cart-item-head">
-          <div>
-            <h3>${escapeHtml(item.name)}</h3>
-            <div class="pos-cart-item-price">
-              ${money(price)} so‘m
-            </div>
-          </div>
-
-          <button
-            class="pos-cart-remove"
-            type="button"
-            data-cart-remove="${productId}"
-            aria-label="Savatdan o‘chirish"
-            title="O‘chirish"
-          >
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M4 7h16"></path>
-              <path d="M9 7V4h6v3"></path>
-              <path d="m6 7 1 14h10l1-14"></path>
-              <path d="M10 11v6M14 11v6"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div class="pos-cart-item-bottom">
-          <div class="pos-qty-control">
-            <button
-              type="button"
-              data-cart-action="dec"
-              data-product-id="${productId}"
-              aria-label="Miqdorni kamaytirish"
-            >−</button>
-
-            <strong>${qtyText(qty)}</strong>
-
-            <button
-              type="button"
-              data-cart-action="inc"
-              data-product-id="${productId}"
-              aria-label="Miqdorni oshirish"
-            >+</button>
-          </div>
-
-          <div class="pos-line-total">
-            <span>Jami</span>
-            <strong>${money(lineTotal)} so‘m</strong>
-          </div>
-        </div>
-      </article>
-    `;
+        <div class="pos-item-name"><span class="pos-row-number">${index + 1}</span><div><h3>${escapeHtml(item.name)}</h3><small>ID: ${productId}</small></div></div>
+        <button class="pos-price-edit" type="button" data-cart-edit="${productId}" aria-label="${escapeHtml(item.name)} narxi va miqdorini o‘zgartirish">${money(price)}<small>so‘m <span aria-hidden="true">✎</span></small></button>
+        <div class="pos-qty-control"><button type="button" data-cart-action="dec" data-product-id="${productId}" aria-label="Miqdorni kamaytirish">−</button><button class="pos-qty-value" type="button" data-cart-edit="${productId}" aria-label="Miqdorni kiritish">${qtyText(qty)}</button><button type="button" data-cart-action="inc" data-product-id="${productId}" aria-label="Miqdorni oshirish">+</button></div>
+        <strong class="pos-line-total">${money(item.line_total ?? qty * price)}<small>so‘m</small></strong>
+        <button class="pos-cart-remove" type="button" data-cart-remove="${productId}" aria-label="${escapeHtml(item.name)}ni savatdan o‘chirish" title="O‘chirish"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>
+      </article>`;
   };
 
   const renderCart = () => {
@@ -560,7 +418,7 @@
         <div class="pos-cart-empty">
           <div class="pos-cart-empty-mark">＋</div>
           <h3>Savat bo‘sh</h3>
-          <p>Chap tomondan mahsulot tanlang.</p>
+          <p>Mahsulotni skanerlang yoki yuqorida nomini yozing.</p>
         </div>
       `;
     } else {
@@ -602,64 +460,8 @@
 
     const empty = itemCount === 0;
 
-    checkoutButton.disabled = empty;
-    clearButton.disabled = empty;
-  };
-
-  const loadProducts = async (categoryId) => {
-    const url = new URL(
-      initial.urls.products,
-      window.location.origin
-    );
-
-    url.searchParams.set(
-      "category_id",
-      String(categoryId)
-    );
-
-    setBusy(true);
-
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        credentials: "same-origin",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Products HTTP ${response.status}`);
-      }
-
-      const payload = await response.json();
-
-      products = Array.isArray(payload.products)
-        ? payload.products
-        : [];
-
-      activeCategoryId = Number(categoryId);
-      renderProducts();
-
-      const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set(
-        "category_id",
-        String(categoryId)
-      );
-
-      window.history.replaceState(
-        {},
-        "",
-        nextUrl
-      );
-    } catch (error) {
-      console.error(error);
-      showToast(
-        "Mahsulotlarni yuklab bo‘lmadi.",
-        true
-      );
-    } finally {
-      setBusy(false);
-    }
+    checkoutButton.disabled = empty || mutationBusy;
+    clearButton.disabled = empty || mutationBusy;
   };
 
   let barcodeScanBusy = false;
@@ -692,7 +494,7 @@
   const scanBarcode = async (
     rawBarcode
   ) => {
-    if (barcodeScanBusy) {
+    if (barcodeScanBusy || mutationBusy) {
       return;
     }
 
@@ -704,6 +506,7 @@
       return;
     }
 
+    closeSearch();
     barcodeScanBusy = true;
     setBusy(true);
 
@@ -729,31 +532,6 @@
     }
   };
 
-
-  document
-    .getElementById("pos-categories")
-    ?.addEventListener("click", async (event) => {
-      const button = event.target.closest(
-        "[data-category-id]"
-      );
-
-      if (!button) {
-        return;
-      }
-
-      document
-        .querySelectorAll("[data-category-id]")
-        .forEach((node) => {
-          node.classList.toggle(
-            "is-active",
-            node === button
-          );
-        });
-
-      await loadProducts(
-        Number(button.dataset.categoryId)
-      );
-    });
 
   globalDiscountType?.addEventListener(
     "change",
@@ -813,35 +591,52 @@
     applySearch
   );
 
-  searchInput?.addEventListener(
-    "keydown",
-    async (event) => {
-      if (event.key !== "Enter") {
-        return;
-      }
-
-      const barcode = String(
-        searchInput.value || ""
-      ).trim();
-
-      if (!barcode) {
-        return;
-      }
-
+  searchInput.addEventListener("keydown", async (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Escape") { closeSearch(); return; }
+    if (["ArrowDown", "ArrowUp"].includes(event.key) && searchMatches.length) {
       event.preventDefault();
-
-      await scanBarcode(
-        barcode
-      );
+      const next = selectedMatch < 0
+        ? (event.key === "ArrowDown" ? 0 : searchMatches.length - 1)
+        : (selectedMatch + (event.key === "ArrowDown" ? 1 : -1) + searchMatches.length) % searchMatches.length;
+      selectMatch(next);
+      return;
     }
-  );
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const query = searchInput.value.trim();
+    if (!query || mutationBusy) return;
+    if (selectedMatch >= 0 && searchMatches[selectedMatch]) return addSearchProduct(searchMatches[selectedMatch]);
+    if (/^[0-9]{8,128}$/.test(query)) return scanBarcode(query);
+    // An exact alphanumeric barcode is also resolved by the search API.
+    clearTimeout(searchTimer);
+    await searchProducts(query);
+  });
+
+  searchResults.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-search-index]");
+    if (row && searchMatches[Number(row.dataset.searchIndex)]) addSearchProduct(searchMatches[Number(row.dataset.searchIndex)]);
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".pos-search-area")) closeSearch();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "F2" && paymentModal.hidden && confirmModal.hidden && editModal.hidden) {
+      event.preventDefault(); searchInput.focus(); searchInput.select();
+    }
+    if (event.key === "Escape") {
+      if (!paymentModal.hidden) closePaymentModal();
+      if (!confirmModal.hidden && !mutationBusy) confirmModal.hidden = true;
+      if (!editModal.hidden && !mutationBusy) { editModal.hidden = true; searchInput.focus(); }
+    }
+  });
 
   document.addEventListener(
     "keydown",
     (event) => {
       if (
         !searchInput ||
-        barcodeScanBusy ||
+        barcodeScanBusy || mutationBusy || !paymentModal.hidden || !confirmModal.hidden || !editModal.hidden ||
         event.defaultPrevented ||
         event.ctrlKey ||
         event.altKey ||
@@ -881,85 +676,23 @@
     }
   );
 
-  productsNode.addEventListener(
-    "input",
-    (event) => {
-      const input = event.target.closest(
-        "[data-money-input]"
-      );
-
-      if (!input) {
-        return;
-      }
-
-      const digits = String(input.value)
-        .replace(/\D/g, "");
-
-      input.value = digits
-        ? Number(digits).toLocaleString("ru-RU")
-        : "";
-    }
-  );
-
-  productsNode.addEventListener(
-    "submit",
-    async (event) => {
-      const form = event.target.closest(
-        "[data-add-form]"
-      );
-
-      if (!form) {
-        return;
-      }
-
-      event.preventDefault();
-
-      const formData = new FormData(form);
-      const values = Object.fromEntries(
-        formData.entries()
-      );
-
-      values.price_uzs = String(
-        values.price_uzs || ""
-      ).replace(/\D/g, "");
-
-      // Product cardda item-level skidka yo‘q.
-      // Kiritilgan sotuv narxi global skidkagacha
-      // bo‘lgan canonical narx hisoblanadi.
-      values.list_price_uzs = values.price_uzs;
-      values.discount_type = "none";
-      values.discount_value = "0";
-
-      setBusy(true);
-
-      try {
-        await postForm(form.action, values);
-        await loadCart();
-
-        const qtyInput = form.querySelector(
-          "[name='qty']"
-        );
-
-        if (qtyInput) {
-          qtyInput.value = "1";
-        }
-
-        showToast("Mahsulot savatga qo‘shildi.");
-      } catch (error) {
-        console.error(error);
-        showToast(
-          "Mahsulotni qo‘shib bo‘lmadi.",
-          true
-        );
-      } finally {
-        setBusy(false);
-      }
-    }
-  );
-
   cartBody.addEventListener(
     "click",
     async (event) => {
+      if (mutationBusy) return;
+      const edit = event.target.closest("[data-cart-edit]");
+      if (edit) {
+        const item = cart.items.find(item => Number(item.product_id) === Number(edit.dataset.cartEdit));
+        if (!item) return;
+        editProductId = Number(item.product_id);
+        document.getElementById("pos-edit-name").textContent = item.name;
+        editQty.value = item.qty;
+        editPrice.value = item.price;
+        document.getElementById("pos-edit-error").hidden = true;
+        editModal.hidden = false;
+        editQty.focus(); editQty.select();
+        return;
+      }
       const remove = event.target.closest(
         "[data-cart-remove]"
       );
@@ -997,12 +730,13 @@
       setBusy(true);
 
       try {
-        await postForm(url);
-        await loadCart();
+        const response = await postForm(url, {_pos_cart_json: "1"});
+        cart = await response.json();
+        renderCart();
       } catch (error) {
         console.error(error);
         showToast(
-          "Savatni yangilab bo‘lmadi.",
+          error.message || "Savatni yangilab bo‘lmadi.",
           true
         );
       } finally {
@@ -1010,6 +744,23 @@
       }
     }
   );
+
+  document.querySelectorAll("[data-edit-cancel]").forEach(button => button.addEventListener("click", () => {
+    if (!mutationBusy) { editModal.hidden = true; searchInput.focus(); }
+  }));
+  editForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (mutationBusy || !editForm.reportValidity()) return;
+    setBusy(true);
+    try {
+      const response = await postForm(`/sales/cart/${editProductId}/update`, {qty: editQty.value, price_uzs: editPrice.value});
+      cart = await response.json(); renderCart();
+      editModal.hidden = true; searchInput.focus();
+    } catch(error) {
+      const node = document.getElementById("pos-edit-error");
+      node.textContent = error.message; node.hidden = false;
+    } finally { setBusy(false); }
+  });
 
   let paymentMethod = "CASH";
 
@@ -1101,7 +852,8 @@
   checkoutForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    if (paymentModal.hidden) {
+    if (paymentModal.hidden && !mutationBusy && cart.items?.length) {
+      closeSearch();
       openPaymentModal();
     }
   });
@@ -1174,6 +926,7 @@
     });
 
   paymentSubmit.addEventListener("click", () => {
+    if (mutationBusy || !cart.items?.length) return;
     const payable = currentPayable();
 
     let cash = 0;
@@ -1237,12 +990,10 @@
           globalDiscountValue.disabled = true;
         }
 
-        await Promise.all([
-          loadCart(),
-          activeCategoryId > 0
-            ? loadProducts(activeCategoryId)
-            : Promise.resolve(),
-        ]);
+        await loadCart();
+        searchInput.value = "";
+        closeSearch();
+        searchInput.focus();
 
         printSaleReceipt(result.sale_id);
 
@@ -1281,11 +1032,13 @@
   confirmClear.addEventListener(
     "click",
     async () => {
+      if (mutationBusy) return;
       setBusy(true);
 
       try {
-        await postForm(initial.urls.clear);
-        await loadCart();
+        const response = await postForm(initial.urls.clear, {_pos_cart_json: "1"});
+        cart = await response.json();
+        renderCart();
 
         confirmModal.hidden = true;
         showToast("Savat tozalandi.");
@@ -1301,7 +1054,7 @@
     }
   );
 
-  renderProducts();
   renderCart();
+  searchInput.focus();
 })();
 

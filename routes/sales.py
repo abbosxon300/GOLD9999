@@ -69,35 +69,37 @@ def register_sales_routes(
 
         cart = cart_get()
 
-        cats = q("""
-            SELECT id, name
-            FROM categories
-            WHERE is_active=1
-            ORDER BY sort_order, id
-        """)
+        cats, products, cat_id = [], [], 0
+        if session.get("role") == "agent":
+            cats = q("""
+                SELECT id, name
+                FROM categories
+                WHERE is_active=1
+                ORDER BY sort_order, id
+            """)
 
-        cat_id = parse_int(
-            request.args.get("category_id") or "0"
-        )
+            cat_id = parse_int(
+                request.args.get("category_id") or "0"
+            )
 
-        if cat_id <= 0 and cats:
-            cat_id = int(cats[0]["id"])
+            if cat_id <= 0 and cats:
+                cat_id = int(cats[0]["id"])
 
-        products = []
+            products = []
 
-        if cat_id > 0:
-            products = q("""
-                SELECT
-                    p.id,
-                    p.name,
-                    p.sell_price_default_uzs
-                        AS sell_default,
-                    COALESCE(p.stock_qty, 0) AS qty
-                FROM products p
-                WHERE p.is_active=1
-                  AND p.category_id=?
-                ORDER BY p.name
-            """, (cat_id,))
+            if cat_id > 0:
+                products = q("""
+                    SELECT
+                        p.id,
+                        p.name,
+                        p.sell_price_default_uzs
+                            AS sell_default,
+                        COALESCE(p.stock_qty, 0) AS qty
+                    FROM products p
+                    WHERE p.is_active=1
+                      AND p.category_id=?
+                    ORDER BY p.name
+                """, (cat_id,))
 
         cart_items = []
 
@@ -299,6 +301,17 @@ def register_sales_routes(
             if product is None:
                 return _sales_add_response("Shtrix-kod topilmadi.", "danger")
 
+        elif "_pos_product_id" in request.form:
+            selected_id = parse_int(request.form.get("_pos_product_id") or "0")
+            product = q1("""
+                SELECT p.id, p.name, p.category_id, p.sell_price_default_uzs
+                FROM products p JOIN users u ON u.tenant_id=p.tenant_id
+                WHERE p.id=? AND u.id=? AND p.tenant_id>0 AND p.is_active=1
+            """, (selected_id, session.get("user_id")))
+            if product is None:
+                return _sales_add_response("Mahsulot topilmadi yoki nofaol", "danger")
+
+        if product is not None:
             product_id = int(product["id"])
             category_id = int(product["category_id"] or 0)
             qty = 1.0
@@ -422,6 +435,9 @@ def register_sales_routes(
         cart = cart_get()
         cart["items"].pop(str(product_id), None)
         session["cart"] = cart
+        if request.form.get("_pos_cart_json") == "1":
+            from flask import jsonify
+            return jsonify(_sales_pos_cart_payload())
         return redirect(url_for("sales"))
 
     @app.route("/sales/clear", methods=["POST"])
@@ -429,6 +445,9 @@ def register_sales_routes(
     def sales_clear():
         session["cart"] = {"items": {}}
         flash("Savat tozalandi", "success")
+        if request.form.get("_pos_cart_json") == "1":
+            from flask import jsonify
+            return jsonify(_sales_pos_cart_payload())
         return redirect(url_for("sales"))
 
     @app.route(
@@ -1034,6 +1053,15 @@ def register_sales_routes(
             qty = 0.0
 
         if action == "inc":
+            available = product_qty(product_id)
+            if product_key not in cart["items"] or (available is not None and qty + 1 > available + 1e-9):
+                if request.form.get("_pos_cart_json") == "1":
+                    from flask import jsonify
+                    return jsonify(ok=False, error="Qoldiq yetarli emas"), 400
+                flash("Qoldiq yetarli emas", "danger")
+                return redirect(url_for("sales"))
+
+        if action == "inc":
             qty += 1.0
         elif action == "dec":
             qty = max(0.0, qty - 1.0)
@@ -1132,12 +1160,43 @@ def register_sales_routes(
 
         session["cart"] = cart
 
+        if request.form.get("_pos_cart_json") == "1":
+            from flask import jsonify
+            return jsonify(_sales_pos_cart_payload())
         return redirect(
             request.referrer
             or url_for("sales")
         )
 
     # ===== SALES POS API START =====
+
+    @app.post("/sales/cart/<int:product_id>/update")
+    @login_required
+    def sales_cart_update(product_id):
+        from flask import jsonify
+        from math import isfinite
+        cart = cart_get()
+        item = cart["items"].get(str(product_id))
+        product = q1("""
+            SELECT p.sell_price_default_uzs, COALESCE(p.stock_qty,0) AS qty
+            FROM products p JOIN users u ON u.tenant_id=p.tenant_id
+            WHERE p.id=? AND u.id=? AND p.tenant_id>0 AND p.is_active=1
+        """, (product_id, session.get("user_id")))
+        if item is None or product is None:
+            return jsonify(ok=False, error="Mahsulot topilmadi"), 404
+        qty = parse_float(request.form.get("qty") or "")
+        price = parse_float(request.form.get("price_uzs") or "")
+        if qty is None or price is None or not isfinite(qty) or not isfinite(price) or qty <= 0 or price <= 0:
+            return jsonify(ok=False, error="Miqdor yoki narx noto‘g‘ri"), 400
+        if qty > float(product["qty"]) + 1e-9:
+            return jsonify(ok=False, error="Qoldiq yetarli emas"), 400
+        if session.get("role") == "agent" and price + 1e-9 < float(product["sell_price_default_uzs"] or 0):
+            return jsonify(ok=False, error="Narx standart narxdan past bo‘lmasin"), 400
+        pricing = calculate_sale_item_pricing(qty=qty, list_price_uzs=price, discount_type="none", discount_value=0)
+        item.update(qty=qty, price=pricing.sell_price_uzs, list_price=pricing.list_price_uzs,
+                    discount_type=pricing.discount_type, discount_value=pricing.discount_value)
+        session["cart"] = cart
+        return jsonify(_sales_pos_cart_payload())
 
     def _sales_pos_cart_payload():
         cart = cart_get()
@@ -1208,6 +1267,29 @@ def register_sales_routes(
     @login_required
     def sales_api_products():
         from flask import jsonify
+
+        if "q" in request.args:
+            query = (request.args.get("q") or "").strip()
+            if len(query) > 128:
+                return jsonify(ok=False, error="Qidiruv juda uzun", products=[]), 400
+            if not query:
+                return jsonify(ok=True, products=[])
+            get_db().create_function("pos_casefold", 1, lambda value: str(value or "").casefold())
+            rows = q("""
+                SELECT p.id, p.name, p.category_id,
+                       p.sell_price_default_uzs AS sell_default,
+                       COALESCE(p.stock_qty, 0) AS qty
+                FROM products p JOIN users u ON u.tenant_id=p.tenant_id
+                WHERE u.id=? AND p.tenant_id>0 AND p.is_active=1
+                  AND (instr(pos_casefold(p.name), ?) > 0 OR EXISTS (
+                    SELECT 1 FROM product_barcodes pb
+                    WHERE pb.product_id=p.id AND pb.tenant_id=p.tenant_id AND pb.barcode=?
+                  ))
+                ORDER BY CASE WHEN pos_casefold(p.name)=? THEN 0 ELSE 1 END,
+                         p.name, p.id
+                LIMIT 30
+            """, (session.get("user_id"), query.casefold(), query, query.casefold()))
+            return jsonify(ok=True, products=[dict(row) for row in rows])
 
         barcode = (
             request.args.get("barcode")
@@ -1347,3 +1429,4 @@ def register_sales_routes(
         })
 
     # ===== SALES POS API END =====
+
