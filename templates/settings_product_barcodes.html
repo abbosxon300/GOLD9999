@@ -29,6 +29,28 @@
     </div>
   </section>
 
+
+  <section class="card barcode-add-card">
+    <h3>Shtrix-kodi yo‘q mahsulot</h3>
+    <p class="barcode-help">
+      Kod avtomatik yaratiladi va shu mahsulotga saqlanadi.
+      Keyingi safar saqlangan kodni chop eting.
+    </p>
+    {% if not barcodes %}
+    <form method="post"
+          action="{{ url_for('settings_product_barcode_generate',
+                             product_id=product.id) }}"
+          style="margin-top:16px">
+      {% if csrf_token is defined %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% endif %}
+      <button class="btn" type="submit">＋ Shtrix-kod yaratish</button>
+    </form>
+    {% else %}
+    <p>Bu mahsulotga kod biriktirilgan. Quyidan chop eting.</p>
+    {% endif %}
+  </section>
+
   <section class="card barcode-add-card">
 
     <h3>Shtrix-kod qo‘shish</h3>
@@ -104,6 +126,28 @@
               </small>
             </div>
 
+
+            <form method="get" target="_blank"
+                  action="{{ url_for('settings_product_barcode_print',
+                                     product_id=product.id,
+                                     barcode_id=row.id) }}"
+                  class="barcode-print-form">
+              <label>
+                Yorliq o‘lchami
+                <select name="size" aria-label="Yorliq o‘lchami">
+                  <option value="58x40">58 × 40 mm</option>
+                  <option value="50x30">50 × 30 mm</option>
+                  <option value="40x30">40 × 30 mm</option>
+                </select>
+              </label>
+              <label>
+                Nusxa soni
+                <input name="copies" type="number" min="1" max="500"
+                       value="1" required aria-label="Nusxa soni">
+              </label>
+              <button class="btn" type="submit">Chop etish</button>
+            </form>
+
             <form
               method="post"
               action="{{ url_for(
@@ -144,6 +188,27 @@
 </div>
 
 <style>
+  .barcode-row { flex-wrap: wrap; }
+  .barcode-print-form {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+    flex-wrap: wrap;
+  }
+  .barcode-print-form label {
+    display: grid;
+    gap: 5px;
+    font-size: 12px;
+  }
+  .barcode-print-form input { width: 80px; }
+  .barcode-print-form input,
+  .barcode-print-form select {
+    min-height: 36px;
+    border: 1px solid #bfc6d4;
+    border-radius: 8px;
+    padding: 6px;
+  }
+
   .barcode-settings-page {
     display: grid;
     gap: 16px;

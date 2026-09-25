@@ -247,7 +247,55 @@ def delete_product_barcode(
         )
 
 
+
+def generate_product_barcode(
+    product_id: int,
+    *,
+    connection: sqlite3.Connection | None = None,
+) -> int:
+    """Create a barcode only for a product without barcodes."""
+    from secrets import randbelow
+    from services.barcode_labels import ean13_check_digit
+
+    with business_transaction(connection) as tx:
+        # Acquire the SQLite write lock before checking existing codes.
+        tx.execute(
+            "UPDATE products SET id=id WHERE id=?",
+            (int(product_id),),
+        )
+        product = _product_row(tx, product_id)
+
+        existing = tx.execute(
+            "SELECT id FROM product_barcodes "
+            "WHERE product_id=? ORDER BY id LIMIT 1",
+            (int(product_id),),
+        ).fetchone()
+
+        if existing is not None:
+            return int(existing["id"])
+
+        for _ in range(100):
+            body = "20" + f"{randbelow(10**10):010d}"
+            code = body + ean13_check_digit(body)
+
+            duplicate = tx.execute(
+                "SELECT 1 FROM product_barcodes WHERE barcode=? LIMIT 1",
+                (code,),
+            ).fetchone()
+            if duplicate is not None:
+                continue
+
+            # Use the existing write and sync mechanism.
+            return add_product_barcode(
+                int(product["id"]),
+                barcode=code,
+                connection=tx,
+            )
+
+        raise RuntimeError("Bo‘sh shtrix-kod yaratilmadi. Qayta urinib ko‘ring.")
+
 __all__ = [
+    "generate_product_barcode",
     "MAX_BARCODE_LENGTH",
     "add_product_barcode",
     "delete_product_barcode",

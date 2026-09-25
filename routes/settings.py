@@ -29,6 +29,7 @@ from services.business_writes.master_data import (
 
 from services.business_writes.product_barcodes import (
     add_product_barcode,
+    generate_product_barcode,
     delete_product_barcode,
     list_product_barcodes,
 )
@@ -447,6 +448,95 @@ def register_settings_routes(
         return redirect(url_for("settings_products"))
 
 
+
+    def _barcode_product(product_id):
+        from flask import abort
+
+        product = q1(
+            "SELECT id, name, tenant_id FROM products "
+            "WHERE id=? AND tenant_id=?",
+            (product_id, _current_tenant_id()),
+        )
+        if product is None:
+            abort(404)
+        return product
+
+    @app.route(
+        "/settings/products/<int:product_id>/barcodes/generate",
+        methods=["POST"],
+    )
+    @login_required
+    @admin_required
+    def settings_product_barcode_generate(product_id):
+        init_db()
+        _barcode_product(product_id)
+        try:
+            generate_product_barcode(product_id)
+        except (
+            ValueError, LookupError, RuntimeError, sqlite3.IntegrityError
+        ) as exc:
+            flash(str(exc), "danger")
+        else:
+            flash("Shtrix-kod tayyor. Uni chop etishingiz mumkin.", "success")
+        return redirect(url_for(
+            "settings_product_barcodes", product_id=product_id
+        ))
+
+    @app.route(
+        "/settings/products/<int:product_id>"
+        "/barcodes/<int:barcode_id>/print"
+    )
+    @login_required
+    @admin_required
+    def settings_product_barcode_print(product_id, barcode_id):
+        from flask import abort
+        from services.barcode_labels import ean13_bits
+
+        init_db()
+        product = _barcode_product(product_id)
+        row = q1(
+            "SELECT barcode FROM product_barcodes "
+            "WHERE id=? AND product_id=? AND tenant_id=?",
+            (barcode_id, product_id, product["tenant_id"]),
+        )
+        if row is None:
+            abort(404)
+
+        try:
+            copies = int(request.args.get("copies", "1"))
+        except (TypeError, ValueError):
+            abort(400)
+        if not 1 <= copies <= 500:
+            abort(400)
+
+        sizes = {
+            "58x40": (58, 40),
+            "50x30": (50, 30),
+            "40x30": (40, 30),
+        }
+        size = request.args.get("size", "58x40")
+        if size not in sizes:
+            abort(400)
+
+        try:
+            bits = ean13_bits(row["barcode"])
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for(
+                "settings_product_barcodes", product_id=product_id
+            ))
+
+        width, height = sizes[size]
+        return render_template(
+            "product_barcode_print.html",
+            product=product,
+            barcode=row["barcode"],
+            bits=bits,
+            copies=copies,
+            width=width,
+            height=height,
+        )
+
     @app.route(
         "/settings/products/<int:product_id>/barcodes"
     )
@@ -456,6 +546,7 @@ def register_settings_routes(
         product_id: int,
     ):
         init_db()
+        _barcode_product(product_id)
 
         product = q1(
             """
@@ -500,6 +591,7 @@ def register_settings_routes(
         product_id: int,
     ):
         init_db()
+        _barcode_product(product_id)
 
         barcode = (
             request.form.get("barcode")
@@ -547,6 +639,7 @@ def register_settings_routes(
         barcode_id: int,
     ):
         init_db()
+        _barcode_product(product_id)
 
         try:
             delete_product_barcode(
