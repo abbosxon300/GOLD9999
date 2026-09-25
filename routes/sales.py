@@ -238,6 +238,20 @@ def register_sales_routes(
     def sales_add():
         init_db()
 
+        def _sales_add_response(message, category):
+            if request.form.get("_pos_cart_json") == "1":
+                from flask import jsonify
+                if category == "success":
+                    return jsonify(_sales_pos_cart_payload())
+                return jsonify({
+                    "ok": False,
+                    "error": str(message),
+                }), 400
+            flash(message, category)
+            return redirect(url_for(
+                "sales", category_id=category_id
+            ))
+
         category_id = parse_int(
             request.form.get("category_id") or "0"
         )
@@ -265,34 +279,13 @@ def register_sales_routes(
         )
 
         if product_id <= 0:
-            flash(
-                "Mahsulot tanlanmadi",
-                "danger",
-            )
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response("Mahsulot tanlanmadi", "danger")
 
         if qty is None or qty <= 0:
-            flash("Miqdor noto‘g‘ri", "danger")
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response("Miqdor noto‘g‘ri", "danger")
 
         if price is None or price <= 0:
-            flash("Narx noto‘g‘ri", "danger")
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response("Narx noto‘g‘ri", "danger")
 
         if list_price is None or list_price <= 0:
             list_price = float(price)
@@ -308,13 +301,7 @@ def register_sales_routes(
                 discount_value=float(discount_value),
             )
         except ValueError as exc:
-            flash(str(exc), "danger")
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response(str(exc), "danger")
 
         price = pricing.sell_price_uzs
         list_price = pricing.list_price_uzs
@@ -332,16 +319,7 @@ def register_sales_routes(
         """, (product_id,))
 
         if not product:
-            flash(
-                "Mahsulot topilmadi yoki nofaol",
-                "danger",
-            )
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response("Mahsulot topilmadi yoki nofaol", "danger")
 
         if session.get("role") == "agent":
             default_price = float(
@@ -351,19 +329,10 @@ def register_sales_routes(
             )
 
             if float(price) + 1e-9 < default_price:
-                flash(
-                    "Narx defaultdan past "
+                return _sales_add_response("Narx defaultdan past "
                     "bo‘lmasin. Minimal: "
                     f"{fmt0_filter(default_price)} "
-                    "so‘m",
-                    "danger",
-                )
-                return redirect(
-                    url_for(
-                        "sales",
-                        category_id=category_id,
-                    )
-                )
+                    "so‘m", "danger")
 
         available = product_qty(product_id)
         cart = cart_get()
@@ -379,17 +348,8 @@ def register_sales_routes(
             and available + 1e-9
             < existing_qty + float(qty)
         ):
-            flash(
-                "Qoldiq yetarli emas. "
-                f"Bor: {available:.2f}",
-                "danger",
-            )
-            return redirect(
-                url_for(
-                    "sales",
-                    category_id=category_id,
-                )
-            )
+            return _sales_add_response("Qoldiq yetarli emas. "
+                f"Bor: {available:.2f}", "danger")
 
         product_key = str(product_id)
 
@@ -421,17 +381,7 @@ def register_sales_routes(
 
         session["cart"] = cart
 
-        flash(
-            "Savatga qo‘shildi ✅",
-            "success",
-        )
-
-        return redirect(
-            url_for(
-                "sales",
-                category_id=category_id,
-            )
-        )
+        return _sales_add_response("Savatga qo‘shildi ✅", "success")
 
     @app.route(
         "/sales/remove/<int:product_id>",

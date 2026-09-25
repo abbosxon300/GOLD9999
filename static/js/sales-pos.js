@@ -278,7 +278,12 @@
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      let message = `HTTP ${response.status}`;
+      if ((response.headers.get("content-type") || "").includes("application/json")) {
+        const payload = await response.json().catch(() => null);
+        if (payload?.error) message = String(payload.error);
+      }
+      throw new Error(message);
     }
 
     return response;
@@ -754,9 +759,10 @@
       return false;
     }
 
-    await postForm(
+    const response = await postForm(
       initial.urls.add,
       {
+        _pos_cart_json: "1",
         category_id: String(
           categoryId
         ),
@@ -775,7 +781,12 @@
       }
     );
 
-    await loadCart();
+    const payload = await response.json();
+    if (!payload.ok || !Array.isArray(payload.items)) {
+      throw new Error(payload.error || "Savat javobi noto‘g‘ri.");
+    }
+    cart = payload;
+    renderCart();
 
     showToast(
       `${product.name} savatga qo‘shildi.`
