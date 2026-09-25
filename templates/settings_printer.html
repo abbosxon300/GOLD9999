@@ -1,153 +1,29 @@
 {% extends "base.html" %}
 {% set title = "Sozlamalar → Chek printeri" %}
-
 {% block content %}
-<link
-  rel="stylesheet"
-  href="{{ url_for('static', filename='css/settings-printer.css') }}"
->
-
-<div
-  class="printer-settings-page"
-  id="printerSettingsPage"
->
-
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings-printer.css') }}">
+<div class="printer-settings-page" id="printerSettingsPage">
   <section class="card">
-
     <div class="printer-settings-head">
-      <div>
-        <h2>Chek printeri</h2>
-
-        <p>
-          Printer sozlamasi faqat shu Windows
-          kompyuterda saqlanadi.
-        </p>
+      <h2>Chek printeri</h2>
+      <p>Sotuv yakunlanganda chek chop qilishni boshqaring.</p>
+    </div>
+    <form id="receiptSettingsForm">
+      <div class="printer-settings-options">
+        <label>
+          <input type="checkbox" id="printerAutoPrint" aria-describedby="receiptPrintHelp">
+          <span>Sotuvdan keyin chek chop qilish</span>
+        </label>
       </div>
-    </div>
-
-    <div
-      id="printerDesktopStatus"
-      class="printer-desktop-status"
-    >
-      Gold9999 Desktop tekshirilmoqda...
-    </div>
-
-    <div class="printer-settings-fields">
-
-      <label>
-        <span>Windows printer</span>
-
-        <select
-          id="printerName"
-          disabled
-        >
-          <option value="">
-            Printerlar yuklanmoqda...
-          </option>
-        </select>
-      </label>
-
-      <label>
-        <span>Qog‘oz kengligi</span>
-
-        <select
-          id="printerPaperWidth"
-          disabled
-        >
-          <option value="58">
-            58 mm
-          </option>
-
-          <option value="80">
-            80 mm
-          </option>
-        </select>
-      </label>
-
-      <label>
-        <span>Nusxa soni</span>
-
-        <select
-          id="printerCopies"
-          disabled
-        >
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        </select>
-      </label>
-
-    </div>
-
-    <div class="printer-settings-options">
-
-      <label>
-        <input
-          type="checkbox"
-          id="printerEnabled"
-          disabled
-        >
-
-        <span>
-          Chek printerini yoqish
-        </span>
-      </label>
-
-      <label>
-        <input
-          type="checkbox"
-          id="printerAutoPrint"
-          disabled
-        >
-
-        <span>
-          Sotuvdan keyin avtomatik chek chiqarish
-        </span>
-      </label>
-
-    </div>
-
-    <div class="printer-settings-actions">
-
-      <button
-        type="button"
-        id="printerRefreshButton"
-        disabled
-      >
-        Yangilash
-      </button>
-
-      <button
-        type="button"
-        id="printerSaveButton"
-        disabled
-      >
-        Saqlash
-      </button>
-
-      <button
-        type="button"
-        id="printerTestButton"
-        disabled
-      >
-        Test chek
-      </button>
-
-    </div>
-
-    <div
-      id="printerResult"
-      hidden
-    ></div>
-
+      <p id="receiptPrintHelp">Yoqilsa, sotuv yakunlanganda brauzerning chop qilish oynasi ochiladi. O‘chirilsa, sotuv chek oynasisiz saqlanadi.</p>
+      <div class="printer-desktop-status">Sozlama faqat shu qurilmadagi brauzerda saqlanadi. Printer va qog‘oz o‘lchamini chop qilish oynasida tanlaysiz.</div>
+      <div class="printer-settings-actions">
+        <button type="submit" id="printerSaveButton">Saqlash</button>
+      </div>
+      <div id="printerResult" role="status" aria-live="polite" hidden></div>
+    </form>
   </section>
-
 </div>
-
-<script
-  src="{{ url_for('static', filename='js/settings-printer.js') }}"
-></script>
-
+<script src="{{ url_for('static', filename='js/receipt-preferences.js', v='receipt-toggle-1') }}"></script>
+<script src="{{ url_for('static', filename='js/settings-printer.js', v='receipt-toggle-1') }}"></script>
 {% endblock %}
