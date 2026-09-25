@@ -665,119 +665,12 @@
   let barcodeScanBusy = false;
 
 
-  const lookupBarcode = async (
-    barcode
-  ) => {
-    const url = new URL(
-      initial.urls.products,
-      window.location.origin
-    );
-
-    url.searchParams.set(
-      "barcode",
-      barcode
-    );
-
-    const response = await fetch(
-      url,
-      {
-        headers: {
-          "X-Requested-With":
-            "XMLHttpRequest",
-        },
-        credentials: "same-origin",
-      }
-    );
-
-    const payload = await response.json();
-
-    if (
-      !response.ok ||
-      !payload.ok
-    ) {
-      throw new Error(
-        payload.error ||
-        `Barcode HTTP ${response.status}`
-      );
-    }
-
-    const matches = Array.isArray(
-      payload.products
-    )
-      ? payload.products
-      : [];
-
-    return matches[0] || null;
-  };
-
-
-  const addScannedProduct = async (
-    product
-  ) => {
-    const productId = Number(
-      product?.id || 0
-    );
-
-    const categoryId = Number(
-      product?.category_id || 0
-    );
-
-    const stockQty = Number(
-      product?.qty || 0
-    );
-
-    const price = Math.round(
-      Number(
-        product?.sell_default || 0
-      )
-    );
-
-    if (
-      productId <= 0 ||
-      categoryId <= 0
-    ) {
-      throw new Error(
-        "Scanner product ma’lumoti noto‘g‘ri"
-      );
-    }
-
-    if (stockQty <= 0) {
-      showToast(
-        "Mahsulot qoldig‘i yo‘q.",
-        true
-      );
-
-      return false;
-    }
-
-    if (price <= 0) {
-      showToast(
-        "Mahsulot sotuv narxi noto‘g‘ri.",
-        true
-      );
-
-      return false;
-    }
-
+  const addScannedBarcode = async (barcode) => {
     const response = await postForm(
       initial.urls.add,
       {
         _pos_cart_json: "1",
-        category_id: String(
-          categoryId
-        ),
-        product_id: String(
-          productId
-        ),
-        qty: "1",
-        price_uzs: String(
-          price
-        ),
-        list_price_uzs: String(
-          price
-        ),
-        discount_type: "none",
-        discount_value: "0",
+        barcode,
       }
     );
 
@@ -789,7 +682,7 @@
     renderCart();
 
     showToast(
-      `${product.name} savatga qo‘shildi.`
+      `${payload.added_product_name || "Mahsulot"} savatga qo‘shildi.`
     );
 
     return true;
@@ -815,22 +708,7 @@
     setBusy(true);
 
     try {
-      const product = await lookupBarcode(
-        barcode
-      );
-
-      if (!product) {
-        showToast(
-          "Shtrix-kod topilmadi.",
-          true
-        );
-
-        return;
-      }
-
-      await addScannedProduct(
-        product
-      );
+      await addScannedBarcode(barcode);
     } catch (error) {
       console.error(error);
 
@@ -1426,3 +1304,4 @@
   renderProducts();
   renderCart();
 })();
+
