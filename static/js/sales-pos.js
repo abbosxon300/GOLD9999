@@ -231,6 +231,8 @@
   };
 
   const printSaleReceipt = (saleId) => {
+    if (window.GoldReceiptPreferences?.isEnabled() === false) return;
+
     document
       .getElementById("pos-receipt-print-frame")
       ?.remove();
@@ -1057,4 +1059,5 @@
   renderCart();
   searchInput.focus();
 })();
+
 

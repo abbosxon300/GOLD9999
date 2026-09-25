@@ -322,10 +322,13 @@ window.SALES_POS_INITIAL = {
 };
 </script>
 
+<script src="{{ url_for('static', filename='js/receipt-preferences.js', v='receipt-toggle-1') }}"></script>
+
 <script
   defer
-  src="{{ url_for('static', filename='js/sales-pos.js', v='cart-20260925') }}"
+  src="{{ url_for('static', filename='js/sales-pos.js', v='receipt-toggle-1') }}"
 ></script>
 
 {% endblock %}
+
 
