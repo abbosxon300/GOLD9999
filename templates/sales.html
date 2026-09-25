@@ -3,7 +3,7 @@
 
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='css/sales-pos.css') }}"
+  href="{{ url_for('static', filename='css/sales-pos.css', v='cart-20260925') }}"
 >
 
 <div
@@ -16,93 +16,33 @@
 >
 
 
-  <section class="pos-toolbar">
-    <div class="pos-categories" id="pos-categories">
-      {% for category in cats %}
-      <button
-        class="pos-category {% if category.id == selected_cat_id %}is-active{% endif %}"
-        type="button"
-        data-category-id="{{ category.id }}"
-      >
-        {{ category.name }}
-      </button>
-      {% endfor %}
+  <header class="pos-toolbar">
+    <div class="pos-brand"><span class="pos-eyebrow">GOLD 9999 · SOTUV</span><h1>Kassa</h1></div>
+    <div class="pos-search-area">
+      <label class="pos-search" for="pos-search">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+        <input id="pos-search" type="search" placeholder="Mahsulot nomi yoki shtrix-kod…" autocomplete="off" maxlength="128" role="combobox" aria-label="Mahsulot nomi yoki shtrix-kod" aria-autocomplete="list" aria-controls="pos-search-results" aria-expanded="false">
+        <kbd>F2</kbd>
+      </label>
+      <div class="pos-search-panel" id="pos-search-panel" hidden>
+        <div class="pos-search-message" id="pos-search-message" role="status"></div>
+        <div id="pos-search-results" role="listbox" aria-label="Qidiruv natijalari"></div>
+      </div>
     </div>
-
-    <button
-      class="pos-kassa-toggle"
-      id="pos-kassa-toggle"
-      type="button"
-      aria-label="Kassa rejimi"
-      title="Kassa rejimi"
-    >
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M8 3H3v5"></path>
-        <path d="M16 3h5v5"></path>
-        <path d="M21 16v5h-5"></path>
-        <path d="M3 16v5h5"></path>
-      </svg>
-      <span>Kassa rejimi</span>
-    </button>
-
-    <label class="pos-search">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="7"></circle>
-        <path d="m16 16 5 5"></path>
-      </svg>
-      <input
-        id="pos-search"
-        type="search"
-        placeholder="Mahsulot qidirish..."
-        autocomplete="off"
-      >
-    </label>
-  </section>
-
+    <button class="pos-kassa-toggle" id="pos-kassa-toggle" type="button" aria-label="Kassa rejimi"><span>Kassa rejimi</span><span aria-hidden="true">⛶</span></button>
+  </header>
   <div class="pos-layout">
-    <main class="pos-catalog">
-      <div class="pos-section-head">
-        <div>
-          <span>Katalog</span>
-          <h2>Mahsulotlar</h2>
-        </div>
-
-        <strong id="pos-product-count">
-          {{ products|length }} ta
-        </strong>
-      </div>
-
-      <div
-        class="pos-products"
-        id="pos-products"
-        aria-live="polite"
-      ></div>
-
-      <div class="pos-empty" id="pos-products-empty" hidden>
-        <div class="pos-empty-mark">□</div>
-        <h3>Mahsulot topilmadi</h3>
-        <p>Tanlangan kategoriya yoki qidiruv bo‘yicha mahsulot yo‘q.</p>
-      </div>
-    </main>
-
-    <aside class="pos-cart">
+    <main class="pos-cart">
       <div class="pos-cart-head">
-        <div>
-          <span>Joriy savdo</span>
-          <h2>Savat</h2>
-        </div>
-
-        <strong id="pos-cart-count">
-          {{ cart_items|length }} ta
-        </strong>
+        <div><span class="pos-eyebrow">JORIY SAVDO</span><h2>Savat <strong id="pos-cart-count">{{ cart_items|length }} ta</strong></h2></div>
+        <span class="pos-cart-hint">Skanerlang yoki nomi bilan qidiring</span>
       </div>
-
-      <div
-        class="pos-cart-body"
-        id="pos-cart-body"
-        aria-live="polite"
-      ></div>
-
+      <div class="pos-cart-columns" aria-hidden="true"><span>Mahsulot</span><span>Narxi</span><span>Miqdor</span><span>Summa</span><span></span></div>
+      <div class="pos-cart-body" id="pos-cart-body" aria-live="polite"></div>
+      <div class="pos-cart-note"><span>F2 — qidirish</span><span>↑ ↓ — tanlash · Enter — qo‘shish</span></div>
+    </main>
+    <aside class="pos-summary" aria-label="Savdo hisobi">
+      <div class="pos-summary-title"><span class="pos-eyebrow">HISOB-KITOB</span><h2>To‘lov</h2></div>
       <div class="pos-cart-footer">
         <div class="pos-cart-summary">
           <div>
@@ -196,6 +136,17 @@
     </aside>
   </div>
 
+  <div class="pos-confirm" id="pos-edit-modal" hidden>
+    <button class="pos-confirm-backdrop" type="button" data-edit-cancel aria-label="Yopish"></button>
+    <form class="pos-confirm-dialog" id="pos-edit-form" role="dialog" aria-modal="true" aria-labelledby="pos-edit-title">
+      <span class="pos-eyebrow">SAVATDAGI MAHSULOT</span><h3 id="pos-edit-title">Miqdor va narx</h3>
+      <p id="pos-edit-name"></p>
+      <label class="pos-edit-field">Miqdor<input id="pos-edit-qty" type="number" min="0.001" step="any" required></label>
+      <label class="pos-edit-field">Sotuv narxi, so‘m<input id="pos-edit-price" type="number" min="0.01" step="any" required></label>
+      <p id="pos-edit-error" class="pos-payment-error" role="alert" hidden></p>
+      <div class="pos-confirm-actions"><button type="button" data-edit-cancel>Bekor qilish</button><button class="is-primary" type="submit">Saqlash</button></div>
+    </form>
+  </div>
   <div class="pos-toast" id="pos-toast" hidden></div>
 
   <div class="pos-payment-modal" id="pos-payment-modal" hidden>
@@ -339,23 +290,8 @@
   </div>
 </div>
 
-<script id="pos-initial-products" type="application/json">
-{{ products|map(attribute='id')|list|tojson }}
-</script>
-
 <script>
 window.SALES_POS_INITIAL = {
-  categoryId: {{ selected_cat_id|int }},
-  products: [
-    {% for product in products %}
-    {
-      id: {{ product.id|int }},
-      name: {{ product.name|tojson }},
-      sell_default: {{ (product.sell_default or 0)|float }},
-      qty: {{ (product.qty or 0)|float }}
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-  ],
   cart: {
     items: [
       {% for item in cart_items %}
@@ -388,7 +324,8 @@ window.SALES_POS_INITIAL = {
 
 <script
   defer
-  src="{{ url_for('static', filename='js/sales-pos.js') }}"
+  src="{{ url_for('static', filename='js/sales-pos.js', v='cart-20260925') }}"
 ></script>
 
 {% endblock %}
+
