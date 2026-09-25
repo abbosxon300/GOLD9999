@@ -26,7 +26,7 @@
   .label {
     width: {{ width }}mm;
     height: {{ height }}mm;
-    padding: {{ '0.5' if width == 30 else '1' }}mm;
+    padding: 1mm {{ '0.5' if width == 30 else '1' }}mm;
     margin: 10px auto;
     background: #fff;
     display: flex;
@@ -37,19 +37,19 @@
   }
   .name {
     width: 100%;
-    height: {{ 4 if height == 20 else (6 if height == 30 else 8) }}mm;
+    height: {{ 5 if height == 20 else (6 if height == 30 else 8) }}mm;
     flex: none;
     overflow: hidden;
     text-align: center;
     font-size: {{ 7 if height == 20 else 9 }}pt;
-    line-height: {{ 2 if height == 20 else (3 if height == 30 else 4) }}mm;
+    line-height: {{ '2.5' if height == 20 else (3 if height == 30 else 4) }}mm;
     overflow-wrap: anywhere;
   }
   svg {
     display: block;
     flex: none;
     width: 100%;
-    height: {{ 8 if height == 20 else (12 if height == 30 else 14) }}mm;
+    height: {{ '6.5' if height == 20 else (12 if height == 30 else 14) }}mm;
   }
   .number {
     font-family: monospace;
