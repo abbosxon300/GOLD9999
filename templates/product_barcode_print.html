@@ -49,14 +49,7 @@
     display: block;
     flex: none;
     width: 100%;
-    height: {{ '6.5' if height == 20 else (12 if height == 30 else 14) }}mm;
-  }
-  .number {
-    font-family: monospace;
-    flex: none;
-    font-size: {{ 6 if width == 30 else 9 }}pt;
-    line-height: {{ '2.5' if height == 20 else (3 if height == 30 else 4) }}mm;
-    letter-spacing: {{ '0.1' if width == 30 else '0.3' }}mm;
+    height: {{ 9 if height == 20 else (15 if height == 30 else 18) }}mm;
   }
   .price {
     flex: none;
@@ -105,17 +98,25 @@
 <div class="label">
   <div class="name">{{ product.name }}</div>
   <svg xmlns="http://www.w3.org/2000/svg"
-       viewBox="0 0 113 50" preserveAspectRatio="none"
+       viewBox="0 0 113 36" preserveAspectRatio="none"
        role="img" aria-label="{{ barcode }}">
-    <rect width="113" height="50" fill="white"/>
+    <rect width="113" height="36" fill="white"/>
     {% for bit in bits %}
     {% if bit == '1' %}
     <rect x="{{ loop.index0 + 11 }}" y="0" width="1"
-          height="50" fill="black"/>
+          height="{{ 31 if loop.index0 in [0, 2, 46, 48, 92, 94] else 26 }}" fill="black"/>
     {% endif %}
     {% endfor %}
+    <g font-family="Arial, sans-serif" font-size="9" fill="black">
+      <text x="6" y="35" text-anchor="end">{{ barcode[0] }}</text>
+      {% for digit in barcode[1:7] %}
+      <text x="{{ 17.5 + loop.index0 * 7 }}" y="35" text-anchor="middle">{{ digit }}</text>
+      {% endfor %}
+      {% for digit in barcode[7:13] %}
+      <text x="{{ 64.5 + loop.index0 * 7 }}" y="35" text-anchor="middle">{{ digit }}</text>
+      {% endfor %}
+    </g>
   </svg>
-  <div class="number">{{ barcode }}</div>
   <div class="price">{{ "{:,.0f}".format(product.sell_price_default_uzs or 0).replace(",", " ") }} so‘m</div>
 </div>
 {% endfor %}
