@@ -453,7 +453,7 @@ def register_settings_routes(
         from flask import abort
 
         product = q1(
-            "SELECT id, name, tenant_id FROM products "
+            "SELECT id, name, tenant_id, sell_price_default_uzs FROM products "
             "WHERE id=? AND tenant_id=?",
             (product_id, _current_tenant_id()),
         )
