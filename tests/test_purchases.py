@@ -305,6 +305,16 @@ def test_tenant_and_duplicate_product_checks(db):
         save_purchase(db, tenant_id=2, entity_uuid=str(uuid4()), payload=payload)
     with pytest.raises(ValueError):
         pay_purchase(db, tenant_id=2, entity_uuid=str(uuid4()), payload=payment(key))
+    supplier_id = db.execute(
+        "SELECT supplier_id FROM purchases WHERE id=?", (doc,)
+    ).fetchone()[0]
+    with pytest.raises(ValueError):
+        pay_supplier(
+            db,
+            tenant_id=2,
+            entity_uuid=str(uuid4()),
+            payload=supplier_payment_payload(db, supplier_id, 1000),
+        )
 
 
 def test_migration_preserves_existing_data_and_reruns(db):
@@ -430,32 +440,39 @@ def test_sync_supplier_payment_keeps_exact_fifo_allocations(db):
     ]
     assert any(c["entity_type"] == "supplier_payment" for c in business)
 
-    for change in business:
-        with business_transaction(remote):
-            apply_remote_change(
-                remote,
-                RemoteChange(
-                    change["entity_type"],
-                    change["entity_uuid"],
-                    change["operation"],
-                    change["payload"],
-                    change["version"],
-                    str(uuid4()),
-                    datetime.now(timezone.utc),
-                ),
-                tenant_id=1,
-            )
+    for _ in range(2):
+        for change in business:
+            with business_transaction(remote):
+                apply_remote_change(
+                    remote,
+                    RemoteChange(
+                        change["entity_type"],
+                        change["entity_uuid"],
+                        change["operation"],
+                        change["payload"],
+                        change["version"],
+                        str(uuid4()),
+                        datetime.now(timezone.utc),
+                    ),
+                    tenant_id=1,
+                )
 
     source_alloc = [
-        (r["purchase_id"], r["amount_uzs"])
+        (r["entity_uuid"], r["amount_uzs"])
         for r in db.execute(
-            "SELECT purchase_id,amount_uzs FROM supplier_payment_allocations ORDER BY id"
+            """SELECT p.entity_uuid,a.amount_uzs
+            FROM supplier_payment_allocations a
+            JOIN purchases p ON p.id=a.purchase_id
+            ORDER BY a.id"""
         )
     ]
     remote_alloc = [
-        (r["purchase_id"], r["amount_uzs"])
+        (r["entity_uuid"], r["amount_uzs"])
         for r in remote.execute(
-            "SELECT purchase_id,amount_uzs FROM supplier_payment_allocations ORDER BY id"
+            """SELECT p.entity_uuid,a.amount_uzs
+            FROM supplier_payment_allocations a
+            JOIN purchases p ON p.id=a.purchase_id
+            ORDER BY a.id"""
         )
     ]
     assert remote_alloc == source_alloc
