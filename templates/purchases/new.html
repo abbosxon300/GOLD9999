@@ -69,12 +69,11 @@
       <div id="pw-results" role="listbox" hidden></div>
     </div>
 
-    <div class="pw-simple-table-head">
-      <span>Mahsulotlar</span>
+    <div class="pw-simple-list-meta">
       <span id="pw-item-count">0 tur</span>
     </div>
 
-    <div class="pw-table-wrap">
+    <div class="pw-table-wrap" id="pw-table-wrap" hidden>
       <table class="pw-table pw-entry-table">
         <thead>
           <tr>
@@ -89,46 +88,19 @@
       </table>
     </div>
 
-    <div class="pw-simple-empty" id="pw-cart-empty">Mahsulot tanlanmagan</div>
+    <div class="pw-simple-empty" id="pw-cart-empty">Mahsulot tanlang</div>
 
     <label class="pw-simple-note">
       <span>Izoh</span>
       <input name="note" maxlength="500" value="{{ initial.get('note','') }}" placeholder="Ixtiyoriy izoh">
     </label>
 
-    <div class="pw-simple-totalbar {% if is_edit %}is-edit{% endif %}">
+    <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') if is_edit else '0' }}">
+
+    <div class="pw-simple-totalbar is-minimal">
       <div class="pw-simple-money">
         <span>Jami</span>
         <strong><span id="pw-total">0</span> <small>so‘m</small></strong>
-      </div>
-
-      {% if is_edit %}
-        <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') }}">
-        <div class="pw-simple-money">
-          <span>To‘langan</span>
-          <strong>{{ money(initial.get('paid',0)) }} <small>so‘m</small></strong>
-        </div>
-      {% else %}
-        <label class="pw-simple-pay">
-          <span>To‘lov</span>
-          <div class="pw-simple-pay-input">
-            <input name="paid" id="pw-paid" inputmode="decimal" value="{{ initial.get('paid','0') }}" placeholder="0">
-            <button type="button" id="pw-pay-all" class="pw-clear">To‘liq</button>
-          </div>
-        </label>
-
-        <label class="pw-simple-method">
-          <span>Kassa</span>
-          <select name="method">
-            <option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option>
-            <option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option>
-          </select>
-        </label>
-      {% endif %}
-
-      <div class="pw-simple-money pw-simple-debt">
-        <span>Qarz</span>
-        <strong><span id="pw-debt">0</span> <small>so‘m</small></strong>
       </div>
 
       <div class="pw-simple-actions">
@@ -162,5 +134,5 @@
 </dialog>
 
 <script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('Saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
-<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_simple_v3" defer></script>
+<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_minimal_v4" defer></script>
 {% endblock %}
