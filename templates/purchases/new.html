@@ -3,7 +3,7 @@
 {% set title = ('Kirimni tahrirlash' if is_edit else 'Yangi kirim') %}
 
 {% block heading %}{{ 'Kirim #' ~ purchase_id ~ 'ni tahrirlash' if is_edit else 'Yangi kirim' }}{% endblock %}
-{% block subtitle %}{{ 'Kirim ma’lumotlarini tuzating' if is_edit else 'Tovar kirimini tez va qulay kiriting' }}{% endblock %}
+{% block subtitle %}{% endblock %}
 
 {% block workspace %}
 {% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
