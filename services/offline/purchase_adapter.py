@@ -6,6 +6,7 @@ from services.business_writes.purchases import (
     create_supplier,
     save_purchase,
     pay_purchase,
+    update_purchase,
     TABLES,
 )
 from services.offline.remote_applier import (
@@ -24,8 +25,10 @@ def apply_purchase_change(context):
         if len(tenants) != 1:
             raise InvalidRemotePayloadError("Sinxronlash uchun firma aniqlanmadi")
         tenant_id = tenants[0][0]
-    if context.remote_version != 1:
-        raise InvalidRemotePayloadError("Kirim hujjatlari o‘zgarmas yozuvlardir")
+    if context.entity_type != "purchase" and context.remote_version != 1:
+        raise InvalidRemotePayloadError("Bu yozuv turi o‘zgarmas")
+    if context.entity_type == "purchase" and context.remote_version < 1:
+        raise InvalidRemotePayloadError("Kirim versiyasi noto‘g‘ri")
     try:
         if context.entity_type == "supplier":
             local_id = create_supplier(
@@ -34,6 +37,17 @@ def apply_purchase_change(context):
                 entity_uuid=context.entity_uuid,
                 name=context.payload.get("name"),
                 phone=context.payload.get("phone", ""),
+                replicate=False,
+            )
+        elif context.entity_type == "purchase" and context.operation == "update":
+            if context.existing is None:
+                raise InvalidRemotePayloadError("Yangilanadigan kirim topilmadi")
+            local_id = update_purchase(
+                db,
+                tenant_id=tenant_id,
+                entity_uuid=context.entity_uuid,
+                payload=dict(context.payload),
+                expected_version=context.remote_version - 1,
                 replicate=False,
             )
         else:
@@ -52,8 +66,8 @@ def apply_purchase_change(context):
         context.entity_type,
         context.entity_uuid,
         local_id,
-        None if created else 1,
-        1,
+        None if created else context.existing.sync_version,
+        context.remote_version,
         created,
         created,
     )
@@ -73,7 +87,7 @@ def purchase_changes(db, device_uuid, tenant_id=None):
                     entity_type=kind,
                     entity_uuid=row["entity_uuid"],
                     payload=json.loads(row["payload_json"]),
-                    version=1,
+                    version=row["sync_version"],
                     device_uuid=device_uuid,
                     occurred_at=row["created_at"],
                 )
