@@ -871,3 +871,20 @@ def test_sidebar_module_states_and_warehouse_ui(web):
     assert kirim_link and "active" not in kirim_link.group(1).split()
 
     assert warehouse.text.count('href="/kpi/new"') >= 2
+
+
+def test_kirim_uses_uzbek_inline_validation_and_compact_editor(web):
+    app, client, path = web
+    page = client.get("/kpi/new")
+    assert page.status_code == 200
+    assert 'id="purchase-form" method="post" autocomplete="off" novalidate' in page.text
+    assert 'id="pw-supplier-select-error"' in page.text
+    assert 'id="pw-date-error"' in page.text
+    assert 'rows="1"' in page.text
+
+    script = client.get("/static/js/purchases.js")
+    assert script.status_code == 200
+    body = script.get_data(as_text=True)
+    assert "Yetkazib beruvchini tanlang." in body
+    assert "Kirim sanasini kiriting." in body
+    assert "Yetkazib beruvchi nomini kiriting." in body

@@ -6,7 +6,7 @@
 {% block workspace %}
 {% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
 <div id="pw-draft" class="pw-draft" hidden><span>{{ 'Bu tahrirning saqlanmagan qoralamasi bor.' if is_edit else 'Bu brauzerda saqlanmagan qoralama bor.' }}</span><button type="button" id="pw-restore" class="pw-button">Tiklash</button><button type="button" id="pw-discard" class="pw-clear">O‘chirish</button></div>
-<form id="purchase-form" method="post" autocomplete="off">
+<form id="purchase-form" method="post" autocomplete="off" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="entity_uuid" value="{{ initial.entity_uuid }}">
   {% if is_edit %}<input type="hidden" name="expected_version" value="{{ expected_version }}">{% endif %}
@@ -15,8 +15,8 @@
     <div class="pw-main">
       <section class="pw-panel pw-pad"><div class="pw-section-head"><h2><span class="pw-step">1</span> Kirim ma’lumotlari</h2></div>
         <div class="pw-info-grid">
-          <label class="pw-supplier-label"><span>Yetkazuvchi <b>*</b></span><div class="pw-inline"><select required name="supplier_id" id="pw-supplier"><option value="">Yetkazuvchini tanlang</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>{{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}</option>{% endfor %}</select><button type="button" id="pw-open-supplier" class="pw-button" aria-label="Yetkazuvchi qo‘shish">+</button></div></label>
-          <label><span>Sana <b>*</b></span><input required type="date" name="purchase_date" value="{{ initial.purchase_date }}"></label>
+          <label class="pw-supplier-label"><span>Yetkazuvchi <b>*</b></span><div class="pw-inline"><select name="supplier_id" id="pw-supplier" aria-describedby="pw-supplier-select-error"><option value="">Yetkazuvchini tanlang</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>{{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}</option>{% endfor %}</select><button type="button" id="pw-open-supplier" class="pw-button" aria-label="Yetkazuvchi qo‘shish">+</button></div><small id="pw-supplier-select-error" class="pw-field-error" hidden></small></label>
+          <label><span>Sana <b>*</b></span><input type="date" name="purchase_date" id="pw-purchase-date" value="{{ initial.purchase_date }}" aria-describedby="pw-date-error"><small id="pw-date-error" class="pw-field-error" hidden></small></label>
           <label>Hujjat raqami<input name="reference" maxlength="80" value="{{ initial.get('reference','') }}" placeholder="Ixtiyoriy, masalan: 125"></label>
         </div>
       </section>
@@ -27,7 +27,7 @@
         <div class="pw-empty" id="pw-cart-empty"><span class="pw-empty-icon" aria-hidden="true">+</span><h3>Mahsulotlarni qo‘shing</h3><p>Yuqoridan qidiring. Turli kategoriyadagi mahsulotlar bitta kirimga qo‘shiladi.</p></div>
         <div class="pw-cart-footer"><span>{{ 'O‘zgarish ombor qoldig‘iga farq bo‘yicha qo‘llanadi' if is_edit else 'Oxirgi kirim narxi avtomatik taklif qilinadi' }}</span><button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button></div>
       </section>
-      <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="2" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
+      <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="1" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
     </div>
     <aside class="pw-summary pw-panel pw-pad">
       <span class="pw-eyebrow">HISOB-KITOB</span><h2>{{ 'Yangilangan kirim' if is_edit else 'Kirim yakuni' }}</h2>
@@ -50,7 +50,7 @@
     </aside>
   </div>
 </form>
-<dialog id="pw-supplier-dialog" class="pw-dialog"><form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}">
+<dialog id="pw-supplier-dialog" class="pw-dialog"><form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}" novalidate>
   <div class="pw-section-head"><h2>Yangi yetkazuvchi</h2><button type="button" id="pw-close-supplier" class="pw-icon-button" aria-label="Yopish">×</button></div>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ supplier_uuid }}">
   <label><span>Nomi <b>*</b></span><input name="name" required maxlength="160" placeholder="Korxona yoki shaxs nomi"></label>
