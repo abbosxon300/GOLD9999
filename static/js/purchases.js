@@ -39,10 +39,13 @@
   function totals() {
     const amount = total(), paid = num($('pw-paid').value) || 0;
     $('pw-total').textContent = money(amount);
-    $('pw-debt').textContent = money(amount - paid);
+    const debt = $('pw-debt');
+    if (debt) debt.textContent = money(amount - paid);
     $('pw-item-count').textContent = `${cart.length} tur`;
     $('pw-items').value = JSON.stringify(cart);
     $('pw-cart-empty').hidden = cart.length > 0;
+    const tableWrap = $('pw-table-wrap');
+    if (tableWrap) tableWrap.hidden = cart.length === 0;
   }
   function saveDraft() {
     if (submitting) return;
