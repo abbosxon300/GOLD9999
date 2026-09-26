@@ -1,5 +1,159 @@
-{% extends 'purchases/layout.html' %}
-{% set title = 'Ombor qoldig‘i' %}
-{% block heading %}Ombor qoldig‘i{% endblock %}
-{% block subtitle %}Barcha mahsulotlarning joriy qoldig‘i va narxlari{% endblock %}
-{% block workspace %}<section class="pw-panel"><form class="pw-filters" method="get"><label class="pw-search">Mahsulot<input name="q" value="{{ search }}" placeholder="Nom yoki shtrix kodi"></label><label>Kategoriya<select name="category"><option value="0">Barcha kategoriyalar</option>{% for c in cats %}<option value="{{ c.id }}" {% if category==c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label><button class="pw-button" type="submit">Ko‘rsatish</button></form><div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Mahsulot</th><th>Kategoriya</th><th class="num">Qoldiq</th><th class="num">O‘rtacha kirim narxi</th><th class="num">Sotuv narxi</th></tr></thead><tbody>{% for p in rows %}<tr><td><strong>{{ p.name }}</strong></td><td>{{ p.category }}</td><td class="num"><span class="pw-badge {% if p.stock_qty>0 %}paid{% else %}debt{% endif %}">{{ quantity(p.stock_qty) }}</span></td><td class="num">{{ money(p.avg_cost) }}</td><td class="num">{{ money(p.sell_price_default_uzs) }}</td></tr>{% else %}<tr><td colspan="5" class="pw-empty">Mahsulot topilmadi</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends 'base.html' %}
+{% set title = 'Ombor' %}
+{% macro money(v) -%}{{ '{:,.0f}'.format(v or 0).replace(',', ' ') }}{%- endmacro %}
+{% macro quantity(v) -%}{{ ('{:,.3f}'.format(v or 0).rstrip('0').rstrip('.')).replace(',', ' ') }}{%- endmacro %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/warehouse.css') }}">
+
+<div class="wh-page">
+  <header class="wh-header">
+    <div class="wh-title">
+      <span class="wh-kicker">OMBOR</span>
+      <h1>Ombor qoldig‘i</h1>
+      <p>Joriy qoldiq, kirim tannarxi va sotuv qiymatini bir joyda nazorat qiling.</p>
+    </div>
+
+    <div class="wh-header-actions">
+      <a class="wh-btn wh-btn-secondary" href="{{ url_for('settings_products') }}">
+        Mahsulotlar
+      </a>
+      <a class="wh-btn wh-btn-primary" href="{{ url_for('purchase_new') }}">
+        <span aria-hidden="true">+</span>
+        Kirim qilish
+      </a>
+    </div>
+  </header>
+
+  <section class="wh-metrics" aria-label="Ombor ko‘rsatkichlari">
+    <article class="wh-metric">
+      <span>Mahsulot turlari</span>
+      <strong>{{ metrics.product_count }}</strong>
+      <small>Faol mahsulotlar</small>
+    </article>
+
+    <article class="wh-metric">
+      <span>Omborda mavjud</span>
+      <strong>{{ metrics.in_stock_count }}</strong>
+      <small>{{ metrics.out_stock_count }} ta mahsulot tugagan</small>
+    </article>
+
+    <article class="wh-metric">
+      <span>Qoldiq tannarxi</span>
+      <strong>{{ money(metrics.cost_value) }}</strong>
+      <small>so‘m · kirim qiymatida</small>
+    </article>
+
+    <article class="wh-metric wh-metric-accent">
+      <span>Sotuv qiymati</span>
+      <strong>{{ money(metrics.sale_value) }}</strong>
+      <small>
+        Farq: {{ money(metrics.sale_value - metrics.cost_value) }} so‘m
+      </small>
+    </article>
+  </section>
+
+  <section class="wh-card">
+    <form class="wh-filters" method="get">
+      <label class="wh-field wh-search-field">
+        <span>Qidirish</span>
+        <div class="wh-search-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5"></circle>
+            <path d="m16 16 5 5"></path>
+          </svg>
+          <input
+            type="search"
+            name="q"
+            value="{{ search }}"
+            placeholder="Mahsulot nomi yoki shtrix-kod">
+        </div>
+      </label>
+
+      <label class="wh-field">
+        <span>Kategoriya</span>
+        <select name="category">
+          <option value="0">Barcha kategoriyalar</option>
+          {% for c in cats %}
+            <option value="{{ c.id }}" {% if category == c.id %}selected{% endif %}>
+              {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="wh-field">
+        <span>Qoldiq holati</span>
+        <select name="stock">
+          <option value="all" {% if stock_status == 'all' %}selected{% endif %}>Barchasi</option>
+          <option value="in" {% if stock_status == 'in' %}selected{% endif %}>Omborda bor</option>
+          <option value="out" {% if stock_status == 'out' %}selected{% endif %}>Tugagan</option>
+        </select>
+      </label>
+
+      <button class="wh-btn wh-filter-btn" type="submit">Ko‘rsatish</button>
+    </form>
+
+    <div class="wh-list-head">
+      <div>
+        <h2>Mahsulot qoldiqlari</h2>
+        <p>Natija: {{ rows|length }} ta mahsulot</p>
+      </div>
+    </div>
+
+    {% if rows %}
+      <div class="wh-table-wrap">
+        <table class="wh-table">
+          <thead>
+            <tr>
+              <th>Mahsulot</th>
+              <th>Kategoriya</th>
+              <th class="num">Qoldiq</th>
+              <th class="num">Kirim narxi</th>
+              <th class="num">Sotuv narxi</th>
+              <th class="num">Qoldiq tannarxi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in rows %}
+              <tr>
+                <td data-label="Mahsulot">
+                  <strong>{{ p.name }}</strong>
+                </td>
+                <td data-label="Kategoriya">
+                  <span class="wh-category">{{ p.category }}</span>
+                </td>
+                <td class="num" data-label="Qoldiq">
+                  <span class="wh-stock {% if p.stock_qty > 0 %}is-in{% else %}is-out{% endif %}">
+                    {{ quantity(p.stock_qty) }}
+                  </span>
+                </td>
+                <td class="num" data-label="Kirim narxi">
+                  {{ money(p.avg_cost) }}
+                </td>
+                <td class="num" data-label="Sotuv narxi">
+                  {{ money(p.sell_price_default_uzs) }}
+                </td>
+                <td class="num wh-value" data-label="Qoldiq tannarxi">
+                  {{ money((p.stock_qty or 0) * (p.avg_cost or 0)) }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="wh-empty">
+        <div class="wh-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5h16v14H4z"></path>
+            <path d="M4 10h16M9 10v9M15 10v9"></path>
+          </svg>
+        </div>
+        <strong>Mahsulot topilmadi</strong>
+        <p>Qidiruv yoki filtrlarni o‘zgartirib qayta tekshiring.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
