@@ -3,7 +3,7 @@
 {% macro quantity(v) -%}{{ ('{:,.3f}'.format(v or 0).rstrip('0').rstrip('.')).replace(',', ' ') }}{%- endmacro %}
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/purchases.css') }}">
-<div class="pw">
+<div class="pw{% if active == 'new' %} pw-entry-page{% endif %}">
   <header class="pw-header">
     <div><span class="pw-eyebrow">{% block eyebrow %}KIRIM{% endblock %}</span><h1>{% block heading %}Kirimlar{% endblock %}</h1><p>{% block subtitle %}Tovar kirim hujjatlari{% endblock %}</p></div>
     {% if active == 'new' %}
