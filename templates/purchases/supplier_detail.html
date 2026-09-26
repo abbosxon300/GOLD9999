@@ -62,7 +62,7 @@
           <tbody>
             {% for r in ledger %}
               <tr>
-                <td>{{ r.date }}</td>
+                <td>{{ r.date[8:10] }}.{{ r.date[5:7] }}.{{ r.date[:4] }}</td>
                 <td>
                   {% if r.kind == 'purchase' %}
                     <span class="pw-ledger-type purchase">Kirim</span>
@@ -106,7 +106,7 @@
               <tr>
                 <td>
                   <a class="pw-doc-link" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">Kirim #{{ r.id }}</a>
-                  <small>{{ r.purchase_date }}{% if r.reference %} · {{ r.reference }}{% endif %}</small>
+                  <small>{{ r.purchase_date[8:10] }}.{{ r.purchase_date[5:7] }}.{{ r.purchase_date[:4] }}{% if r.reference %} · {{ r.reference }}{% endif %}</small>
                 </td>
                 <td>{{ r.item_count }} tur</td>
                 <td class="num">{{ money(r.total_uzs) }}</td>
@@ -139,7 +139,7 @@
           <tbody>
             {% for p in payments %}
               <tr>
-                <td>{{ p.payment_date }}</td>
+                <td>{{ p.payment_date[8:10] }}.{{ p.payment_date[5:7] }}.{{ p.payment_date[:4] }}</td>
                 <td><a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a></td>
                 <td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td>
                 <td>{{ p.note or '—' }}</td>
