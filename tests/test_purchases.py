@@ -825,3 +825,42 @@ def test_purchase_v2_update_and_void_sync_as_single_aggregate(db):
     assert row["is_void"] == 1
     assert row["sync_version"] == 3
     remote.close()
+
+
+def test_sidebar_module_states_and_warehouse_ui(web):
+    app, client, path = web
+
+    kirim = client.get("/kpi")
+    assert kirim.status_code == 200
+    assert 'class="pw-metrics"' not in kirim.text
+    assert "Kirim hujjatlari" in kirim.text
+
+    warehouse = client.get("/kpi/stock")
+    assert warehouse.status_code == 200
+    assert "css/warehouse.css" in warehouse.text
+    assert "Qoldiq tannarxi" in warehouse.text
+    assert "Sotuv qiymati" in warehouse.text
+
+    warehouse_link = re.search(
+        r'href="/kpi/stock"\s+class="([^"]+)"',
+        warehouse.text,
+    )
+    kirim_link = re.search(
+        r'href="/kpi"\s+class="([^"]+)"',
+        warehouse.text,
+    )
+    assert warehouse_link and "active" in warehouse_link.group(1).split()
+    assert kirim_link and "active" not in kirim_link.group(1).split()
+
+    suppliers = client.get("/kpi/suppliers")
+    assert suppliers.status_code == 200
+    supplier_link = re.search(
+        r'href="/kpi/suppliers"\s+class="([^"]+)"',
+        suppliers.text,
+    )
+    kirim_link = re.search(
+        r'href="/kpi"\s+class="([^"]+)"',
+        suppliers.text,
+    )
+    assert supplier_link and "active" in supplier_link.group(1).split()
+    assert kirim_link and "active" not in kirim_link.group(1).split()
