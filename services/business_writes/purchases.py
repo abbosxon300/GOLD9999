@@ -70,6 +70,8 @@ def _existing(db, kind, tenant_id, entity_uuid, payload):
         f"SELECT * FROM {TABLES[kind]} WHERE entity_uuid=?", (entity_uuid,)
     ).fetchone()
     if row:
+        if kind == "purchase" and "is_void" in row.keys() and int(row["is_void"] or 0):
+            raise ValueError("Bu kirim bekor qilingan")
         if row["tenant_id"] != tenant_id or row["payload_json"] != encoded(payload):
             raise ValueError("Bu identifikator bilan boshqa ma’lumot avval saqlangan")
         return row["id"]
@@ -537,6 +539,98 @@ def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, ta
 
 
 
+
+def void_purchase(
+    db,
+    *,
+    tenant_id,
+    entity_uuid,
+    expected_version,
+    target_version=None,
+    replicate=True,
+):
+    """Reverse an unpaid purchase from stock while retaining an audit tombstone."""
+    entity_uuid = uid(entity_uuid)
+    try:
+        expected_version = int(expected_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirim versiyasi noto‘g‘ri") from None
+    if expected_version < 1:
+        raise ValueError("Kirim versiyasi noto‘g‘ri")
+    if target_version is None:
+        target_version = expected_version + 1
+    try:
+        target_version = int(target_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirimning yangi versiyasi noto‘g‘ri") from None
+    if target_version <= expected_version:
+        raise ValueError("Kirimning yangi versiyasi eski versiyadan katta bo‘lishi kerak")
+
+    purchase = db.execute(
+        "SELECT * FROM purchases WHERE entity_uuid=? AND tenant_id=?",
+        (entity_uuid, tenant_id),
+    ).fetchone()
+    if not purchase:
+        raise ValueError("Kirim topilmadi")
+    if int(purchase["sync_version"]) != expected_version:
+        raise ValueError("Kirim boshqa qurilmada o‘zgargan. Sahifani yangilang")
+    if int(purchase["is_void"] or 0):
+        raise ValueError("Kirim allaqachon bekor qilingan")
+
+    payment_count = db.execute(
+        "SELECT COUNT(*) FROM purchase_payments WHERE purchase_id=?",
+        (purchase["id"],),
+    ).fetchone()[0]
+    if payment_count:
+        raise ValueError(
+            "To‘lov yozilgan kirimni o‘chirib bo‘lmaydi. Avval to‘lovni tuzatish kerak"
+        )
+
+    rows = db.execute(
+        "SELECT * FROM purchase_items WHERE purchase_id=? AND tenant_id=? ORDER BY id",
+        (purchase["id"], tenant_id),
+    ).fetchall()
+    original_payload = json.loads(purchase["payload_json"])
+    wire_payload = dict(original_payload)
+    wire_payload["voided"] = True
+
+    with business_transaction(db):
+        for row in rows:
+            qty = float(row["qty"])
+            cursor = db.execute(
+                """UPDATE products SET stock_qty=COALESCE(stock_qty,0)-?
+                WHERE id=? AND COALESCE(stock_qty,0)+1e-9>=?""",
+                (qty, row["product_id"], qty),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Bu kirimdagi tovar ishlatilgan. Kirimni o‘chirish uchun omborda qoldiq yetarli emas"
+                )
+            db.execute("DELETE FROM purchase_items WHERE id=?", (row["id"],))
+            db.execute(
+                "DELETE FROM inventory_moves WHERE id=?",
+                (row["inventory_move_id"],),
+            )
+
+        db.execute(
+            """UPDATE purchases
+            SET is_void=1,voided_at=CURRENT_TIMESTAMP,sync_version=?
+            WHERE id=?""",
+            (target_version, purchase["id"]),
+        )
+        if replicate:
+            _queue(
+                db,
+                "purchase",
+                entity_uuid,
+                wire_payload,
+                operation="update",
+                sync_version=target_version,
+            )
+        return purchase["id"]
+
+
+
 def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
     entity_uuid = uid(entity_uuid)
     if not isinstance(payload, dict):
@@ -556,7 +650,7 @@ def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
             return existing
         purchase = db.execute(
             """SELECT p.*, COALESCE((SELECT SUM(amount_uzs) FROM purchase_payments pp WHERE pp.purchase_id=p.id),0) paid
-            FROM purchases p WHERE entity_uuid=? AND tenant_id=?""",
+            FROM purchases p WHERE entity_uuid=? AND tenant_id=? AND COALESCE(p.is_void,0)=0""",
             (payload["purchase_uuid"], tenant_id),
         ).fetchone()
         if not purchase:
