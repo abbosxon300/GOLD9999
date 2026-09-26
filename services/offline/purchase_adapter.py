@@ -1,73 +1,157 @@
-"""Purchase replication reuses movement UUIDs, never device-local IDs."""
+"""Purchase replication owns its stock receipts as one aggregate snapshot."""
 
 import json
 
 from services.business_writes.purchases import (
-    create_supplier,
-    save_purchase,
-    pay_purchase,
-    update_purchase,
     TABLES,
+    create_supplier,
+    encoded,
+    pay_purchase,
+    save_purchase,
+    update_purchase,
 )
 from services.offline.remote_applier import (
-    register_remote_handler,
-    RemoteApplyResult,
     InvalidRemotePayloadError,
+    RemoteApplyResult,
+    StaleRemoteChangeError,
+    register_remote_handler,
 )
+
+
+def _tenant(context):
+    if context.tenant_id is not None:
+        return context.tenant_id
+    tenants = context.connection.execute(
+        "SELECT id FROM tenants WHERE is_active=1"
+    ).fetchall()
+    if len(tenants) != 1:
+        raise InvalidRemotePayloadError("Sinxronlash uchun firma aniqlanmadi")
+    return tenants[0][0]
+
+
+def _clean_payload(context):
+    payload = dict(context.payload)
+    payload.pop("sync_version", None)
+    return payload
+
+
+def _purchase_snapshot(context, tenant_id):
+    db = context.connection
+    payload = _clean_payload(context)
+    existing = db.execute(
+        "SELECT id,payload_json,sync_version FROM purchases WHERE entity_uuid=? AND tenant_id=?",
+        (context.entity_uuid, tenant_id),
+    ).fetchone()
+
+    # A fresh device can receive the current v2/v3 snapshot directly.
+    if existing is None:
+        local_id = save_purchase(
+            db,
+            tenant_id=tenant_id,
+            entity_uuid=context.entity_uuid,
+            payload=payload,
+            replicate=False,
+        )
+        if context.remote_version > 1:
+            db.execute(
+                "UPDATE purchases SET sync_version=? WHERE id=?",
+                (context.remote_version, local_id),
+            )
+            db.execute(
+                """UPDATE inventory_moves SET sync_version=?
+                WHERE id IN (
+                    SELECT inventory_move_id FROM purchase_items WHERE purchase_id=?
+                )""",
+                (context.remote_version, local_id),
+            )
+        return RemoteApplyResult(
+            context.entity_type,
+            context.entity_uuid,
+            local_id,
+            None,
+            context.remote_version,
+            True,
+            True,
+        )
+
+    current_version = int(existing["sync_version"])
+    if context.remote_version == current_version:
+        if existing["payload_json"] != encoded(payload):
+            raise StaleRemoteChangeError(
+                "Kirim bir xil versiya bilan boshqa ma’lumot yubordi"
+            )
+        return RemoteApplyResult(
+            context.entity_type,
+            context.entity_uuid,
+            int(existing["id"]),
+            current_version,
+            current_version,
+            False,
+            False,
+        )
+
+    local_id = update_purchase(
+        db,
+        tenant_id=tenant_id,
+        entity_uuid=context.entity_uuid,
+        payload=payload,
+        expected_version=current_version,
+        target_version=context.remote_version,
+        replicate=False,
+    )
+    return RemoteApplyResult(
+        context.entity_type,
+        context.entity_uuid,
+        local_id,
+        current_version,
+        context.remote_version,
+        False,
+        True,
+    )
 
 
 def apply_purchase_change(context):
     db = context.connection
-    tenant_id = context.tenant_id
-    if tenant_id is None:
-        # A desktop has one local tenant. Never guess in a multi-tenant database.
-        tenants = db.execute("SELECT id FROM tenants WHERE is_active=1").fetchall()
-        if len(tenants) != 1:
-            raise InvalidRemotePayloadError("Sinxronlash uchun firma aniqlanmadi")
-        tenant_id = tenants[0][0]
-    if context.entity_type != "purchase" and context.remote_version != 1:
+    tenant_id = _tenant(context)
+
+    if context.entity_type == "purchase":
+        try:
+            return _purchase_snapshot(context, tenant_id)
+        except (ValueError, TypeError) as exc:
+            raise InvalidRemotePayloadError(str(exc)) from exc
+
+    if context.remote_version != 1:
         raise InvalidRemotePayloadError("Bu yozuv turi o‘zgarmas")
-    if context.entity_type == "purchase" and context.remote_version < 1:
-        raise InvalidRemotePayloadError("Kirim versiyasi noto‘g‘ri")
+
+    payload = _clean_payload(context)
     try:
         if context.entity_type == "supplier":
             local_id = create_supplier(
                 db,
                 tenant_id=tenant_id,
                 entity_uuid=context.entity_uuid,
-                name=context.payload.get("name"),
-                phone=context.payload.get("phone", ""),
-                replicate=False,
-            )
-        elif context.entity_type == "purchase" and context.operation == "update":
-            if context.existing is None:
-                raise InvalidRemotePayloadError("Yangilanadigan kirim topilmadi")
-            local_id = update_purchase(
-                db,
-                tenant_id=tenant_id,
-                entity_uuid=context.entity_uuid,
-                payload=dict(context.payload),
-                expected_version=context.remote_version - 1,
+                name=payload.get("name"),
+                phone=payload.get("phone", ""),
                 replicate=False,
             )
         else:
-            save = save_purchase if context.entity_type == "purchase" else pay_purchase
-            local_id = save(
+            local_id = pay_purchase(
                 db,
                 tenant_id=tenant_id,
                 entity_uuid=context.entity_uuid,
-                payload=dict(context.payload),
+                payload=payload,
                 replicate=False,
             )
     except (ValueError, TypeError) as exc:
         raise InvalidRemotePayloadError(str(exc)) from exc
+
     created = context.existing is None
     return RemoteApplyResult(
         context.entity_type,
         context.entity_uuid,
         local_id,
-        None if created else context.existing.sync_version,
-        context.remote_version,
+        None if created else 1,
+        1,
         created,
         created,
     )
@@ -82,14 +166,16 @@ def purchase_changes(db, device_uuid, tenant_id=None):
             f"SELECT * FROM {table} WHERE (? IS NULL OR tenant_id=?) ORDER BY id",
             (tenant_id, tenant_id),
         ):
+            version = int(row["sync_version"])
             changes.append(
                 _wire_change(
                     entity_type=kind,
                     entity_uuid=row["entity_uuid"],
                     payload=json.loads(row["payload_json"]),
-                    version=row["sync_version"],
+                    version=version,
                     device_uuid=device_uuid,
                     occurred_at=row["created_at"],
+                    operation=("update" if kind == "purchase" and version > 1 else "create"),
                 )
             )
     return changes
