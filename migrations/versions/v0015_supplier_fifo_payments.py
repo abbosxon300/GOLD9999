@@ -20,6 +20,7 @@ def upgrade(db):
             sync_version INTEGER NOT NULL DEFAULT 1,
             payload_json TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(id, tenant_id),
             FOREIGN KEY(supplier_id, tenant_id) REFERENCES suppliers(id, tenant_id),
             CHECK((method='cash' AND cash_move_id IS NOT NULL AND click_move_id IS NULL)
                OR (method='click' AND click_move_id IS NOT NULL AND cash_move_id IS NULL))
@@ -28,9 +29,11 @@ def upgrade(db):
         """CREATE TABLE supplier_payment_allocations (
             id INTEGER PRIMARY KEY,
             tenant_id INTEGER NOT NULL,
-            supplier_payment_id INTEGER NOT NULL REFERENCES supplier_payments(id) ON DELETE RESTRICT,
+            supplier_payment_id INTEGER NOT NULL,
             purchase_id INTEGER NOT NULL,
             amount_uzs REAL NOT NULL CHECK(amount_uzs > 0),
+            FOREIGN KEY(supplier_payment_id, tenant_id)
+                REFERENCES supplier_payments(id, tenant_id) ON DELETE RESTRICT,
             FOREIGN KEY(purchase_id, tenant_id) REFERENCES purchases(id, tenant_id),
             UNIQUE(supplier_payment_id,purchase_id)
         )""",
