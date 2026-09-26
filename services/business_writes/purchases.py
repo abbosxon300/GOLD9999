@@ -304,7 +304,7 @@ def save_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
 
 
 
-def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, replicate=True):
+def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, target_version=None, replicate=True):
     """Atomically edit a purchase and apply only the resulting stock delta."""
     entity_uuid = uid(entity_uuid)
     try:
@@ -313,6 +313,14 @@ def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, re
         raise ValueError("Kirim versiyasi noto‘g‘ri") from None
     if expected_version < 1:
         raise ValueError("Kirim versiyasi noto‘g‘ri")
+    if target_version is None:
+        target_version = expected_version + 1
+    try:
+        target_version = int(target_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirimning yangi versiyasi noto‘g‘ri") from None
+    if target_version <= expected_version:
+        raise ValueError("Kirimning yangi versiyasi eski versiyadan katta bo‘lishi kerak")
     if not isinstance(payload, dict):
         raise ValueError("Kirim ma’lumoti noto‘g‘ri")
 
@@ -410,7 +418,7 @@ def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, re
     }
 
     with business_transaction(db):
-        new_version = expected_version + 1
+        new_version = target_version
 
         # Removed products: reduce only the stock contributed by this edit.
         for product_id, old in old_by_product.items():
