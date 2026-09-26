@@ -355,6 +355,68 @@ def test_http_workflow_and_xss(web):
     conn.close()
 
 
+
+def test_supplier_cabinet_v2_and_kirim_preselection(web):
+    app, client, path = web
+    csrf = token_from(client)
+
+    supplier_response = client.post(
+        "/kpi/suppliers",
+        data={
+            "csrf_token": csrf,
+            "entity_uuid": str(uuid4()),
+            "name": "Donyor",
+            "phone": "+998947289999",
+        },
+        headers={"Accept": "application/json"},
+    )
+    assert supplier_response.status_code == 201
+    supplier_id = supplier_response.json["id"]
+
+    purchase_response = client.post(
+        "/kpi/new",
+        data={
+            "csrf_token": csrf,
+            "entity_uuid": str(uuid4()),
+            "supplier_id": supplier_id,
+            "purchase_date": "2026-09-27",
+            "reference": "SUP-1",
+            "note": "",
+            "items": json.dumps(
+                [{"product_id": 11, "qty": 2, "unit_cost_uzs": 45000}]
+            ),
+        },
+    )
+    assert purchase_response.status_code == 302
+
+    cabinet = client.get(f"/kpi/suppliers/{supplier_id}")
+    assert cabinet.status_code == 200
+    assert cabinet.text.count("+ Yangi kirim") == 1
+    assert 'id="supplier-pay-open"' in cabinet.text
+    assert 'id="supplier-pay-dialog"' in cabinet.text
+    assert 'data-supplier-tab="turnover"' in cabinet.text
+    assert 'data-supplier-tab="purchases"' in cabinet.text
+    assert 'data-supplier-tab="payments"' in cabinet.text
+    assert "Aylanma" in cabinet.text
+    assert "Balans" in cabinet.text
+    assert "SUP-1" in cabinet.text
+    assert "20260927_supplier_v2" in cabinet.text
+
+    entry = client.get(f"/kpi/new?supplier={supplier_id}")
+    assert entry.status_code == 200
+    assert re.search(
+        rf'<option\s+value="{supplier_id}"\s+selected>',
+        entry.text,
+    )
+
+    script = client.get("/static/js/supplier_detail.js")
+    assert script.status_code == 200
+    body = script.get_data(as_text=True)
+    assert "querySelectorAll('[data-supplier-tab]')" in body
+    assert "supplier-pay-dialog" in body
+    assert "To‘lov summasini kiriting." in body
+    assert "To‘lov kirim qarzidan oshmasligi kerak." in body
+
 def test_http_csrf_auth_and_cross_tenant(web):
     app, client, path = web
     csrf = token_from(client)

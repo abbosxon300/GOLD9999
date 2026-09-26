@@ -162,6 +162,13 @@ def register_kpi_routes(
             "items": [],
             "entity_uuid": str(uuid4()),
         }
+        if request.method == "GET":
+            supplier_id = parse_int(request.args.get("supplier"))
+            if supplier_id and q1(
+                "SELECT id FROM suppliers WHERE id=? AND tenant_id=?",
+                (supplier_id, tenant),
+            ):
+                initial["supplier_id"] = supplier_id
         error = None
         if request.method == "POST":
             check_csrf()
@@ -474,15 +481,52 @@ def register_kpi_routes(
         )
         total = round(sum(r["total_uzs"] for r in documents), 2)
         paid = round(sum(r["amount_uzs"] for r in payments), 2)
+        debt = round(total - paid, 2)
+
+        ledger = []
+        for row in documents:
+            ledger.append(
+                {
+                    "date": row["purchase_date"],
+                    "order": 0,
+                    "id": row["id"],
+                    "kind": "purchase",
+                    "purchase_id": row["id"],
+                    "reference": row["reference"],
+                    "debit": float(row["total_uzs"] or 0),
+                    "credit": 0.0,
+                }
+            )
+        for row in payments:
+            ledger.append(
+                {
+                    "date": row["payment_date"],
+                    "order": 1,
+                    "id": row["id"],
+                    "kind": "payment",
+                    "purchase_id": row["purchase_id"],
+                    "reference": row["reference"],
+                    "debit": 0.0,
+                    "credit": float(row["amount_uzs"] or 0),
+                }
+            )
+        ledger.sort(key=lambda r: (r["date"], r["order"], r["id"]))
+        running = 0.0
+        for row in ledger:
+            running = round(running + row["debit"] - row["credit"], 2)
+            row["balance"] = running
+        ledger.reverse()
+
         return page(
             "purchases/supplier_detail.html",
             active="suppliers",
             supplier=supplier,
             documents=documents,
             payments=payments,
+            ledger=ledger,
             total=total,
             paid=paid,
-            debt=round(total-paid, 2),
+            debt=debt,
             unpaid_documents=[
                 r for r in documents if r["total_uzs"] - r["paid"] > 0.005
             ],
