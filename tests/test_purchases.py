@@ -14,6 +14,7 @@ from services.business_writes.purchases import (
     prepare_purchase,
     save_purchase,
     pay_purchase,
+    pay_supplier,
     update_purchase,
     void_purchase,
 )
@@ -79,6 +80,20 @@ def payment(key, amount=50000, method="cash"):
     )
 
 
+def supplier_payment_payload(db, supplier_id, amount, method="cash", payment_date="2026-09-27"):
+    supplier_uuid = db.execute(
+        "SELECT entity_uuid FROM suppliers WHERE id=?",
+        (supplier_id,),
+    ).fetchone()[0]
+    return dict(
+        supplier_uuid=supplier_uuid,
+        payment_date=payment_date,
+        amount_uzs=amount,
+        method=method,
+        note="Supplier test",
+    )
+
+
 def test_purchase_stock_average_and_retry(db):
     doc, key, payload = purchase(db)
     assert (
@@ -96,6 +111,93 @@ def test_purchase_stock_average_and_retry(db):
     with pytest.raises(ValueError):
         save_purchase(db, tenant_id=1, entity_uuid=key, payload=changed)
     assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+
+
+def test_supplier_payment_fifo_one_cash_move_and_retry(db):
+    supplier_id = create_supplier(db, tenant_id=1, name="FIFO supplier")
+
+    first_uuid = str(uuid4())
+    first_payload = prepare_purchase(
+        db,
+        tenant_id=1,
+        supplier_id=supplier_id,
+        purchase_date="2026-09-25",
+        reference="F-1",
+        note="",
+        items=[{"product_id": 11, "qty": 2, "unit_cost_uzs": 50000}],
+        entity_uuid=first_uuid,
+    )
+    first_id = save_purchase(
+        db, tenant_id=1, entity_uuid=first_uuid, payload=first_payload
+    )
+
+    second_uuid = str(uuid4())
+    second_payload = prepare_purchase(
+        db,
+        tenant_id=1,
+        supplier_id=supplier_id,
+        purchase_date="2026-09-26",
+        reference="F-2",
+        note="",
+        items=[{"product_id": 12, "qty": 2, "unit_cost_uzs": 100000}],
+        entity_uuid=second_uuid,
+    )
+    second_id = save_purchase(
+        db, tenant_id=1, entity_uuid=second_uuid, payload=second_payload
+    )
+
+    token = str(uuid4())
+    payload = supplier_payment_payload(db, supplier_id, 150000)
+    payment_id = pay_supplier(
+        db, tenant_id=1, entity_uuid=token, payload=payload
+    )
+    assert pay_supplier(
+        db, tenant_id=1, entity_uuid=token, payload=payload
+    ) == payment_id
+
+    assert db.execute(
+        "SELECT COUNT(*) FROM supplier_payments"
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT COUNT(*) FROM cash_moves WHERE direction='OUT'"
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT SUM(amount_uzs) FROM cash_moves WHERE direction='OUT'"
+    ).fetchone()[0] == 150000
+
+    allocations = db.execute(
+        """SELECT purchase_id,amount_uzs
+        FROM supplier_payment_allocations
+        ORDER BY id"""
+    ).fetchall()
+    assert [(r["purchase_id"], r["amount_uzs"]) for r in allocations] == [
+        (first_id, 100000),
+        (second_id, 50000),
+    ]
+
+    with pytest.raises(ValueError, match="qarzdan oshmasin"):
+        pay_supplier(
+            db,
+            tenant_id=1,
+            entity_uuid=str(uuid4()),
+            payload=supplier_payment_payload(db, supplier_id, 151000),
+        )
+
+    with pytest.raises(ValueError, match="qarzdan oshmasin"):
+        pay_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=str(uuid4()),
+            payload=payment(second_uuid, 151000),
+        )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute(
+            "UPDATE cash_moves SET amount_uzs=1 "
+            "WHERE id=(SELECT cash_move_id FROM supplier_payments WHERE id=?)",
+            (payment_id,),
+        )
+    db.rollback()
 
 
 def test_payment_retry_overpay_and_cash_guard(db):
