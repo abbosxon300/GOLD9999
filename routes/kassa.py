@@ -56,8 +56,11 @@ def _ledger_context(
     owner = db.execute("SELECT tenant_id FROM users WHERE id=?", (session.get("user_id"),)).fetchone()
     tenant_id = owner[0] if owner else None
     link_column = "cash_move_id" if table == "cash_moves" else "click_move_id"
-    conditions = [f"NOT EXISTS(SELECT 1 FROM purchase_payments pp WHERE pp.{link_column}={table}.id AND (? IS NULL OR pp.tenant_id<>?))"]
-    params = [tenant_id, tenant_id]
+    conditions = [
+        f"NOT EXISTS(SELECT 1 FROM purchase_payments pp WHERE pp.{link_column}={table}.id AND (? IS NULL OR pp.tenant_id<>?))",
+        f"NOT EXISTS(SELECT 1 FROM supplier_payments sp WHERE sp.{link_column}={table}.id AND (? IS NULL OR sp.tenant_id<>?))",
+    ]
+    params = [tenant_id, tenant_id, tenant_id, tenant_id]
 
     if from_date:
         conditions.append("move_date >= ?")
@@ -305,6 +308,26 @@ def register_kassa_routes(
             flash("Bu to‘lov kirim hujjatiga bog‘langan.", "warning")
             return redirect(url_for("purchase_detail", purchase_id=purchase_payment["purchase_id"]))
 
+        supplier_payment = db.execute(
+            "SELECT supplier_id,tenant_id FROM supplier_payments WHERE cash_move_id=?",
+            (move_id,),
+        ).fetchone()
+        if supplier_payment:
+            owner = db.execute(
+                "SELECT tenant_id FROM users WHERE id=?",
+                (session.get("user_id"),),
+            ).fetchone()
+            if not owner or owner[0] != supplier_payment["tenant_id"]:
+                flash("Topilmadi", "danger")
+                return redirect(url_for("kassa"))
+            flash("Bu to‘lov yetkazib beruvchi hisobiga bog‘langan.", "warning")
+            return redirect(
+                url_for(
+                    "purchase_supplier_detail",
+                    supplier_id=supplier_payment["supplier_id"],
+                )
+            )
+
         if row.sale_id is not None:
             flash(
                 "Auto sale yozuvini "
@@ -368,6 +391,26 @@ def register_kassa_routes(
                 return redirect(url_for("kassa"))
             flash("Bu to‘lov kirim hujjatiga bog‘langan.", "warning")
             return redirect(url_for("purchase_detail", purchase_id=purchase_payment["purchase_id"]))
+
+        supplier_payment = db.execute(
+            "SELECT supplier_id,tenant_id FROM supplier_payments WHERE cash_move_id=?",
+            (move_id,),
+        ).fetchone()
+        if supplier_payment:
+            owner = db.execute(
+                "SELECT tenant_id FROM users WHERE id=?",
+                (session.get("user_id"),),
+            ).fetchone()
+            if not owner or owner[0] != supplier_payment["tenant_id"]:
+                flash("Topilmadi", "danger")
+                return redirect(url_for("kassa"))
+            flash("Bu to‘lov yetkazib beruvchi hisobiga bog‘langan.", "warning")
+            return redirect(
+                url_for(
+                    "purchase_supplier_detail",
+                    supplier_id=supplier_payment["supplier_id"],
+                )
+            )
 
         is_auto_sale = (
             row.sale_id is not None
