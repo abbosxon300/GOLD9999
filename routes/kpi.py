@@ -552,25 +552,86 @@ def register_kpi_routes(
         tenant = identity()
         search = request.args.get("q", "").strip()[:160]
         category = parse_int(request.args.get("category"))
-        rows = q(
-            """SELECT p.id,p.name,p.stock_qty,p.sell_price_default_uzs,c.name category,
-            COALESCE((SELECT SUM(m.qty*m.unit_cost_uzs)/NULLIF(SUM(m.qty),0) FROM inventory_moves m WHERE m.product_id=p.id AND m.move_type='IN'),0) avg_cost
-            FROM products p JOIN categories c ON c.id=p.category_id WHERE p.tenant_id=? AND c.tenant_id=? AND p.is_active=1
-            AND (?=0 OR p.category_id=?) AND (p.name LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.id AND b.tenant_id=? AND b.barcode=?))
+        stock_status = request.args.get("stock", "all")
+        if stock_status not in ("all", "in", "out"):
+            stock_status = "all"
+
+        all_rows = q(
+            """SELECT p.id,p.name,p.stock_qty,p.sell_price_default_uzs,
+            c.id category_id,c.name category,
+            COALESCE((
+                SELECT SUM(m.qty*m.unit_cost_uzs)/NULLIF(SUM(m.qty),0)
+                FROM inventory_moves m
+                WHERE m.product_id=p.id AND m.move_type='IN'
+            ),0) avg_cost,
+            COALESCE((
+                SELECT group_concat(b.barcode,' ')
+                FROM product_barcodes b
+                WHERE b.product_id=p.id AND b.tenant_id=p.tenant_id
+            ),'') barcodes
+            FROM products p
+            JOIN categories c ON c.id=p.category_id
+            WHERE p.tenant_id=? AND c.tenant_id=?
+              AND p.is_active=1 AND c.is_active=1
             ORDER BY c.sort_order,c.name,p.name""",
-            (tenant, tenant, category, category, f"%{search}%", tenant, search),
+            (tenant, tenant),
         )
+
+        needle = search.casefold()
+        rows = []
+        for row in all_rows:
+            stock_qty = float(row["stock_qty"] or 0)
+            if category and int(row["category_id"]) != category:
+                continue
+            if stock_status == "in" and stock_qty <= 0:
+                continue
+            if stock_status == "out" and stock_qty > 0:
+                continue
+            if needle and needle not in (
+                f"{row['name']} {row['category']} {row['barcodes']}".casefold()
+            ):
+                continue
+            rows.append(row)
+
+        metrics = {
+            "product_count": len(all_rows),
+            "in_stock_count": sum(
+                1 for row in all_rows if float(row["stock_qty"] or 0) > 0
+            ),
+            "out_stock_count": sum(
+                1 for row in all_rows if float(row["stock_qty"] or 0) <= 0
+            ),
+            "cost_value": round(
+                sum(
+                    float(row["stock_qty"] or 0) * float(row["avg_cost"] or 0)
+                    for row in all_rows
+                    if float(row["stock_qty"] or 0) > 0
+                ),
+                2,
+            ),
+            "sale_value": round(
+                sum(
+                    float(row["stock_qty"] or 0)
+                    * float(row["sell_price_default_uzs"] or 0)
+                    for row in all_rows
+                    if float(row["stock_qty"] or 0) > 0
+                ),
+                2,
+            ),
+        }
+
         cats = q(
             "SELECT id,name FROM categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order,name",
             (tenant,),
         )
         return page(
             "purchases/stock.html",
-            active="stock",
             rows=rows,
             cats=cats,
+            metrics=metrics,
             search=search,
             category=category,
+            stock_status=stock_status,
         )
 
     @app.route("/kpi/legacy")
