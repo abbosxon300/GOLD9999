@@ -24,6 +24,7 @@ from services.business_writes.purchases import (
     save_purchase,
     pay_purchase,
     update_purchase,
+    void_purchase,
     number,
 )
 
@@ -100,7 +101,7 @@ def register_kpi_routes(
         start, end = request.args.get("from", ""), request.args.get("to", "")
         status = request.args.get("status", "")
         page_no = max(1, parse_int(request.args.get("page"), 1))
-        clauses, params = ["p.tenant_id=?"], [tenant]
+        clauses, params = ["p.tenant_id=?", "COALESCE(p.is_void,0)=0"], [tenant]
         if search:
             clauses.append(
                 "(s.name LIKE ? OR p.reference LIKE ? OR CAST(p.id AS TEXT)=?)"
@@ -237,7 +238,7 @@ def register_kpi_routes(
         tenant = identity()
         row = q1(
             """SELECT p.*,s.name supplier_name,s.phone FROM purchases p JOIN suppliers s ON s.id=p.supplier_id
-            WHERE p.id=? AND p.tenant_id=?""",
+            WHERE p.id=? AND p.tenant_id=? AND COALESCE(p.is_void,0)=0""",
             (purchase_id, tenant),
         )
         if not row:
@@ -272,7 +273,7 @@ def register_kpi_routes(
         doc = q1(
             """SELECT p.*,s.name supplier_name FROM purchases p
             JOIN suppliers s ON s.id=p.supplier_id
-            WHERE p.id=? AND p.tenant_id=?""",
+            WHERE p.id=? AND p.tenant_id=? AND COALESCE(p.is_void,0)=0""",
             (purchase_id, tenant),
         )
         if not doc:
@@ -349,6 +350,37 @@ def register_kpi_routes(
             purchase_id=purchase_id,
         ), (422 if error else 200)
 
+    @app.post("/kpi/documents/<int:purchase_id>/void")
+    @login_required
+    @admin_required
+    def purchase_void(purchase_id):
+        tenant = identity()
+        check_csrf()
+        doc = q1(
+            """SELECT entity_uuid,sync_version FROM purchases
+            WHERE id=? AND tenant_id=? AND COALESCE(is_void,0)=0""",
+            (purchase_id, tenant),
+        )
+        if not doc:
+            abort(404)
+        try:
+            void_purchase(
+                get_db(),
+                tenant_id=tenant,
+                entity_uuid=doc["entity_uuid"],
+                expected_version=request.form.get("expected_version"),
+            )
+            flash("Kirim bekor qilindi. Ombor va yetkazuvchi hisobi qayta hisoblandi.", "success")
+            return redirect(url_for("kpi"))
+        except (ValueError, sqlite3.Error) as exc:
+            if isinstance(exc, sqlite3.Error):
+                app.logger.exception("Purchase void failed")
+            flash(
+                str(exc) if isinstance(exc, ValueError) else "Kirim bekor qilinmadi",
+                "danger",
+            )
+            return redirect(url_for("purchase_detail", purchase_id=purchase_id))
+
     @app.post("/kpi/documents/<int:purchase_id>/pay")
     @login_required
     @admin_required
@@ -356,7 +388,7 @@ def register_kpi_routes(
         tenant = identity()
         check_csrf()
         doc = q1(
-            "SELECT entity_uuid FROM purchases WHERE id=? AND tenant_id=?",
+            "SELECT entity_uuid FROM purchases WHERE id=? AND tenant_id=? AND COALESCE(is_void,0)=0",
             (purchase_id, tenant),
         )
         if not doc:
@@ -413,8 +445,15 @@ def register_kpi_routes(
             return redirect(url_for("purchase_suppliers"))
         rows = q(
             """SELECT s.*, COALESCE(d.total,0) total,COALESCE(pay.paid,0) paid,COALESCE(d.count,0) count
-            FROM suppliers s LEFT JOIN (SELECT supplier_id,SUM(total_uzs) total,COUNT(*) count FROM purchases GROUP BY supplier_id) d ON d.supplier_id=s.id
-            LEFT JOIN (SELECT p.supplier_id,SUM(pp.amount_uzs) paid FROM purchase_payments pp JOIN purchases p ON p.id=pp.purchase_id GROUP BY p.supplier_id) pay ON pay.supplier_id=s.id
+            FROM suppliers s LEFT JOIN (
+                SELECT supplier_id,SUM(total_uzs) total,COUNT(*) count
+                FROM purchases WHERE COALESCE(is_void,0)=0 GROUP BY supplier_id
+            ) d ON d.supplier_id=s.id
+            LEFT JOIN (
+                SELECT p.supplier_id,SUM(pp.amount_uzs) paid
+                FROM purchase_payments pp JOIN purchases p ON p.id=pp.purchase_id
+                WHERE COALESCE(p.is_void,0)=0 GROUP BY p.supplier_id
+            ) pay ON pay.supplier_id=s.id
             WHERE s.tenant_id=? ORDER BY s.name,s.id""",
             (tenant,),
         )
@@ -441,13 +480,15 @@ def register_kpi_routes(
             (SELECT COUNT(*) FROM purchase_items i WHERE i.purchase_id=p.id) item_count
             FROM purchases p
             LEFT JOIN (SELECT purchase_id,SUM(amount_uzs) paid FROM purchase_payments GROUP BY purchase_id) pay ON pay.purchase_id=p.id
-            WHERE p.tenant_id=? AND p.supplier_id=? ORDER BY p.purchase_date DESC,p.id DESC""",
+            WHERE p.tenant_id=? AND p.supplier_id=? AND COALESCE(p.is_void,0)=0
+            ORDER BY p.purchase_date DESC,p.id DESC""",
             (tenant, supplier_id),
         )
         payments = q(
             """SELECT pp.*,p.id purchase_id,p.reference FROM purchase_payments pp
             JOIN purchases p ON p.id=pp.purchase_id
-            WHERE pp.tenant_id=? AND p.supplier_id=? ORDER BY pp.payment_date DESC,pp.id DESC""",
+            WHERE pp.tenant_id=? AND p.supplier_id=? AND COALESCE(p.is_void,0)=0
+            ORDER BY pp.payment_date DESC,pp.id DESC""",
             (tenant, supplier_id),
         )
         total = round(sum(r["total_uzs"] for r in documents), 2)
@@ -461,7 +502,48 @@ def register_kpi_routes(
             total=total,
             paid=paid,
             debt=round(total-paid, 2),
+            unpaid_documents=[
+                r for r in documents if r["total_uzs"] - r["paid"] > 0.005
+            ],
+            payment_uuid=str(uuid4()),
         )
+
+    @app.post("/kpi/suppliers/<int:supplier_id>/pay")
+    @login_required
+    @admin_required
+    def purchase_supplier_pay(supplier_id):
+        tenant = identity()
+        check_csrf()
+        purchase_id = parse_int(request.form.get("purchase_id"))
+        doc = q1(
+            """SELECT id,entity_uuid FROM purchases
+            WHERE id=? AND supplier_id=? AND tenant_id=? AND COALESCE(is_void,0)=0""",
+            (purchase_id, supplier_id, tenant),
+        )
+        if not doc:
+            abort(404)
+        try:
+            pay_purchase(
+                get_db(),
+                tenant_id=tenant,
+                entity_uuid=request.form.get("entity_uuid"),
+                payload={
+                    "purchase_uuid": doc["entity_uuid"],
+                    "payment_date": request.form.get("payment_date"),
+                    "amount_uzs": request.form.get("amount_uzs"),
+                    "method": request.form.get("method"),
+                    "note": request.form.get("note", ""),
+                },
+            )
+            flash("Yetkazib beruvchiga to‘lov saqlandi", "success")
+        except (ValueError, sqlite3.Error) as exc:
+            if isinstance(exc, sqlite3.Error):
+                app.logger.exception("Supplier payment failed")
+            flash(
+                str(exc) if isinstance(exc, ValueError) else "To‘lov saqlanmadi",
+                "danger",
+            )
+        return redirect(url_for("purchase_supplier_detail", supplier_id=supplier_id))
 
     @app.route("/kpi/stock")
     @login_required
