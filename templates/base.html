@@ -87,7 +87,7 @@
       {% if session.get("role") == "admin" %}
       <a
         href="{{ url_for('kpi') }}"
-        class="sidebar-link {% if request.path.startswith('/kpi') %}active{% endif %}"
+        class="sidebar-link {% if request.path == '/kpi' or request.path.startswith('/kpi/new') or request.path.startswith('/kpi/documents') or request.path.startswith('/kpi/legacy') %}active{% endif %}"
         title="Kirim"
       >
         <span class="sidebar-icon">
@@ -100,23 +100,35 @@
         <span class="sidebar-label">Kirim</span>
       </a>
 
-    <a
-      class="sidebar-item {% if request.path == '/kpi/stock' %}active{% endif %}"
-      href="{{ url_for('purchase_stock') }}"
-      title="Ombor"
-    >
-      <span class="sidebar-icon">▦</span>
-      <span class="sidebar-label">Ombor</span>
-    </a>
+      <a
+        href="{{ url_for('purchase_stock') }}"
+        class="sidebar-link {% if request.path == '/kpi/stock' %}active{% endif %}"
+        title="Ombor"
+      >
+        <span class="sidebar-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5h16v14H4z"/>
+            <path d="M4 10h16M9 10v9M15 10v9"/>
+          </svg>
+        </span>
+        <span class="sidebar-label">Ombor</span>
+      </a>
 
-    <a
-      class="sidebar-item {% if request.path.startswith('/kpi/suppliers') %}active{% endif %}"
-      href="{{ url_for('purchase_suppliers') }}"
-      title="Yetkazib beruvchilar"
-    >
-      <span class="sidebar-icon">⇄</span>
-      <span class="sidebar-label">Yetkazib beruvchilar</span>
-    </a>
+      <a
+        href="{{ url_for('purchase_suppliers') }}"
+        class="sidebar-link {% if request.path.startswith('/kpi/suppliers') %}active{% endif %}"
+        title="Yetkazib beruvchilar"
+      >
+        <span class="sidebar-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 6h11v10H3z"/>
+            <path d="M14 9h3l4 4v3h-7z"/>
+            <circle cx="7" cy="18" r="2"/>
+            <circle cx="17" cy="18" r="2"/>
+          </svg>
+        </span>
+        <span class="sidebar-label">Yetkazib beruvchilar</span>
+      </a>
 
       <a
         href="{{ url_for('reports') }}"
@@ -392,7 +404,7 @@
 
   {% if session.get("role") == "admin" %}
   <a
-    class="bn-item {% if request.path.startswith('/kpi') %}active{% endif %}"
+    class="bn-item {% if request.path == '/kpi' or request.path.startswith('/kpi/new') or request.path.startswith('/kpi/documents') or request.path.startswith('/kpi/legacy') %}active{% endif %}"
     href="{{ url_for('kpi') }}"
   >
     <span class="bn-ico">
@@ -418,7 +430,7 @@
 
   <button
     type="button"
-    class="bn-item bn-more-button"
+    class="bn-item bn-more-button {% if request.path == '/kpi/stock' or request.path.startswith('/kpi/suppliers') or request.path.startswith('/settings') %}active{% endif %}"
     id="mobileMoreButton"
   >
     <span class="bn-more-dots">•••</span>
@@ -433,6 +445,8 @@
 <div class="mobile-sheet" id="mobileSheet">
   <div class="mobile-sheet-card">
 
+    <a href="{{ url_for('purchase_stock') }}">Ombor</a>
+    <a href="{{ url_for('purchase_suppliers') }}">Yetkazib beruvchilar</a>
     <a href="{{ url_for('settings_agents') }}">Xodimlar</a>
     <a href="{{ url_for('settings_products') }}">Mahsulotlar</a>
     <a href="{{ url_for('settings_categories') }}">Kategoriyalar</a>
