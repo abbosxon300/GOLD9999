@@ -12,6 +12,18 @@
   let cart = [], results = [], selected = -1, draftTimer, submitting = false, changed = false;
   const draftKey = data.draftKey;
   const successKey = `${draftKey}:submitted`;
+  function setFieldError(id, message) {
+    const node = $(id);
+    if (!node) return;
+    node.textContent = message || '';
+    node.hidden = !message;
+  }
+  function clearEntryErrors() {
+    setFieldError('pw-supplier-select-error', '');
+    setFieldError('pw-date-error', '');
+    $('pw-supplier').removeAttribute('aria-invalid');
+    $('pw-purchase-date').removeAttribute('aria-invalid');
+  }
   function element(tag, text, cls) {
     const e = document.createElement(tag);
     if (text !== undefined) e.textContent = text;
@@ -114,14 +126,50 @@
   const payAll = $('pw-pay-all');
   if (payAll) payAll.addEventListener('click',()=>{$('pw-paid').value=String(total());totals();edited();});
   form.addEventListener('input',edited); form.addEventListener('change',edited);
+  $('pw-supplier').addEventListener('change',()=>{
+    setFieldError('pw-supplier-select-error','');
+    $('pw-supplier').removeAttribute('aria-invalid');
+  });
+  $('pw-purchase-date').addEventListener('input',()=>{
+    setFieldError('pw-date-error','');
+    $('pw-purchase-date').removeAttribute('aria-invalid');
+  });
   form.addEventListener('submit',e=>{
+    clearEntryErrors();
+    const supplierMissing = !$('pw-supplier').value;
+    const dateMissing = !$('pw-purchase-date').value;
     const bad = cart.find(i => !Number.isFinite(num(i.qty)) || num(i.qty)<=0 || !Number.isFinite(num(i.unit_cost_uzs)) || num(i.unit_cost_uzs)<=0);
     const paid = num($('pw-paid').value || '0');
     const paymentError = data.editMode
       ? 'Jami summa oldin to‘langan summadan kam bo‘lishi mumkin emas.'
       : 'To‘lov 0 dan jami summagacha bo‘lishi kerak.';
-    const message = !cart.length ? 'Kamida bitta mahsulot qo‘shing.' : bad ? 'Miqdor va kirim narxini musbat son bilan kiriting.' : !Number.isFinite(paid)||paid<0||paid>total() ? paymentError : '';
-    if (message || submitting) { e.preventDefault(); $('pw-form-error').textContent=message; $('pw-form-error').hidden=!message; return; }
+
+    if (supplierMissing) {
+      setFieldError('pw-supplier-select-error', 'Yetkazib beruvchini tanlang.');
+      $('pw-supplier').setAttribute('aria-invalid', 'true');
+    }
+    if (dateMissing) {
+      setFieldError('pw-date-error', 'Kirim sanasini kiriting.');
+      $('pw-purchase-date').setAttribute('aria-invalid', 'true');
+    }
+
+    const message = !cart.length
+      ? 'Kamida bitta mahsulot qo‘shing.'
+      : bad
+        ? 'Miqdor va kirim narxini musbat son bilan kiriting.'
+        : !Number.isFinite(paid)||paid<0||paid>total()
+          ? paymentError
+          : '';
+
+    if (supplierMissing || dateMissing || message || submitting) {
+      e.preventDefault();
+      $('pw-form-error').textContent=message;
+      $('pw-form-error').hidden=!message;
+      if (supplierMissing) $('pw-supplier').focus();
+      else if (dateMissing) $('pw-purchase-date').focus();
+      return;
+    }
+
     totals(); saveDraft(); submitting=true; clearTimeout(draftTimer);
     // Only the success page removes the draft; a failed save keeps every entered value.
     try { sessionStorage.setItem(successKey,form.elements.entity_uuid.value); } catch (_) {}
@@ -150,7 +198,16 @@
   $('pw-open-supplier').addEventListener('click',()=>dialog.showModal());
   $('pw-close-supplier').addEventListener('click',()=>dialog.close());
   $('pw-supplier-form').addEventListener('submit',async e=>{
-    e.preventDefault();const supplierForm=e.currentTarget,button=supplierForm.querySelector('[type=submit]');button.disabled=true;$('pw-supplier-error').textContent='';
+    e.preventDefault();
+    const supplierForm=e.currentTarget,button=supplierForm.querySelector('[type=submit]');
+    const supplierName=String(supplierForm.elements.name.value||'').trim();
+    $('pw-supplier-error').textContent='';
+    if(!supplierName){
+      $('pw-supplier-error').textContent='Yetkazib beruvchi nomini kiriting.';
+      supplierForm.elements.name.focus();
+      return;
+    }
+    button.disabled=true;
     try {
       const response=await fetch(supplierForm.action,{method:'POST',body:new FormData(supplierForm),headers:{Accept:'application/json'},credentials:'same-origin'});
       const result=await response.json();if(!response.ok)throw new Error(result.error||'Yetkazuvchi qo‘shilmadi');
