@@ -412,7 +412,8 @@ def test_supplier_cabinet_v2_and_kirim_preselection(web):
     script = client.get("/static/js/supplier_detail.js")
     assert script.status_code == 200
     body = script.get_data(as_text=True)
-    assert "data-supplier-tab" not in body
+    assert "querySelectorAll('[data-supplier-tab]')" in body
+    assert "supplier-pay-dialog" in body
     assert "To‘lov summasini kiriting." in body
     assert "To‘lov kirim qarzidan oshmasligi kerak." in body
 
