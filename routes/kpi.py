@@ -23,6 +23,7 @@ from services.business_writes.purchases import (
     prepare_purchase,
     save_purchase,
     pay_purchase,
+    update_purchase,
     number,
 )
 
@@ -76,6 +77,17 @@ def register_kpi_routes(
         return q(
             "SELECT id,name,phone FROM suppliers WHERE tenant_id=? ORDER BY name,id",
             (tenant,),
+        )
+
+    def purchase_products(tenant):
+        return q(
+            """SELECT p.id,p.name,p.stock_qty,c.name category,
+            COALESCE((SELECT m.unit_cost_uzs FROM inventory_moves m WHERE m.product_id=p.id AND m.move_type='IN' ORDER BY m.id DESC LIMIT 1),0) last_cost,
+            COALESCE((SELECT group_concat(b.barcode,' ') FROM product_barcodes b WHERE b.product_id=p.id AND b.tenant_id=p.tenant_id),'') barcodes
+            FROM products p JOIN categories c ON c.id=p.category_id
+            WHERE p.tenant_id=? AND c.tenant_id=? AND p.is_active=1 AND c.is_active=1
+            ORDER BY p.name""",
+            (tenant, tenant),
         )
 
     @app.route("/kpi")
@@ -204,14 +216,7 @@ def register_kpi_routes(
                 error = (
                     "Kirim saqlanmadi. Ma’lumotlarni tekshirib qayta urinib ko‘ring."
                 )
-        products = q(
-            """SELECT p.id,p.name,p.stock_qty,c.name category,
-            COALESCE((SELECT m.unit_cost_uzs FROM inventory_moves m WHERE m.product_id=p.id AND m.move_type='IN' ORDER BY m.id DESC LIMIT 1),0) last_cost,
-            COALESCE((SELECT group_concat(b.barcode,' ') FROM product_barcodes b WHERE b.product_id=p.id AND b.tenant_id=p.tenant_id),'') barcodes
-            FROM products p JOIN categories c ON c.id=p.category_id
-            WHERE p.tenant_id=? AND c.tenant_id=? AND p.is_active=1 AND c.is_active=1 ORDER BY p.name""",
-            (tenant, tenant),
-        )
+        products = purchase_products(tenant)
         if not isinstance(initial.get("items"), list):
             initial["items"] = []
         return page(
@@ -257,6 +262,87 @@ def register_kpi_routes(
             payment_uuid=str(uuid4()),
             draft_key=f"purchase-draft:{tenant}:{session.get('user_id')}",
         )
+
+    @app.route("/kpi/documents/<int:purchase_id>/edit", methods=["GET", "POST"])
+    @login_required
+    @admin_required
+    def purchase_edit(purchase_id):
+        tenant = identity()
+        doc = q1(
+            """SELECT p.*,s.name supplier_name FROM purchases p
+            JOIN suppliers s ON s.id=p.supplier_id
+            WHERE p.id=? AND p.tenant_id=?""",
+            (purchase_id, tenant),
+        )
+        if not doc:
+            abort(404)
+        rows = q(
+            """SELECT i.product_id,i.qty,i.unit_cost_uzs FROM purchase_items i
+            WHERE i.purchase_id=? AND i.tenant_id=? ORDER BY i.id""",
+            (purchase_id, tenant),
+        )
+        paid_row = q1(
+            "SELECT COALESCE(SUM(amount_uzs),0) paid FROM purchase_payments WHERE purchase_id=? AND tenant_id=?",
+            (purchase_id, tenant),
+        )
+        paid = float(paid_row["paid"] or 0)
+        initial = {
+            "entity_uuid": doc["entity_uuid"],
+            "supplier_id": doc["supplier_id"],
+            "purchase_date": doc["purchase_date"],
+            "reference": doc["reference"],
+            "note": doc["note"],
+            "paid": paid,
+            "items": [dict(r) for r in rows],
+        }
+        error = None
+        if request.method == "POST":
+            check_csrf()
+            initial.update(request.form.to_dict())
+            initial["paid"] = paid
+            try:
+                items = json.loads(request.form.get("items", "[]"))
+                initial["items"] = items
+                db = get_db()
+                payload = prepare_purchase(
+                    db,
+                    tenant_id=tenant,
+                    supplier_id=parse_int(request.form.get("supplier_id")),
+                    purchase_date=request.form.get("purchase_date"),
+                    reference=request.form.get("reference", ""),
+                    note=request.form.get("note", ""),
+                    items=items,
+                    entity_uuid=doc["entity_uuid"],
+                )
+                update_purchase(
+                    db,
+                    tenant_id=tenant,
+                    entity_uuid=doc["entity_uuid"],
+                    payload=payload,
+                    expected_version=request.form.get("expected_version"),
+                )
+                flash("Kirim yangilandi. Ombor va yetkazuvchi hisobi qayta hisoblandi.", "success")
+                return redirect(url_for("purchase_detail", purchase_id=purchase_id))
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+                error = str(exc)
+            except sqlite3.Error:
+                app.logger.exception("Purchase edit failed")
+                error = "Kirim yangilanmadi. Ma’lumotlarni tekshirib qayta urinib ko‘ring."
+        if not isinstance(initial.get("items"), list):
+            initial["items"] = []
+        return page(
+            "purchases/new.html",
+            active="documents",
+            suppliers=suppliers(tenant),
+            products=[dict(p) for p in purchase_products(tenant)],
+            initial=initial,
+            error=error,
+            supplier_uuid=str(uuid4()),
+            draft_key=f"purchase-edit:{tenant}:{purchase_id}:{session.get('user_id')}",
+            edit_mode=True,
+            expected_version=doc["sync_version"],
+            purchase_id=purchase_id,
+        ), (422 if error else 200)
 
     @app.post("/kpi/documents/<int:purchase_id>/pay")
     @login_required
