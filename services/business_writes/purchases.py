@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from services.business_writes.inventory import (
     receive_stock,
@@ -70,30 +70,33 @@ def _existing(db, kind, tenant_id, entity_uuid, payload):
         f"SELECT * FROM {TABLES[kind]} WHERE entity_uuid=?", (entity_uuid,)
     ).fetchone()
     if row:
+        if kind == "purchase" and "is_void" in row.keys() and int(row["is_void"] or 0):
+            raise ValueError("Bu kirim bekor qilingan")
         if row["tenant_id"] != tenant_id or row["payload_json"] != encoded(payload):
             raise ValueError("Bu identifikator bilan boshqa ma’lumot avval saqlangan")
         return row["id"]
     return None
 
 
-def _queue(db, kind, entity_uuid, payload):
+def _queue(db, kind, entity_uuid, payload, operation="create", sync_version=1):
     if not _desktop_sync_enabled():
         return
     from services.offline.models import SyncRecord
     from services.offline.sqlite_queue import SQLiteSyncQueue
 
+    wire_payload = dict(payload)
+    wire_payload["sync_version"] = int(sync_version)
     SQLiteSyncQueue(lambda: db).enqueue(
         SyncRecord(
             entity_type=kind,
             entity_uuid=entity_uuid,
-            operation="create",
-            payload=payload,
+            operation=operation,
+            payload=wire_payload,
             device_uuid=_device_uuid(db),
             occurred_at=datetime.now(timezone.utc),
         ),
         connection=db,
     )
-
 
 def create_supplier(db, *, tenant_id, name, phone="", entity_uuid=None, replicate=True):
     entity_uuid = uid(entity_uuid or uuid4())
@@ -264,8 +267,6 @@ def save_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
                     raise ValueError("Kirim va ombor harakati mos kelmadi")
                 move_id = movement["id"]
             else:
-                if not replicate:
-                    raise ValueError("Kirimning ombor harakati hali sinxronlanmagan")
                 move = receive_stock(
                     db,
                     move_date=purchase_date,
@@ -274,7 +275,7 @@ def save_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
                     unit_cost_uzs=item["unit_cost_uzs"],
                     note=movement_note,
                     entity_uuid=item["move_uuid"],
-                    replicate=replicate,
+                    replicate=False,
                 )
                 move_id = move.id
             line_total = number(
@@ -304,6 +305,332 @@ def save_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
         return purchase_id
 
 
+
+def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, target_version=None, replicate=True):
+    """Atomically edit a purchase and apply only the resulting stock delta."""
+    entity_uuid = uid(entity_uuid)
+    try:
+        expected_version = int(expected_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirim versiyasi noto‘g‘ri") from None
+    if expected_version < 1:
+        raise ValueError("Kirim versiyasi noto‘g‘ri")
+    if target_version is None:
+        target_version = expected_version + 1
+    try:
+        target_version = int(target_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirimning yangi versiyasi noto‘g‘ri") from None
+    if target_version <= expected_version:
+        raise ValueError("Kirimning yangi versiyasi eski versiyadan katta bo‘lishi kerak")
+    if not isinstance(payload, dict):
+        raise ValueError("Kirim ma’lumoti noto‘g‘ri")
+
+    purchase = db.execute(
+        "SELECT * FROM purchases WHERE entity_uuid=? AND tenant_id=?",
+        (entity_uuid, tenant_id),
+    ).fetchone()
+    if not purchase:
+        raise ValueError("Kirim topilmadi")
+    if int(purchase["sync_version"]) != expected_version:
+        raise ValueError("Kirim boshqa qurilmada o‘zgargan. Sahifani yangilang")
+
+    supplier_uuid = uid(payload.get("supplier_uuid"))
+    supplier = db.execute(
+        "SELECT id FROM suppliers WHERE entity_uuid=? AND tenant_id=?",
+        (supplier_uuid, tenant_id),
+    ).fetchone()
+    if not supplier:
+        raise ValueError("Yetkazuvchi topilmadi")
+
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list) or not 1 <= len(raw_items) <= 200:
+        raise ValueError("1 tadan 200 tagacha mahsulot kiriting")
+    clean, seen = [], set()
+    for item in raw_items:
+        if not isinstance(item, dict):
+            raise ValueError("Mahsulot qatori noto‘g‘ri")
+        product_uuid = uid(item.get("product_uuid"))
+        if product_uuid in seen:
+            raise ValueError("Takrorlangan mahsulot")
+        seen.add(product_uuid)
+        product = db.execute(
+            """SELECT p.id FROM products p JOIN categories c ON c.id=p.category_id
+            WHERE p.entity_uuid=? AND p.tenant_id=? AND c.tenant_id=?
+              AND p.is_active=1 AND c.is_active=1""",
+            (product_uuid, tenant_id, tenant_id),
+        ).fetchone()
+        if not product:
+            raise ValueError("Mahsulot topilmadi yoki nofaol")
+        qty = number(item.get("qty"), "Miqdor", places=3)
+        cost = number(item.get("unit_cost_uzs"), "Kirim narxi")
+        line_total = number(
+            Decimal(str(qty)) * Decimal(str(cost)), "Qator summasi"
+        )
+        clean.append(
+            {
+                "product_id": product["id"],
+                "product_uuid": product_uuid,
+                "qty": qty,
+                "unit_cost_uzs": cost,
+                "line_total": line_total,
+                "move_uuid": str(uuid5(UUID(entity_uuid), product_uuid)),
+            }
+        )
+
+    purchase_date = iso_date(payload.get("purchase_date"))
+    reference = text_value(payload.get("reference", ""), "Hujjat raqami", 80)
+    note = text_value(payload.get("note", ""), "Izoh")
+    total = number(
+        sum(Decimal(str(i["line_total"])) for i in clean), "Jami"
+    )
+    payment_info = db.execute(
+        """SELECT COALESCE(SUM(amount_uzs),0) paid, MIN(payment_date) first_date
+        FROM purchase_payments WHERE purchase_id=?""",
+        (purchase["id"],),
+    ).fetchone()
+    paid = float(payment_info["paid"] or 0)
+    if total + 0.005 < paid:
+        raise ValueError("Yangi kirim summasi to‘langan summadan kam bo‘lishi mumkin emas")
+    if payment_info["first_date"] and purchase_date > payment_info["first_date"]:
+        raise ValueError("Kirim sanasi mavjud to‘lov sanasidan keyin bo‘lishi mumkin emas")
+
+    old_rows = db.execute(
+        """SELECT i.*,p.entity_uuid product_uuid FROM purchase_items i
+        JOIN products p ON p.id=i.product_id
+        WHERE i.purchase_id=? AND i.tenant_id=? ORDER BY i.id""",
+        (purchase["id"], tenant_id),
+    ).fetchall()
+    old_by_product = {int(row["product_id"]): row for row in old_rows}
+    new_by_product = {int(item["product_id"]): item for item in clean}
+    normalized = {
+        "purchase_date": purchase_date,
+        "reference": reference,
+        "note": note,
+        "supplier_uuid": supplier_uuid,
+        "items": [
+            {
+                "product_uuid": item["product_uuid"],
+                "qty": item["qty"],
+                "unit_cost_uzs": item["unit_cost_uzs"],
+                "move_uuid": item["move_uuid"],
+            }
+            for item in clean
+        ],
+    }
+
+    with business_transaction(db):
+        new_version = target_version
+
+        # Removed products: reduce only the stock contributed by this edit.
+        for product_id, old in old_by_product.items():
+            if product_id in new_by_product:
+                continue
+            reduction = float(old["qty"])
+            cursor = db.execute(
+                """UPDATE products SET stock_qty=COALESCE(stock_qty,0)-?
+                WHERE id=? AND COALESCE(stock_qty,0)+1e-9>=?""",
+                (reduction, product_id, reduction),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Bu kirimdagi tovar ishlatilgan. Mahsulotni olib tashlash uchun qoldiq yetarli emas"
+                )
+            db.execute("DELETE FROM purchase_items WHERE id=?", (old["id"],))
+            db.execute("DELETE FROM inventory_moves WHERE id=?", (old["inventory_move_id"],))
+
+        # Existing products: apply qty delta and keep the same deterministic move UUID.
+        for product_id, item in new_by_product.items():
+            old = old_by_product.get(product_id)
+            if old is None:
+                continue
+            delta = float(item["qty"]) - float(old["qty"])
+            if delta < -1e-9:
+                reduction = -delta
+                cursor = db.execute(
+                    """UPDATE products SET stock_qty=COALESCE(stock_qty,0)-?
+                    WHERE id=? AND COALESCE(stock_qty,0)+1e-9>=?""",
+                    (reduction, product_id, reduction),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError(
+                        "Kirim miqdorini kamaytirish uchun omborda qoldiq yetarli emas"
+                    )
+            elif delta > 1e-9:
+                db.execute(
+                    "UPDATE products SET stock_qty=COALESCE(stock_qty,0)+? WHERE id=?",
+                    (delta, product_id),
+                )
+            db.execute(
+                """UPDATE inventory_moves SET move_date=?,qty=?,unit_cost_uzs=?,note=?,sync_version=?
+                WHERE id=?""",
+                (
+                    purchase_date,
+                    item["qty"],
+                    item["unit_cost_uzs"],
+                    f"Kirim {entity_uuid}",
+                    new_version,
+                    old["inventory_move_id"],
+                ),
+            )
+            db.execute(
+                """UPDATE purchase_items SET qty=?,unit_cost_uzs=?,total_uzs=?
+                WHERE id=?""",
+                (item["qty"], item["unit_cost_uzs"], item["line_total"], old["id"]),
+            )
+
+        # Added products create their owned IN movement without separate inventory replication.
+        for product_id, item in new_by_product.items():
+            if product_id in old_by_product:
+                continue
+            move = receive_stock(
+                db,
+                move_date=purchase_date,
+                product_id=product_id,
+                qty=item["qty"],
+                unit_cost_uzs=item["unit_cost_uzs"],
+                note=f"Kirim {entity_uuid}",
+                entity_uuid=item["move_uuid"],
+                replicate=False,
+            )
+            db.execute(
+                "UPDATE inventory_moves SET sync_version=? WHERE id=?",
+                (new_version, move.id),
+            )
+            db.execute(
+                """INSERT INTO purchase_items(
+                    tenant_id,purchase_id,product_id,qty,unit_cost_uzs,total_uzs,inventory_move_id
+                ) VALUES(?,?,?,?,?,?,?)""",
+                (
+                    tenant_id,
+                    purchase["id"],
+                    product_id,
+                    item["qty"],
+                    item["unit_cost_uzs"],
+                    item["line_total"],
+                    move.id,
+                ),
+            )
+
+        db.execute(
+            """UPDATE purchases SET supplier_id=?,purchase_date=?,reference=?,note=?,
+               total_uzs=?,payload_json=?,sync_version=? WHERE id=?""",
+            (
+                supplier["id"],
+                purchase_date,
+                reference,
+                note,
+                total,
+                encoded(normalized),
+                new_version,
+                purchase["id"],
+            ),
+        )
+        if replicate:
+            _queue(
+                db,
+                "purchase",
+                entity_uuid,
+                normalized,
+                operation="update",
+                sync_version=new_version,
+            )
+        return purchase["id"]
+
+
+
+
+def void_purchase(
+    db,
+    *,
+    tenant_id,
+    entity_uuid,
+    expected_version,
+    target_version=None,
+    replicate=True,
+):
+    """Reverse an unpaid purchase from stock while retaining an audit tombstone."""
+    entity_uuid = uid(entity_uuid)
+    try:
+        expected_version = int(expected_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirim versiyasi noto‘g‘ri") from None
+    if expected_version < 1:
+        raise ValueError("Kirim versiyasi noto‘g‘ri")
+    if target_version is None:
+        target_version = expected_version + 1
+    try:
+        target_version = int(target_version)
+    except (TypeError, ValueError):
+        raise ValueError("Kirimning yangi versiyasi noto‘g‘ri") from None
+    if target_version <= expected_version:
+        raise ValueError("Kirimning yangi versiyasi eski versiyadan katta bo‘lishi kerak")
+
+    purchase = db.execute(
+        "SELECT * FROM purchases WHERE entity_uuid=? AND tenant_id=?",
+        (entity_uuid, tenant_id),
+    ).fetchone()
+    if not purchase:
+        raise ValueError("Kirim topilmadi")
+    if int(purchase["sync_version"]) != expected_version:
+        raise ValueError("Kirim boshqa qurilmada o‘zgargan. Sahifani yangilang")
+    if int(purchase["is_void"] or 0):
+        raise ValueError("Kirim allaqachon bekor qilingan")
+
+    payment_count = db.execute(
+        "SELECT COUNT(*) FROM purchase_payments WHERE purchase_id=?",
+        (purchase["id"],),
+    ).fetchone()[0]
+    if payment_count:
+        raise ValueError(
+            "To‘lov yozilgan kirimni o‘chirib bo‘lmaydi. Avval to‘lovni tuzatish kerak"
+        )
+
+    rows = db.execute(
+        "SELECT * FROM purchase_items WHERE purchase_id=? AND tenant_id=? ORDER BY id",
+        (purchase["id"], tenant_id),
+    ).fetchall()
+    original_payload = json.loads(purchase["payload_json"])
+    wire_payload = dict(original_payload)
+    wire_payload["voided"] = True
+
+    with business_transaction(db):
+        for row in rows:
+            qty = float(row["qty"])
+            cursor = db.execute(
+                """UPDATE products SET stock_qty=COALESCE(stock_qty,0)-?
+                WHERE id=? AND COALESCE(stock_qty,0)+1e-9>=?""",
+                (qty, row["product_id"], qty),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(
+                    "Bu kirimdagi tovar ishlatilgan. Kirimni o‘chirish uchun omborda qoldiq yetarli emas"
+                )
+            db.execute("DELETE FROM purchase_items WHERE id=?", (row["id"],))
+            db.execute(
+                "DELETE FROM inventory_moves WHERE id=?",
+                (row["inventory_move_id"],),
+            )
+
+        db.execute(
+            """UPDATE purchases
+            SET is_void=1,voided_at=CURRENT_TIMESTAMP,sync_version=?
+            WHERE id=?""",
+            (target_version, purchase["id"]),
+        )
+        if replicate:
+            _queue(
+                db,
+                "purchase",
+                entity_uuid,
+                wire_payload,
+                operation="update",
+                sync_version=target_version,
+            )
+        return purchase["id"]
+
+
+
 def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
     entity_uuid = uid(entity_uuid)
     if not isinstance(payload, dict):
@@ -323,7 +650,7 @@ def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
             return existing
         purchase = db.execute(
             """SELECT p.*, COALESCE((SELECT SUM(amount_uzs) FROM purchase_payments pp WHERE pp.purchase_id=p.id),0) paid
-            FROM purchases p WHERE entity_uuid=? AND tenant_id=?""",
+            FROM purchases p WHERE entity_uuid=? AND tenant_id=? AND COALESCE(p.is_void,0)=0""",
             (payload["purchase_uuid"], tenant_id),
         ).fetchone()
         if not purchase:

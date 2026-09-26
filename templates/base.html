@@ -100,6 +100,24 @@
         <span class="sidebar-label">Kirim</span>
       </a>
 
+    <a
+      class="sidebar-item {% if request.path == '/kpi/stock' %}active{% endif %}"
+      href="{{ url_for('purchase_stock') }}"
+      title="Ombor"
+    >
+      <span class="sidebar-icon">▦</span>
+      <span class="sidebar-label">Ombor</span>
+    </a>
+
+    <a
+      class="sidebar-item {% if request.path.startswith('/kpi/suppliers') %}active{% endif %}"
+      href="{{ url_for('purchase_suppliers') }}"
+      title="Yetkazib beruvchilar"
+    >
+      <span class="sidebar-icon">⇄</span>
+      <span class="sidebar-label">Yetkazib beruvchilar</span>
+    </a>
+
       <a
         href="{{ url_for('reports') }}"
         class="sidebar-link {% if request.path.startswith('/reports') %}active{% endif %}"

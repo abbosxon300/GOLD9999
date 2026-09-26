@@ -1,13 +1,15 @@
 {% extends 'purchases/layout.html' %}
-{% set title = 'Yangi kirim' %}
-{% block heading %}Yangi kirim{% endblock %}
-{% block subtitle %}Yetkazuvchi va mahsulotlarni bitta hujjatda kiriting{% endblock %}
+{% set is_edit = edit_mode|default(false) %}
+{% set title = ('Kirimni tahrirlash' if is_edit else 'Yangi kirim') %}
+{% block heading %}{{ 'Kirim #' ~ purchase_id ~ 'ni tahrirlash' if is_edit else 'Yangi kirim' }}{% endblock %}
+{% block subtitle %}{{ 'Xato kirim ma’lumotlarini xavfsiz tuzating' if is_edit else 'Yetkazuvchi va mahsulotlarni bitta hujjatda kiriting' }}{% endblock %}
 {% block workspace %}
 {% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
-<div id="pw-draft" class="pw-draft" hidden><span>Bu brauzerda saqlanmagan qoralama bor.</span><button type="button" id="pw-restore" class="pw-button">Tiklash</button><button type="button" id="pw-discard" class="pw-clear">O‘chirish</button></div>
+<div id="pw-draft" class="pw-draft" hidden><span>{{ 'Bu tahrirning saqlanmagan qoralamasi bor.' if is_edit else 'Bu brauzerda saqlanmagan qoralama bor.' }}</span><button type="button" id="pw-restore" class="pw-button">Tiklash</button><button type="button" id="pw-discard" class="pw-clear">O‘chirish</button></div>
 <form id="purchase-form" method="post" autocomplete="off">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="entity_uuid" value="{{ initial.entity_uuid }}">
+  {% if is_edit %}<input type="hidden" name="expected_version" value="{{ expected_version }}">{% endif %}
   <input type="hidden" name="items" id="pw-items">
   <div class="pw-editor">
     <div class="pw-main">
@@ -23,21 +25,27 @@
         <div class="pw-product-search"><label for="pw-search">Mahsulot nomi yoki shtrix kodi</label><div class="pw-search-box"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="pw-search" type="search" placeholder="Qidiring yoki shtrix kodni skanerlang…" role="combobox" aria-expanded="false" aria-controls="pw-results" aria-autocomplete="list"><kbd>Enter</kbd></div><div id="pw-results" role="listbox" hidden></div></div>
         <div class="pw-table-wrap"><table class="pw-table pw-entry-table"><thead><tr><th>Mahsulot</th><th>Miqdor</th><th>Kirim narxi, so‘m</th><th class="num">Jami, so‘m</th><th></th></tr></thead><tbody id="pw-cart"></tbody></table></div>
         <div class="pw-empty" id="pw-cart-empty"><span class="pw-empty-icon" aria-hidden="true">+</span><h3>Mahsulotlarni qo‘shing</h3><p>Yuqoridan qidiring. Turli kategoriyadagi mahsulotlar bitta kirimga qo‘shiladi.</p></div>
-        <div class="pw-cart-footer"><span>Oxirgi kirim narxi avtomatik taklif qilinadi</span><button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button></div>
+        <div class="pw-cart-footer"><span>{{ 'O‘zgarish ombor qoldig‘iga farq bo‘yicha qo‘llanadi' if is_edit else 'Oxirgi kirim narxi avtomatik taklif qilinadi' }}</span><button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button></div>
       </section>
       <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="2" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
     </div>
     <aside class="pw-summary pw-panel pw-pad">
-      <span class="pw-eyebrow">HISOB-KITOB</span><h2>Kirim yakuni</h2>
+      <span class="pw-eyebrow">HISOB-KITOB</span><h2>{{ 'Yangilangan kirim' if is_edit else 'Kirim yakuni' }}</h2>
       <div class="pw-summary-total"><span>Jami summa</span><strong id="pw-total">0</strong><small>so‘m</small></div>
-      <label>Hozir to‘lanadi, so‘m<input name="paid" id="pw-paid" inputmode="decimal" value="{{ initial.get('paid','0') }}" placeholder="0"></label>
-      <button class="pw-clear pw-pay-all" type="button" id="pw-pay-all">To‘liq to‘lash</button>
-      <label>Qaysi kassadan?<select name="method"><option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option><option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option></select></label>
-      <p class="pw-help">To‘lov kiritilsa, tanlangan kassadan chiqim yoziladi.</p>
+      {% if is_edit %}
+        <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') }}">
+        <div class="pw-summary-line"><span>Oldin to‘langan</span><strong>{{ money(initial.get('paid',0)) }}</strong></div>
+        <p class="pw-help">Jami summa to‘langan summadan past bo‘lishi mumkin emas.</p>
+      {% else %}
+        <label>Hozir to‘lanadi, so‘m<input name="paid" id="pw-paid" inputmode="decimal" value="{{ initial.get('paid','0') }}" placeholder="0"></label>
+        <button class="pw-clear pw-pay-all" type="button" id="pw-pay-all">To‘liq to‘lash</button>
+        <label>Qaysi kassadan?<select name="method"><option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option><option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option></select></label>
+        <p class="pw-help">To‘lov kiritilsa, tanlangan kassadan chiqim yoziladi.</p>
+      {% endif %}
       <div class="pw-balance"><span>Qolgan qarz</span><strong><span id="pw-debt">0</span> <small>so‘m</small></strong></div>
       <p id="pw-form-error" class="pw-inline-error" role="alert" hidden></p>
-      <button type="submit" id="pw-save" class="pw-button pw-primary pw-wide">Kirimni saqlash</button>
-      <a class="pw-button pw-wide pw-secondary" href="{{ url_for('kpi') }}">Kirimlar ro‘yxati</a>
+      <button type="submit" id="pw-save" class="pw-button pw-primary pw-wide">{{ 'O‘zgarishlarni saqlash' if is_edit else 'Kirimni saqlash' }}</button>
+      <a class="pw-button pw-wide pw-secondary" href="{{ url_for('purchase_detail',purchase_id=purchase_id) if is_edit else url_for('kpi') }}">{{ 'Bekor qilish' if is_edit else 'Kirimlar ro‘yxati' }}</a>
       <small class="pw-draft-status" id="pw-draft-status" aria-live="polite"></small>
     </aside>
   </div>
@@ -49,6 +57,6 @@
   <label>Telefon<input name="phone" type="tel" maxlength="40" placeholder="+998 …"></label>
   <p id="pw-supplier-error" class="pw-inline-error" role="alert"></p><button class="pw-button pw-primary pw-wide" type="submit">Qo‘shish va tanlash</button>
 </form></dialog>
-<script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none}|tojson }}</script>
+<script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('O‘zgarishlarni saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
 <script src="{{ url_for('static', filename='js/purchases.js') }}" defer></script>
 {% endblock %}

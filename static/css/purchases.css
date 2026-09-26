@@ -12,3 +12,10 @@ body[data-theme=dark] .pw,body.dark-mode .pw,html[data-theme=dark] .pw{--pw-bg:#
 @media(max-width:640px){
  .pw-entry-table{min-width:0;display:block}.pw-entry-table thead{display:none}.pw-entry-table tbody{display:block}.pw-entry-table tbody tr{display:grid;grid-template-columns:1fr 1.2fr;gap:12px;position:relative;padding:18px 16px;border-top:1px solid var(--pw-line)}.pw-entry-table tbody td{display:block;padding:0!important;border:0!important;min-width:0!important}.pw-entry-table tbody td:first-child{grid-column:1/-1;padding-right:34px!important}.pw-entry-table td:nth-child(2)::before{content:'Miqdor';display:block;color:var(--pw-muted);font-size:11px;margin-bottom:6px}.pw-entry-table td:nth-child(3)::before{content:'Kirim narxi, so‘m';display:block;color:var(--pw-muted);font-size:11px;margin-bottom:6px}.pw-entry-table input,.pw-entry-table input[data-field=unit_cost_uzs]{width:100%;font-size:16px}.pw-entry-table td:nth-child(4){grid-column:1/-1;display:flex;justify-content:space-between;font-weight:700;padding-top:3px!important}.pw-entry-table td:nth-child(4)::before{content:'Jami, so‘m';font-size:12px;font-weight:500;color:var(--pw-muted)}.pw-entry-table td:last-child{position:absolute;right:12px;top:12px}
 }
+
+.pw-account-actions{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px}.pw-account-actions>a:first-child{font-size:12px;font-weight:650}.pw-panel>.pw-section-head{padding:21px 22px 0}@media(max-width:640px){.pw-account-actions{align-items:center}.pw-account-actions .pw-button{min-height:38px;padding:8px 11px;font-size:11px}}
+
+.pw .pw-danger{border-color:#e7c9c9;color:#a33;background:#fff8f8}.pw .pw-danger:hover{border-color:#dca9a9;background:#fff0f0}
+.pw-supplier-pay{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:14px;align-items:end}.pw-supplier-pay .pw-pay-note{grid-column:1/-2}.pw-supplier-pay>.pw-button{align-self:end}
+@media(max-width:900px){.pw-supplier-pay{grid-template-columns:1fr 1fr}.pw-supplier-pay .pw-pay-note{grid-column:1/-1}}
+@media(max-width:640px){.pw-supplier-pay{grid-template-columns:1fr}.pw-supplier-pay .pw-pay-note{grid-column:auto}}

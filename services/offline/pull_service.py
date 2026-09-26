@@ -110,6 +110,7 @@ def _wire_change(
     version: object,
     device_uuid: str,
     occurred_at: object,
+    operation: str = "create",
 ) -> dict[str, Any]:
     return {
         "entity_type": entity_type,
@@ -117,7 +118,7 @@ def _wire_change(
             entity_uuid,
             field_name=f"{entity_type}.entity_uuid",
         ),
-        "operation": "create",
+        "operation": operation,
         "payload": dict(payload),
         "version": _positive_integer(
             version,
@@ -270,6 +271,9 @@ def _inventory_changes(
           AND p.entity_uuid IS NOT NULL
           AND TRIM(p.entity_uuid) <> ''
           AND COALESCE(im.source_type, '') <> 'sale_item'
+          AND NOT EXISTS(
+              SELECT 1 FROM purchase_items pi WHERE pi.inventory_move_id=im.id
+          )
         ORDER BY im.id
         """
     ).fetchall()
