@@ -161,7 +161,6 @@ def register_kpi_routes(
             "purchase_date": today(),
             "items": [],
             "entity_uuid": str(uuid4()),
-            "paid": "0",
         }
         error = None
         if request.method == "POST":
