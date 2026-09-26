@@ -886,7 +886,7 @@ def test_kirim_uses_uzbek_validation_and_minimal_entry(web):
     assert 'id="pw-list-meta" hidden' in page.text
     assert 'id="pw-note-toggle"' in page.text
     assert 'id="pw-note-field"' in page.text
-    assert 'id="pw-note-field"\n        hidden' in page.text
+    assert re.search(r'id="pw-note-field"\s+hidden', page.text)
     assert "Mahsulot tanlang" not in page.text
     assert 'class="pw-simple-totalbar is-minimal"' in page.text
     assert 'name="method"' not in page.text
