@@ -835,6 +835,11 @@ def test_sidebar_module_states_and_warehouse_ui(web):
     assert 'class="pw-metrics"' not in kirim.text
     assert "Kirim hujjatlari" in kirim.text
 
+    entry = client.get("/kpi/new")
+    assert entry.status_code == 200
+    assert "Yangi kirim" in entry.text
+    assert 'href="/kpi">Kirim hujjatlari</a>' in entry.text
+
     warehouse = client.get("/kpi/stock")
     assert warehouse.status_code == 200
     assert "css/warehouse.css" in warehouse.text
@@ -846,7 +851,7 @@ def test_sidebar_module_states_and_warehouse_ui(web):
         warehouse.text,
     )
     kirim_link = re.search(
-        r'href="/kpi"\s+class="([^"]+)"',
+        r'href="/kpi/new"\s+class="([^"]+)"',
         warehouse.text,
     )
     assert warehouse_link and "active" in warehouse_link.group(1).split()
@@ -859,8 +864,10 @@ def test_sidebar_module_states_and_warehouse_ui(web):
         suppliers.text,
     )
     kirim_link = re.search(
-        r'href="/kpi"\s+class="([^"]+)"',
+        r'href="/kpi/new"\s+class="([^"]+)"',
         suppliers.text,
     )
     assert supplier_link and "active" in supplier_link.group(1).split()
     assert kirim_link and "active" not in kirim_link.group(1).split()
+
+    assert warehouse.text.count('href="/kpi/new"') >= 2
