@@ -1,28 +1,151 @@
 {% extends 'purchases/layout.html' %}
-{% set title = 'Kirimlar' %}
+{% set title = 'Kirim' %}
+{% block eyebrow %}KIRIM{% endblock %}
+{% block heading %}Kirim hujjatlari{% endblock %}
+{% block subtitle %}Yetkazib beruvchidan qabul qilingan tovar kirimlari{% endblock %}
+
 {% block workspace %}
-<div class="pw-metrics">
-  <div class="pw-metric"><span>Kirim hujjatlari</span><strong>{{ totals.count }} <small>ta</small></strong><em>Tanlangan davr va filtrlar</em></div>
-  <div class="pw-metric"><span>Jami kirim</span><strong>{{ money(totals.total) }} <small>so‘m</small></strong><em>Mahsulotlarning kirim qiymati</em></div>
-  <div class="pw-metric"><span>To‘langan</span><strong>{{ money(totals.paid) }} <small>so‘m</small></strong><em>Naqd va Click to‘lovlari</em></div>
-  <div class="pw-metric pw-debt"><span>Qolgan qarz</span><strong>{{ money(totals.total-totals.paid) }} <small>so‘m</small></strong><em>Yetkazuvchilarga to‘lanadi</em></div>
-</div>
 <section class="pw-panel">
-  <div class="pw-section-head"><h2>Kirim hujjatlari</h2><a href="{{ url_for('purchase_legacy') }}">Eski kirimlar tarixi ↗</a></div>
+  <div class="pw-section-head">
+    <div>
+      <h2>Hujjatlar</h2>
+      <span class="pw-muted">{{ totals.count }} ta kirim hujjati</span>
+    </div>
+    <a href="{{ url_for('purchase_legacy') }}">Eski kirimlar tarixi ↗</a>
+  </div>
+
   <form class="pw-filters" method="get">
-    <label class="pw-search">Qidirish<input name="q" value="{{ filters.get('q','') }}" placeholder="Yetkazuvchi yoki hujjat №"></label>
-    <label>Yetkazuvchi<select name="supplier"><option value="">Barchasi</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if filters.get('supplier') == s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></label>
-    <label>Dan<input aria-label="Boshlanish sanasi" type="date" name="from" value="{{ filters.get('from','') }}"></label>
-    <label>Gacha<input aria-label="Tugash sanasi" type="date" name="to" value="{{ filters.get('to','') }}"></label>
-    <label>Holat<select name="status"><option value="">Barchasi</option><option value="debt" {% if filters.get('status')=='debt' %}selected{% endif %}>Qarz bor</option><option value="paid" {% if filters.get('status')=='paid' %}selected{% endif %}>To‘langan</option></select></label>
+    <label class="pw-search">
+      Qidirish
+      <input
+        name="q"
+        value="{{ filters.get('q','') }}"
+        placeholder="Yetkazuvchi yoki hujjat №">
+    </label>
+
+    <label>
+      Yetkazuvchi
+      <select name="supplier">
+        <option value="">Barchasi</option>
+        {% for s in suppliers %}
+          <option value="{{ s.id }}" {% if filters.get('supplier') == s.id|string %}selected{% endif %}>
+            {{ s.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Dan
+      <input
+        aria-label="Boshlanish sanasi"
+        type="date"
+        name="from"
+        value="{{ filters.get('from','') }}">
+    </label>
+
+    <label>
+      Gacha
+      <input
+        aria-label="Tugash sanasi"
+        type="date"
+        name="to"
+        value="{{ filters.get('to','') }}">
+    </label>
+
+    <label>
+      Holat
+      <select name="status">
+        <option value="">Barchasi</option>
+        <option value="debt" {% if filters.get('status') == 'debt' %}selected{% endif %}>Qarz bor</option>
+        <option value="paid" {% if filters.get('status') == 'paid' %}selected{% endif %}>To‘langan</option>
+      </select>
+    </label>
+
     <button class="pw-button" type="submit">Ko‘rsatish</button>
-    {% if filters %}<a class="pw-clear" href="{{ url_for('kpi') }}">Tozalash</a>{% endif %}
+
+    {% if filters %}
+      <a class="pw-clear" href="{{ url_for('kpi') }}">Tozalash</a>
+    {% endif %}
   </form>
+
   {% if rows %}
-  <div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Hujjat / sana</th><th>Yetkazuvchi</th><th>Mahsulot</th><th class="num">Jami</th><th class="num">Qarz</th><th>Holat</th><th></th></tr></thead><tbody>
-    {% for r in rows %}<tr><td><a class="pw-doc-link" href="{{ url_for('purchase_detail', purchase_id=r.id) }}">Kirim #{{ r.id }}</a><small>{{ r.purchase_date[8:10] }}.{{ r.purchase_date[5:7] }}.{{ r.purchase_date[:4] }}{% if r.reference %} · {{ r.reference }}{% endif %}</small></td><td><strong>{{ r.supplier_name }}</strong></td><td>{{ r.item_count }} tur</td><td class="num">{{ money(r.total_uzs) }}</td><td class="num">{{ money(r.total_uzs-r.paid) }}</td><td>{% if r.total_uzs-r.paid < 0.005 %}<span class="pw-badge paid">To‘langan</span>{% elif r.paid %}<span class="pw-badge partial">Qisman</span>{% else %}<span class="pw-badge debt">Qarz</span>{% endif %}</td><td><a class="pw-arrow" aria-label="Kirim {{ r.id }} ni ochish" href="{{ url_for('purchase_detail', purchase_id=r.id) }}">↗</a></td></tr>{% endfor %}
-  </tbody></table></div>
-  <div class="pw-pagination"><span>{{ totals.count }} hujjat · {{ page_no }} / {{ pages }} sahifa</span><div>{% if page_no>1 %}<a class="pw-button" href="{{ previous }}">← Oldingi</a>{% endif %}{% if page_no<pages %}<a class="pw-button" href="{{ next }}">Keyingi →</a>{% endif %}</div></div>
-  {% else %}<div class="pw-empty"><span class="pw-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span><h3>{% if filters %}Mos kirim topilmadi{% else %}Birinchi kirimni yarating{% endif %}</h3><p>Yetkazuvchini tanlang, mahsulotlarni qo‘shing va bir marta saqlang.</p><a class="pw-button pw-primary" href="{{ url_for('purchase_new') }}">+ Yangi kirim</a><a href="{{ url_for('purchase_legacy') }}">Avvalgi kirimlarni ko‘rish</a></div>{% endif %}
+    <div class="pw-table-wrap">
+      <table class="pw-table">
+        <thead>
+          <tr>
+            <th>Hujjat / sana</th>
+            <th>Yetkazuvchi</th>
+            <th>Mahsulot</th>
+            <th class="num">Jami</th>
+            <th class="num">Qarz</th>
+            <th>Holat</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>
+                <a class="pw-doc-link" href="{{ url_for('purchase_detail', purchase_id=r.id) }}">
+                  Kirim #{{ r.id }}
+                </a>
+                <small>
+                  {{ r.purchase_date[8:10] }}.{{ r.purchase_date[5:7] }}.{{ r.purchase_date[:4] }}
+                  {% if r.reference %} · {{ r.reference }}{% endif %}
+                </small>
+              </td>
+              <td><strong>{{ r.supplier_name }}</strong></td>
+              <td>{{ r.item_count }} tur</td>
+              <td class="num">{{ money(r.total_uzs) }}</td>
+              <td class="num">{{ money(r.total_uzs-r.paid) }}</td>
+              <td>
+                {% if r.total_uzs-r.paid < 0.005 %}
+                  <span class="pw-badge paid">To‘langan</span>
+                {% elif r.paid %}
+                  <span class="pw-badge partial">Qisman</span>
+                {% else %}
+                  <span class="pw-badge debt">Qarz</span>
+                {% endif %}
+              </td>
+              <td>
+                <a
+                  class="pw-arrow"
+                  aria-label="Kirim {{ r.id }} ni ochish"
+                  href="{{ url_for('purchase_detail', purchase_id=r.id) }}">
+                  ↗
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pw-pagination">
+      <span>{{ totals.count }} hujjat · {{ page_no }} / {{ pages }} sahifa</span>
+      <div>
+        {% if page_no > 1 %}
+          <a class="pw-button" href="{{ previous }}">← Oldingi</a>
+        {% endif %}
+        {% if page_no < pages %}
+          <a class="pw-button" href="{{ next }}">Keyingi →</a>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="pw-empty">
+      <span class="pw-empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="5" y="3" width="14" height="18" rx="2"/>
+          <path d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+      </span>
+      <h3>{% if filters %}Mos kirim topilmadi{% else %}Birinchi kirimni yarating{% endif %}</h3>
+      <p>Yetkazuvchini tanlang, mahsulotlarni qo‘shing va kirimni saqlang.</p>
+      <a class="pw-button pw-primary" href="{{ url_for('purchase_new') }}">+ Yangi kirim</a>
+      <a href="{{ url_for('purchase_legacy') }}">Avvalgi kirimlarni ko‘rish</a>
+    </div>
+  {% endif %}
 </section>
 {% endblock %}
