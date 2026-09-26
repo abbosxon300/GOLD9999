@@ -1,0 +1,22 @@
+{% extends 'purchases/layout.html' %}
+{% set title = supplier.name %}
+{% block eyebrow %}YETKAZIB BERUVCHI KABINETI{% endblock %}
+{% block heading %}{{ supplier.name }}{% endblock %}
+{% block subtitle %}{{ supplier.phone or 'Telefon kiritilmagan' }} · aylanma va hisob-kitob{% endblock %}
+{% block workspace %}
+<div class="pw-account-actions"><a href="{{ url_for('purchase_suppliers') }}">← Yetkazib beruvchilar</a><a class="pw-button pw-primary" href="{{ url_for('purchase_new') }}?supplier={{ supplier.id }}">+ Yangi kirim</a></div>
+<div class="pw-metrics pw-space-top">
+ <div class="pw-metric"><span>Kirim hujjatlari</span><strong>{{ documents|length }} <small>ta</small></strong><em>Yetkazilgan yuklar</em></div>
+ <div class="pw-metric"><span>Jami aylanma</span><strong>{{ money(total) }} <small>so‘m</small></strong><em>Kirim qiymati</em></div>
+ <div class="pw-metric"><span>To‘langan</span><strong>{{ money(paid) }} <small>so‘m</small></strong><em>Naqd va Click</em></div>
+ <div class="pw-metric pw-debt"><span>Qoldiq qarz</span><strong>{{ money(debt) }} <small>so‘m</small></strong><em>Yetkazuvchiga to‘lanadi</em></div>
+</div>
+<section class="pw-panel">
+ <div class="pw-section-head"><h2>Aylanma · yuklar</h2><span class="pw-muted">{{ documents|length }} hujjat</span></div>
+ {% if documents %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Sana / hujjat</th><th>Mahsulot</th><th class="num">Kirim</th><th class="num">To‘langan</th><th class="num">Qarz</th><th></th></tr></thead><tbody>{% for r in documents %}<tr><td><a class="pw-doc-link" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">Kirim #{{ r.id }}</a><small>{{ r.purchase_date }}{% if r.reference %} · {{ r.reference }}{% endif %}</small></td><td>{{ r.item_count }} tur</td><td class="num">{{ money(r.total_uzs) }}</td><td class="num">{{ money(r.paid) }}</td><td class="num">{{ money(r.total_uzs-r.paid) }}</td><td><a class="pw-arrow" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">↗</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>Hali kirim yo‘q</h3><p>Bu yetkazib beruvchidan birinchi kirimni kiriting.</p></div>{% endif %}
+</section>
+<section class="pw-panel pw-space-top">
+ <div class="pw-section-head"><h2>To‘lovlar</h2><span class="pw-muted">{{ payments|length }} operatsiya</span></div>
+ {% if payments %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Sana</th><th>Hujjat</th><th>Usul</th><th>Izoh</th><th class="num">To‘lov</th></tr></thead><tbody>{% for p in payments %}<tr><td>{{ p.payment_date }}</td><td><a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a></td><td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td><td>{{ p.note or '—' }}</td><td class="num">{{ money(p.amount_uzs) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>To‘lovlar yo‘q</h3><p>To‘lov kirim hujjati ichidan amalga oshiriladi.</p></div>{% endif %}
+</section>
+{% endblock %}
