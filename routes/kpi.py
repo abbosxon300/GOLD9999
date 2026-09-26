@@ -261,6 +261,7 @@ def register_kpi_routes(
             debt=round(row["total_uzs"] - paid, 2),
             payment_uuid=str(uuid4()),
             draft_key=f"purchase-draft:{tenant}:{session.get('user_id')}",
+            edit_draft_key=f"purchase-edit:{tenant}:{purchase_id}:{session.get('user_id')}",
         )
 
     @app.route("/kpi/documents/<int:purchase_id>/edit", methods=["GET", "POST"])
@@ -340,7 +341,11 @@ def register_kpi_routes(
             supplier_uuid=str(uuid4()),
             draft_key=f"purchase-edit:{tenant}:{purchase_id}:{session.get('user_id')}",
             edit_mode=True,
-            expected_version=doc["sync_version"],
+            expected_version=(
+                request.form.get("expected_version")
+                if request.method == "POST"
+                else doc["sync_version"]
+            ),
             purchase_id=purchase_id,
         ), (422 if error else 200)
 
