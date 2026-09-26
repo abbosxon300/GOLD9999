@@ -182,6 +182,7 @@ def test_migration_preserves_existing_data_and_reruns(db):
     assert db.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 0
 
 
+
 def test_sync_two_databases_no_double_stock(db):
     import services.offline.master_data_adapters  # noqa: F401
     import services.offline.purchase_adapter  # noqa: F401
@@ -205,8 +206,7 @@ def test_sync_two_databases_no_double_stock(db):
     business = [
         c
         for c in changes
-        if c["entity_type"]
-        in ("supplier", "inventory_move", "purchase", "purchase_payment")
+        if c["entity_type"] in ("supplier", "purchase", "purchase_payment")
     ]
     for iteration in range(2):
         for change in business:
@@ -216,9 +216,9 @@ def test_sync_two_databases_no_double_stock(db):
                     RemoteChange(
                         change["entity_type"],
                         change["entity_uuid"],
-                        "create",
+                        change["operation"],
                         change["payload"],
-                        1,
+                        change["version"],
                         str(uuid4()),
                         datetime.now(timezone.utc),
                     ),
@@ -237,9 +237,8 @@ def test_sync_two_databases_no_double_stock(db):
     assert not any(
         c["entity_type"] in ("supplier", "purchase", "purchase_payment") for c in legacy
     )
-    assert len([c for c in legacy if c["entity_type"] == "inventory_move"]) == 2
+    assert not any(c["entity_type"] == "inventory_move" for c in legacy)
     remote.close()
-
 
 def test_pull_isolates_tenants(db):
     from services.offline.pull_service import build_pull_response
@@ -427,16 +426,40 @@ def test_new_pull_cursor_does_not_skip_new_dependency_groups(db):
     assert len(seen) == len(set(seen)) == len(replay.changes)
 
 
-def test_remote_purchase_waits_for_stock_without_partial_document(db):
-    doc, key, payload = purchase(db)
-    payload["items"][0]["move_uuid"] = str(uuid4())
-    with pytest.raises(ValueError, match="sinxronlanmagan"):
-        save_purchase(
-            db, tenant_id=1, entity_uuid=str(uuid4()), payload=payload, replicate=False
-        )
-    assert db.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 1
-    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
 
+def test_purchase_aggregate_materializes_owned_stock_without_inventory_replication(db):
+    supplier = create_supplier(db, tenant_id=1, name="Aggregate supplier")
+    key = str(uuid4())
+    payload = prepare_purchase(
+        db,
+        tenant_id=1,
+        supplier_id=supplier,
+        purchase_date="2026-09-26",
+        reference="AGG-1",
+        note="",
+        items=[
+            {"product_id": 11, "qty": 2, "unit_cost_uzs": 45000},
+            {"product_id": 12, "qty": 3, "unit_cost_uzs": 20000},
+        ],
+        entity_uuid=key,
+    )
+    doc = save_purchase(
+        db,
+        tenant_id=1,
+        entity_uuid=key,
+        payload=payload,
+        replicate=False,
+    )
+    assert doc > 0
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+    assert db.execute("SELECT stock_qty FROM products WHERE id=12").fetchone()[0] == 3
+    move_uuids = [
+        row[0]
+        for row in db.execute(
+            "SELECT entity_uuid FROM inventory_moves ORDER BY id"
+        ).fetchall()
+    ]
+    assert move_uuids == [item["move_uuid"] for item in payload["items"]]
 
 def test_fractional_totals_equal_sum_of_displayed_rows(db):
     doc, key, _ = purchase(
@@ -455,7 +478,8 @@ def test_fractional_totals_equal_sum_of_displayed_rows(db):
         )
 
 
-def test_desktop_queue_has_stable_movement_ids(db, monkeypatch):
+
+def test_desktop_queue_uses_purchase_aggregate_with_stable_movement_ids(db, monkeypatch):
     from services.offline.schema import ensure_offline_sync_schema
 
     ensure_offline_sync_schema(db)
@@ -466,15 +490,15 @@ def test_desktop_queue_has_stable_movement_ids(db, monkeypatch):
     rows = db.execute(
         "SELECT entity_type,entity_uuid FROM sync_queue ORDER BY id"
     ).fetchall()
-    assert [r["entity_type"] for r in rows] == [
-        "supplier",
-        "inventory_move",
-        "inventory_move",
-        "purchase",
-    ]
-    assert rows[1]["entity_uuid"] == payload["items"][0]["move_uuid"]
+    assert [r["entity_type"] for r in rows] == ["supplier", "purchase"]
     assert rows[-1]["entity_uuid"] == key
-
+    movement_ids = [
+        row["entity_uuid"]
+        for row in db.execute(
+            "SELECT entity_uuid FROM inventory_moves ORDER BY id"
+        ).fetchall()
+    ]
+    assert movement_ids == [item["move_uuid"] for item in payload["items"]]
 
 def test_release_backup_and_upgrade_from_v12(tmp_path):
     from services.migrations import discover_migrations, ensure_schema_migrations
@@ -560,6 +584,7 @@ def test_purchase_edit_recalculates_stock_and_version(db):
         )
 
 
+
 def test_purchase_edit_never_drops_below_paid_or_negative_stock(db):
     doc, key, payload = purchase(db)
     pay_purchase(
@@ -580,17 +605,19 @@ def test_purchase_edit_never_drops_below_paid_or_negative_stock(db):
             payload=too_small,
             expected_version=1,
         )
+
     db.execute("UPDATE products SET stock_qty=0 WHERE id=11")
     db.commit()
+    reduced = copy.deepcopy(payload)
+    reduced["items"][0]["qty"] = 1
     with pytest.raises(ValueError, match="qoldiq"):
         update_purchase(
             db,
             tenant_id=1,
             entity_uuid=key,
-            payload=payload,
+            payload=reduced,
             expected_version=1,
         )
-
 
 def test_purchase_void_reverses_stock_and_keeps_tombstone(db):
     doc, key, _ = purchase(db)
@@ -680,3 +707,121 @@ def test_http_purchase_edit_and_void(web):
         "SELECT is_void FROM purchases WHERE id=?", (doc,)
     ).fetchone()[0] == 1
     conn.close()
+
+
+
+def test_purchase_v2_update_and_void_sync_as_single_aggregate(db):
+    import services.offline.master_data_adapters  # noqa: F401
+    import services.offline.purchase_adapter  # noqa: F401
+    from services.offline.models import RemoteChange
+    from services.offline.pull_service import build_pull_response
+    from services.offline.remote_applier import apply_remote_change
+
+    remote = sqlite3.connect(":memory:")
+    remote.row_factory = sqlite3.Row
+    db.backup(remote)
+
+    doc, key, payload = purchase(db)
+    first = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    ).changes
+    for change in first:
+        if change["entity_type"] not in ("supplier", "purchase"):
+            continue
+        with business_transaction(remote):
+            apply_remote_change(
+                remote,
+                RemoteChange(
+                    change["entity_type"],
+                    change["entity_uuid"],
+                    change["operation"],
+                    change["payload"],
+                    change["version"],
+                    str(uuid4()),
+                    datetime.now(timezone.utc),
+                ),
+                tenant_id=1,
+            )
+    assert remote.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+
+    changed = copy.deepcopy(payload)
+    changed["items"][0]["qty"] = 5
+    update_purchase(
+        db,
+        tenant_id=1,
+        entity_uuid=key,
+        payload=changed,
+        expected_version=1,
+    )
+    second = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    ).changes
+    update_change = next(
+        c for c in second
+        if c["entity_type"] == "purchase" and c["entity_uuid"] == key
+    )
+    assert update_change["operation"] == "update"
+    assert update_change["version"] == 2
+    with business_transaction(remote):
+        apply_remote_change(
+            remote,
+            RemoteChange(
+                update_change["entity_type"],
+                update_change["entity_uuid"],
+                update_change["operation"],
+                update_change["payload"],
+                update_change["version"],
+                str(uuid4()),
+                datetime.now(timezone.utc),
+            ),
+            tenant_id=1,
+        )
+    assert remote.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 5
+
+    void_purchase(db, tenant_id=1, entity_uuid=key, expected_version=2)
+    third = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    ).changes
+    void_change = next(
+        c for c in third
+        if c["entity_type"] == "purchase" and c["entity_uuid"] == key
+    )
+    assert void_change["operation"] == "update"
+    assert void_change["version"] == 3
+    assert void_change["payload"]["voided"] is True
+    with business_transaction(remote):
+        apply_remote_change(
+            remote,
+            RemoteChange(
+                void_change["entity_type"],
+                void_change["entity_uuid"],
+                void_change["operation"],
+                void_change["payload"],
+                void_change["version"],
+                str(uuid4()),
+                datetime.now(timezone.utc),
+            ),
+            tenant_id=1,
+        )
+    assert remote.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 0
+    row = remote.execute(
+        "SELECT is_void,sync_version FROM purchases WHERE entity_uuid=?", (key,)
+    ).fetchone()
+    assert row["is_void"] == 1
+    assert row["sync_version"] == 3
+    remote.close()
