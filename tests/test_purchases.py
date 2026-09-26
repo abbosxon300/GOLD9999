@@ -14,6 +14,8 @@ from services.business_writes.purchases import (
     prepare_purchase,
     save_purchase,
     pay_purchase,
+    update_purchase,
+    void_purchase,
 )
 from services.business_writes.transaction import business_transaction
 
@@ -527,3 +529,154 @@ def test_cash_ledger_hides_other_firms_supplier_payments(web):
     assert response.status_code == 200
     assert "12 500" in response.text
     assert "77 777" not in response.text
+
+
+def test_purchase_edit_recalculates_stock_and_version(db):
+    doc, key, payload = purchase(db)
+    changed = copy.deepcopy(payload)
+    changed["items"][0]["qty"] = 5
+    changed["items"][0]["unit_cost_uzs"] = 47000
+    update_purchase(
+        db,
+        tenant_id=1,
+        entity_uuid=key,
+        payload=changed,
+        expected_version=1,
+    )
+    row = db.execute(
+        "SELECT total_uzs,sync_version FROM purchases WHERE id=?", (doc,)
+    ).fetchone()
+    assert row["sync_version"] == 2
+    assert row["total_uzs"] == 295000
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 5
+    assert db.execute("SELECT stock_qty FROM products WHERE id=12").fetchone()[0] == 3
+    with pytest.raises(ValueError, match="boshqa qurilmada"):
+        update_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=key,
+            payload=changed,
+            expected_version=1,
+        )
+
+
+def test_purchase_edit_never_drops_below_paid_or_negative_stock(db):
+    doc, key, payload = purchase(db)
+    pay_purchase(
+        db,
+        tenant_id=1,
+        entity_uuid=str(uuid4()),
+        payload=payment(key, 100000),
+    )
+    too_small = copy.deepcopy(payload)
+    too_small["items"] = [
+        dict(too_small["items"][0], qty=1, unit_cost_uzs=10000)
+    ]
+    with pytest.raises(ValueError, match="to‘langan"):
+        update_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=key,
+            payload=too_small,
+            expected_version=1,
+        )
+    db.execute("UPDATE products SET stock_qty=0 WHERE id=11")
+    db.commit()
+    with pytest.raises(ValueError, match="qoldiq"):
+        update_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=key,
+            payload=payload,
+            expected_version=1,
+        )
+
+
+def test_purchase_void_reverses_stock_and_keeps_tombstone(db):
+    doc, key, _ = purchase(db)
+    void_purchase(db, tenant_id=1, entity_uuid=key, expected_version=1)
+    row = db.execute(
+        "SELECT is_void,sync_version FROM purchases WHERE id=?", (doc,)
+    ).fetchone()
+    assert row["is_void"] == 1
+    assert row["sync_version"] == 2
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 0
+    assert db.execute("SELECT stock_qty FROM products WHERE id=12").fetchone()[0] == 0
+    assert db.execute(
+        "SELECT COUNT(*) FROM purchase_items WHERE purchase_id=?", (doc,)
+    ).fetchone()[0] == 0
+
+
+def test_purchase_void_blocks_payments(db):
+    doc, key, _ = purchase(db)
+    pay_purchase(
+        db,
+        tenant_id=1,
+        entity_uuid=str(uuid4()),
+        payload=payment(key, 50000),
+    )
+    with pytest.raises(ValueError, match="To‘lov"):
+        void_purchase(db, tenant_id=1, entity_uuid=key, expected_version=1)
+    assert db.execute(
+        "SELECT is_void FROM purchases WHERE id=?", (doc,)
+    ).fetchone()[0] == 0
+
+
+def test_http_purchase_edit_and_void(web):
+    app, client, path = web
+    csrf = token_from(client)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    supplier = create_supplier(conn, tenant_id=1, name="HTTP supplier")
+    key = str(uuid4())
+    payload = prepare_purchase(
+        conn,
+        tenant_id=1,
+        supplier_id=supplier,
+        purchase_date="2026-09-26",
+        reference="HTTP-1",
+        note="",
+        items=[{"product_id": 11, "qty": 2, "unit_cost_uzs": 10000}],
+        entity_uuid=key,
+    )
+    doc = save_purchase(conn, tenant_id=1, entity_uuid=key, payload=payload)
+    conn.close()
+
+    page = client.get(f"/kpi/documents/{doc}/edit")
+    assert page.status_code == 200
+    assert "Kirimni tahrirlash" in page.text
+
+    edit = client.post(
+        f"/kpi/documents/{doc}/edit",
+        data={
+            "csrf_token": csrf,
+            "expected_version": "1",
+            "supplier_id": str(supplier),
+            "purchase_date": "2026-09-26",
+            "reference": "HTTP-2",
+            "note": "edited",
+            "items": json.dumps(
+                [{"product_id": 11, "qty": 3, "unit_cost_uzs": 10000}]
+            ),
+        },
+    )
+    assert edit.status_code == 302
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT reference,sync_version FROM purchases WHERE id=?", (doc,)
+    ).fetchone()
+    assert row["reference"] == "HTTP-2"
+    assert row["sync_version"] == 2
+    conn.close()
+
+    deleted = client.post(
+        f"/kpi/documents/{doc}/void",
+        data={"csrf_token": csrf, "expected_version": "2"},
+    )
+    assert deleted.status_code == 302
+    conn = sqlite3.connect(path)
+    assert conn.execute(
+        "SELECT is_void FROM purchases WHERE id=?", (doc,)
+    ).fetchone()[0] == 1
+    conn.close()
