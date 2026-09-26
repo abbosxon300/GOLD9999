@@ -2,21 +2,14 @@
 {% set is_edit = edit_mode|default(false) %}
 {% set title = ('Kirimni tahrirlash' if is_edit else 'Yangi kirim') %}
 
-{% block heading %}
-  {{ 'Kirim #' ~ purchase_id ~ 'ni tahrirlash' if is_edit else 'Yangi kirim' }}
-{% endblock %}
-
-{% block subtitle %}
-  {{ 'Xato kirim ma’lumotlarini xavfsiz tuzating' if is_edit else 'Yetkazuvchi, mahsulot va to‘lovni bitta oqimda kiriting' }}
-{% endblock %}
+{% block heading %}{{ 'Kirim #' ~ purchase_id ~ 'ni tahrirlash' if is_edit else 'Yangi kirim' }}{% endblock %}
+{% block subtitle %}{{ 'Kirim ma’lumotlarini tuzating' if is_edit else 'Tovar kirimini tez va qulay kiriting' }}{% endblock %}
 
 {% block workspace %}
-{% if error %}
-  <div class="pw-alert" role="alert">{{ error }}</div>
-{% endif %}
+{% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
 
 <div id="pw-draft" class="pw-draft" hidden>
-  <span>{{ 'Bu tahrirning saqlanmagan qoralamasi bor.' if is_edit else 'Bu brauzerda saqlanmagan qoralama bor.' }}</span>
+  <span>{{ 'Bu tahrirning saqlanmagan qoralamasi bor.' if is_edit else 'Saqlanmagan qoralama bor.' }}</span>
   <button type="button" id="pw-restore" class="pw-button">Tiklash</button>
   <button type="button" id="pw-discard" class="pw-clear">O‘chirish</button>
 </div>
@@ -24,253 +17,150 @@
 <form id="purchase-form" method="post" autocomplete="off" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="entity_uuid" value="{{ initial.entity_uuid }}">
-  {% if is_edit %}
-    <input type="hidden" name="expected_version" value="{{ expected_version }}">
-  {% endif %}
+  {% if is_edit %}<input type="hidden" name="expected_version" value="{{ expected_version }}">{% endif %}
   <input type="hidden" name="items" id="pw-items">
 
-  <div class="pw-entry-workspace">
-    <section class="pw-panel pw-entry-meta-card">
-      <div class="pw-entry-section-head">
-        <div>
-          <span class="pw-entry-index">01</span>
-          <h2>Kirim ma’lumotlari</h2>
+  <section class="pw-panel pw-simple-entry">
+    <div class="pw-simple-meta">
+      <label class="pw-simple-field pw-simple-supplier">
+        <span>Yetkazuvchi <b>*</b></span>
+        <div class="pw-inline">
+          <select name="supplier_id" id="pw-supplier" aria-describedby="pw-supplier-select-error">
+            <option value="">Yetkazuvchini tanlang</option>
+            {% for s in suppliers %}
+              <option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>
+                {{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <button type="button" id="pw-open-supplier" class="pw-simple-add" aria-label="Yetkazuvchi qo‘shish" title="Yangi yetkazuvchi">+</button>
         </div>
-        <span>Hujjat asoslari</span>
+        <small id="pw-supplier-select-error" class="pw-field-error" hidden></small>
+      </label>
+
+      <label class="pw-simple-field">
+        <span>Sana <b>*</b></span>
+        <input type="date" name="purchase_date" id="pw-purchase-date" value="{{ initial.purchase_date }}" aria-describedby="pw-date-error">
+        <small id="pw-date-error" class="pw-field-error" hidden></small>
+      </label>
+
+      <label class="pw-simple-field">
+        <span>Hujjat raqami</span>
+        <input name="reference" maxlength="80" value="{{ initial.get('reference','') }}" placeholder="Masalan: 125">
+      </label>
+    </div>
+
+    <div class="pw-simple-search pw-product-search">
+      <div class="pw-search-box">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
+          <circle cx="10.5" cy="10.5" r="6.5"/>
+          <path d="m16 16 5 5"/>
+        </svg>
+        <input
+          id="pw-search"
+          type="search"
+          placeholder="Mahsulot nomi yoki shtrix-kod"
+          role="combobox"
+          aria-expanded="false"
+          aria-controls="pw-results"
+          aria-autocomplete="list">
+        <kbd>Enter</kbd>
       </div>
+      <div id="pw-results" role="listbox" hidden></div>
+    </div>
 
-      <div class="pw-entry-meta-grid">
-        <label class="pw-entry-field pw-entry-supplier">
-          <span>Yetkazuvchi <b>*</b></span>
-          <div class="pw-inline">
-            <select
-              name="supplier_id"
-              id="pw-supplier"
-              aria-describedby="pw-supplier-select-error">
-              <option value="">Yetkazuvchini tanlang</option>
-              {% for s in suppliers %}
-                <option
-                  value="{{ s.id }}"
-                  {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>
-                  {{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}
-                </option>
-              {% endfor %}
-            </select>
-            <button
-              type="button"
-              id="pw-open-supplier"
-              class="pw-entry-add-supplier"
-              aria-label="Yetkazuvchi qo‘shish"
-              title="Yangi yetkazuvchi">
-              +
-            </button>
-          </div>
-          <small id="pw-supplier-select-error" class="pw-field-error" hidden></small>
-        </label>
+    <div class="pw-simple-table-head">
+      <span>Mahsulotlar</span>
+      <span id="pw-item-count">0 tur</span>
+    </div>
 
-        <label class="pw-entry-field">
-          <span>Sana <b>*</b></span>
-          <input
-            type="date"
-            name="purchase_date"
-            id="pw-purchase-date"
-            value="{{ initial.purchase_date }}"
-            aria-describedby="pw-date-error">
-          <small id="pw-date-error" class="pw-field-error" hidden></small>
-        </label>
+    <div class="pw-table-wrap">
+      <table class="pw-table pw-entry-table">
+        <thead>
+          <tr>
+            <th>Mahsulot</th>
+            <th>Miqdor</th>
+            <th>Kirim narxi</th>
+            <th class="num">Jami</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pw-cart"></tbody>
+      </table>
+    </div>
 
-        <label class="pw-entry-field">
-          <span>Hujjat raqami</span>
-          <input
-            name="reference"
-            maxlength="80"
-            value="{{ initial.get('reference','') }}"
-            placeholder="Masalan: 125">
-        </label>
-      </div>
-    </section>
+    <div class="pw-simple-empty" id="pw-cart-empty">Mahsulot tanlanmagan</div>
 
-    <section class="pw-panel pw-products-card">
-      <div class="pw-entry-section-head pw-products-head">
-        <div>
-          <span class="pw-entry-index">02</span>
-          <h2>Mahsulotlar</h2>
-        </div>
-        <span id="pw-item-count">0 tur</span>
-      </div>
-
-      <div class="pw-product-search pw-entry-product-search">
-        <label for="pw-search">Mahsulot qidirish yoki shtrix-kod skanerlash</label>
-        <div class="pw-search-box">
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
-            <circle cx="10.5" cy="10.5" r="6.5"/>
-            <path d="m16 16 5 5"/>
-          </svg>
-          <input
-            id="pw-search"
-            type="search"
-            placeholder="Mahsulot nomini yozing yoki shtrix-kodni skanerlang"
-            role="combobox"
-            aria-expanded="false"
-            aria-controls="pw-results"
-            aria-autocomplete="list">
-          <kbd>Enter</kbd>
-        </div>
-        <div id="pw-results" role="listbox" hidden></div>
-      </div>
-
-      <div class="pw-table-wrap">
-        <table class="pw-table pw-entry-table">
-          <thead>
-            <tr>
-              <th>Mahsulot</th>
-              <th>Miqdor</th>
-              <th>Kirim narxi</th>
-              <th class="num">Jami</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="pw-cart"></tbody>
-        </table>
-      </div>
-
-      <div class="pw-empty pw-entry-empty" id="pw-cart-empty">
-        <span class="pw-empty-icon" aria-hidden="true">+</span>
-        <div>
-          <h3>Mahsulot qo‘shing</h3>
-          <p>Qidiruvdan tanlang yoki shtrix-kodni skanerlang.</p>
-        </div>
-      </div>
-
-      <div class="pw-cart-footer pw-entry-cart-footer">
-        <span>{{ 'O‘zgarish ombor qoldig‘iga farq bo‘yicha qo‘llanadi' if is_edit else 'Oxirgi kirim narxi avtomatik taklif qilinadi' }}</span>
-        <button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button>
-      </div>
-    </section>
-
-    <label class="pw-panel pw-entry-note">
+    <label class="pw-simple-note">
       <span>Izoh</span>
-      <textarea
-        name="note"
-        maxlength="500"
-        rows="1"
-        placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea>
+      <input name="note" maxlength="500" value="{{ initial.get('note','') }}" placeholder="Ixtiyoriy izoh">
     </label>
 
-    <section class="pw-panel pw-checkout">
-      <div class="pw-checkout-head">
-        <div>
-          <span class="pw-eyebrow">HISOB-KITOB</span>
-          <h2>{{ 'Yangilangan kirim' if is_edit else 'Kirim yakuni' }}</h2>
-        </div>
-        <small>{{ 'O‘zgarishlarni tekshirib saqlang' if is_edit else 'To‘lov ixtiyoriy — qarz avtomatik hisoblanadi' }}</small>
-      </div>
-
-      <div class="pw-checkout-grid {% if is_edit %}is-edit{% endif %}">
-        <div class="pw-checkout-stat">
-          <span>Jami summa</span>
-          <strong><span id="pw-total">0</span> <small>so‘m</small></strong>
-        </div>
-
-        {% if is_edit %}
-          <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') }}">
-          <div class="pw-checkout-stat">
-            <span>Oldin to‘langan</span>
-            <strong>{{ money(initial.get('paid',0)) }} <small>so‘m</small></strong>
-          </div>
-        {% else %}
-          <label class="pw-checkout-field">
-            <span>Hozir to‘lanadi</span>
-            <div class="pw-checkout-input-action">
-              <input
-                name="paid"
-                id="pw-paid"
-                inputmode="decimal"
-                value="{{ initial.get('paid','0') }}"
-                placeholder="0">
-              <button class="pw-clear pw-pay-all" type="button" id="pw-pay-all">To‘liq</button>
-            </div>
-          </label>
-
-          <label class="pw-checkout-field">
-            <span>Kassa</span>
-            <select name="method">
-              <option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option>
-              <option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option>
-            </select>
-          </label>
-        {% endif %}
-
-        <div class="pw-checkout-stat pw-checkout-debt">
-          <span>Qolgan qarz</span>
-          <strong><span id="pw-debt">0</span> <small>so‘m</small></strong>
-        </div>
-
-        <div class="pw-checkout-actions">
-          <button
-            type="submit"
-            id="pw-save"
-            class="pw-button pw-primary">
-            {{ 'O‘zgarishlarni saqlash' if is_edit else 'Kirimni saqlash' }}
-          </button>
-          <a
-            class="pw-button pw-secondary"
-            href="{{ url_for('purchase_detail',purchase_id=purchase_id) if is_edit else url_for('kpi') }}">
-            {{ 'Bekor qilish' if is_edit else 'Hujjatlar' }}
-          </a>
-        </div>
+    <div class="pw-simple-totalbar {% if is_edit %}is-edit{% endif %}">
+      <div class="pw-simple-money">
+        <span>Jami</span>
+        <strong><span id="pw-total">0</span> <small>so‘m</small></strong>
       </div>
 
       {% if is_edit %}
-        <p class="pw-checkout-hint">Jami summa oldin to‘langan summadan past bo‘lishi mumkin emas.</p>
+        <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') }}">
+        <div class="pw-simple-money">
+          <span>To‘langan</span>
+          <strong>{{ money(initial.get('paid',0)) }} <small>so‘m</small></strong>
+        </div>
       {% else %}
-        <p class="pw-checkout-hint">To‘lov kiritilsa, tanlangan kassadan chiqim yoziladi.</p>
+        <label class="pw-simple-pay">
+          <span>To‘lov</span>
+          <div class="pw-simple-pay-input">
+            <input name="paid" id="pw-paid" inputmode="decimal" value="{{ initial.get('paid','0') }}" placeholder="0">
+            <button type="button" id="pw-pay-all" class="pw-clear">To‘liq</button>
+          </div>
+        </label>
+
+        <label class="pw-simple-method">
+          <span>Kassa</span>
+          <select name="method">
+            <option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option>
+            <option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option>
+          </select>
+        </label>
       {% endif %}
 
-      <p id="pw-form-error" class="pw-inline-error pw-checkout-error" role="alert" hidden></p>
-      <small class="pw-draft-status" id="pw-draft-status" aria-live="polite"></small>
-    </section>
-  </div>
+      <div class="pw-simple-money pw-simple-debt">
+        <span>Qarz</span>
+        <strong><span id="pw-debt">0</span> <small>so‘m</small></strong>
+      </div>
+
+      <div class="pw-simple-actions">
+        <button type="submit" id="pw-save" class="pw-button pw-primary">
+          {{ 'Saqlash' if is_edit else 'Kirimni saqlash' }}
+        </button>
+        {% if is_edit %}
+          <a class="pw-button pw-secondary" href="{{ url_for('purchase_detail',purchase_id=purchase_id) }}">Bekor qilish</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <p id="pw-form-error" class="pw-inline-error pw-simple-error" role="alert" hidden></p>
+    <small class="pw-draft-status" id="pw-draft-status" aria-live="polite"></small>
+  </section>
 </form>
 
 <dialog id="pw-supplier-dialog" class="pw-dialog">
-  <form
-    id="pw-supplier-form"
-    method="post"
-    action="{{ url_for('purchase_suppliers') }}"
-    novalidate>
+  <form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}" novalidate>
     <div class="pw-section-head">
       <h2>Yangi yetkazuvchi</h2>
-      <button
-        type="button"
-        id="pw-close-supplier"
-        class="pw-icon-button"
-        aria-label="Yopish">×</button>
+      <button type="button" id="pw-close-supplier" class="pw-icon-button" aria-label="Yopish">×</button>
     </div>
-
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="entity_uuid" value="{{ supplier_uuid }}">
-
-    <label>
-      <span>Nomi <b>*</b></span>
-      <input
-        name="name"
-        maxlength="160"
-        placeholder="Korxona yoki shaxs nomi">
-    </label>
-
-    <label>
-      Telefon
-      <input name="phone" type="tel" maxlength="40" placeholder="+998 …">
-    </label>
-
+    <label><span>Nomi <b>*</b></span><input name="name" maxlength="160" placeholder="Korxona yoki shaxs nomi"></label>
+    <label>Telefon<input name="phone" type="tel" maxlength="40" placeholder="+998 …"></label>
     <p id="pw-supplier-error" class="pw-inline-error" role="alert"></p>
-    <button class="pw-button pw-primary pw-wide" type="submit">
-      Qo‘shish va tanlash
-    </button>
+    <button class="pw-button pw-primary pw-wide" type="submit">Qo‘shish va tanlash</button>
   </form>
 </dialog>
 
-<script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('O‘zgarishlarni saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
-<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_workspace_v2" defer></script>
+<script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('Saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_simple_v3" defer></script>
 {% endblock %}
