@@ -6,7 +6,11 @@
 <div class="pw">
   <header class="pw-header">
     <div><span class="pw-eyebrow">{% block eyebrow %}KIRIM{% endblock %}</span><h1>{% block heading %}Kirimlar{% endblock %}</h1><p>{% block subtitle %}Tovar kirim hujjatlari{% endblock %}</p></div>
-    {% if active != 'new' %}<a class="pw-button pw-primary" href="{{ url_for('purchase_new') }}"><span aria-hidden="true">+</span> Yangi kirim</a>{% endif %}
+    {% if active == 'new' %}
+      <a class="pw-button" href="{{ url_for('kpi') }}">Kirim hujjatlari</a>
+    {% else %}
+      <a class="pw-button pw-primary" href="{{ url_for('purchase_new') }}"><span aria-hidden="true">+</span> Yangi kirim</a>
+    {% endif %}
   </header>
   {% block workspace %}{% endblock %}
 </div>
