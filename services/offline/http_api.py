@@ -404,6 +404,7 @@ class HttpSyncApi:
 
         query: dict[str, str] = {
             "limit": str(normalized_limit),
+            "purchases": "1",
         }
 
         if cursor is not None:

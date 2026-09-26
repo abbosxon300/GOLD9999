@@ -1,6 +1,8 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sqlite3
+import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -427,6 +429,8 @@ def build_pull_response(
     cursor: str | None,
     limit: int = DEFAULT_PULL_LIMIT,
     device_uuid: str,
+    include_purchases: bool = False,
+    tenant_id: int | None = None,
 ) -> PullResponse:
     if not isinstance(
         connection,
@@ -451,7 +455,7 @@ def build_pull_response(
         field_name="device_uuid",
     )
 
-    offset = _cursor_offset(cursor)
+    offset = 0 if include_purchases else _cursor_offset(cursor)
 
     previous_row_factory = connection.row_factory
     connection.row_factory = sqlite3.Row
@@ -478,6 +482,38 @@ def build_pull_response(
     finally:
         connection.row_factory = previous_row_factory
 
+    if tenant_id is not None:
+        # Scope even legacy changes to the authenticated device's business.
+        def belongs(change):
+            kind = change["entity_type"]
+            identity = change["entity_uuid"]
+            if kind in ("category", "product"):
+                table = "categories" if kind == "category" else "products"
+                sql = f"SELECT 1 FROM {table} WHERE entity_uuid=? AND tenant_id=?"
+            elif kind == "inventory_move":
+                sql = "SELECT 1 FROM inventory_moves m JOIN products p ON p.id=m.product_id WHERE m.entity_uuid=? AND p.tenant_id=?"
+            else:
+                sql = "SELECT 1 FROM sales s JOIN sale_items i ON i.sale_id=s.id JOIN products p ON p.id=i.product_id WHERE s.entity_uuid=? AND p.tenant_id=?"
+            return connection.execute(sql, (identity, tenant_id)).fetchone() is not None
+        all_changes = [change for change in all_changes if belongs(change)]
+    if include_purchases:
+        from services.offline.purchase_adapter import purchase_changes
+        previous_factory = connection.row_factory
+        connection.row_factory = sqlite3.Row
+        try:
+            all_changes += purchase_changes(connection, normalized_device_uuid, tenant_id)
+        finally:
+            connection.row_factory = previous_factory
+
+    # Versioned snapshot cursor: inserts into earlier dependency groups must not
+    # make a saved numeric offset silently skip new suppliers or movements.
+    fingerprint = None
+    if include_purchases:
+        fingerprint = hashlib.sha256(json.dumps(all_changes, sort_keys=True, default=str).encode()).hexdigest()[:24]
+        parts = str(cursor or "").split(":")
+        if len(parts) == 3 and parts[0] == "p1" and parts[1] == fingerprint:
+            offset = _cursor_offset(parts[2])
+
     batch_changes = tuple(
         all_changes[
             offset:offset + normalized_limit
@@ -489,7 +525,7 @@ def build_pull_response(
 
     return PullResponse(
         changes=batch_changes,
-        next_cursor=str(next_offset),
+        next_cursor=f"p1:{fingerprint}:{next_offset}" if include_purchases else str(next_offset),
         batch_id=str(uuid.uuid4()),
         has_more=has_more,
     )

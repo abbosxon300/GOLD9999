@@ -1133,6 +1133,13 @@ def apply_inventory_move_remote(
             "topilmadi"
         )
 
+    if context.tenant_id is not None:
+        owner = context.connection.execute(
+            "SELECT tenant_id FROM products WHERE id=?", (product.local_id,)
+        ).fetchone()
+        if owner is None or owner["tenant_id"] != context.tenant_id:
+            raise InvalidRemotePayloadError("Mahsulot boshqa firmaga tegishli")
+
     if context.existing is not None:
         row = _get_inventory_move_row(
             context.connection,
@@ -1191,6 +1198,8 @@ def apply_inventory_move_remote(
                     payload["source_type"]
                 ),
                 source_id=payload["source_id"],
+                entity_uuid=context.entity_uuid,
+                replicate=False,
             )
         else:
             movement = consume_stock(

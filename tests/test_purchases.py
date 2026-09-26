@@ -1,0 +1,529 @@
+"""Purchase invariants and HTTP/security checks against disposable SQLite databases."""
+
+import copy
+import json
+import re
+import sqlite3
+from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
+from services.migrations import run_migrations
+from services.business_writes.purchases import (
+    create_supplier,
+    prepare_purchase,
+    save_purchase,
+    pay_purchase,
+)
+from services.business_writes.transaction import business_transaction
+
+
+def database():
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=ON")
+    run_migrations(db)
+    db.execute("INSERT INTO tenants(name,slug) VALUES('Other','other')")
+    for tenant in (1, 2):
+        db.execute(
+            "INSERT INTO categories(id,name,tenant_id,entity_uuid,sync_version) VALUES(?,?,?,?,1)",
+            (tenant, f"Category {tenant}", tenant, str(uuid4())),
+        )
+        for n in (1, 2):
+            product_id = tenant * 10 + n
+            db.execute(
+                "INSERT INTO products(id,name,category_id,tenant_id,entity_uuid,sync_version) VALUES(?,?,?,?,?,1)",
+                (product_id, f"Product {product_id}", tenant, tenant, str(uuid4())),
+            )
+    db.commit()
+    return db
+
+
+@pytest.fixture
+def db():
+    db = database()
+    yield db
+    db.close()
+
+
+def purchase(db, *, tenant=1, items=None):
+    supplier = create_supplier(db, tenant_id=tenant, name="Test supplier")
+    key = str(uuid4())
+    payload = prepare_purchase(
+        db,
+        tenant_id=tenant,
+        supplier_id=supplier,
+        purchase_date="2026-09-26",
+        reference="R-12",
+        note="Test",
+        items=items
+        or [
+            {"product_id": tenant * 10 + 1, "qty": "2", "unit_cost_uzs": "45000"},
+            {"product_id": tenant * 10 + 2, "qty": "3", "unit_cost_uzs": "20000"},
+        ],
+        entity_uuid=key,
+    )
+    doc = save_purchase(db, tenant_id=tenant, entity_uuid=key, payload=payload)
+    return doc, key, payload
+
+
+def payment(key, amount=50000, method="cash"):
+    return dict(
+        purchase_uuid=key,
+        payment_date="2026-09-26",
+        amount_uzs=amount,
+        method=method,
+        note="Test",
+    )
+
+
+def test_purchase_stock_average_and_retry(db):
+    doc, key, payload = purchase(db)
+    assert (
+        db.execute("SELECT total_uzs FROM purchases WHERE id=?", (doc,)).fetchone()[0]
+        == 150000
+    )
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+    assert save_purchase(db, tenant_id=1, entity_uuid=key, payload=payload) == doc
+    assert db.execute("SELECT COUNT(*) FROM inventory_moves").fetchone()[0] == 2
+    from services.sales_helpers import product_avg_cost
+
+    assert product_avg_cost(lambda: db, 11) == 45000
+    changed = copy.deepcopy(payload)
+    changed["items"][0]["qty"] = 10
+    with pytest.raises(ValueError):
+        save_purchase(db, tenant_id=1, entity_uuid=key, payload=changed)
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+
+
+def test_payment_retry_overpay_and_cash_guard(db):
+    doc, key, _ = purchase(db)
+    token = str(uuid4())
+    result = pay_purchase(db, tenant_id=1, entity_uuid=token, payload=payment(key))
+    assert (
+        pay_purchase(db, tenant_id=1, entity_uuid=token, payload=payment(key)) == result
+    )
+    pay_purchase(
+        db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key, 100000, "click")
+    )
+    assert (
+        db.execute(
+            "SELECT SUM(amount_uzs) FROM cash_moves WHERE direction='OUT'"
+        ).fetchone()[0]
+        == 50000
+    )
+    assert db.execute("SELECT SUM(amount_uzs) FROM click_moves").fetchone()[0] == 100000
+    with pytest.raises(ValueError):
+        pay_purchase(db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key, 1))
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute("UPDATE cash_moves SET amount_uzs=1")
+    db.rollback()
+    with pytest.raises(sqlite3.IntegrityError):
+        db.execute("DELETE FROM cash_moves")
+    db.rollback()
+
+
+def test_rollback_all_rows_and_initial_payment(db):
+    before = db.execute("SELECT COUNT(*) FROM inventory_moves").fetchone()[0]
+    with pytest.raises(ValueError):
+        with business_transaction(db):
+            doc, key, payload = purchase(db)
+            pay_purchase(
+                db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key, 999999)
+            )
+    assert db.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM inventory_moves").fetchone()[0] == before
+    assert db.execute("SELECT SUM(stock_qty) FROM products").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("qty", "NaN"),
+        ("qty", "inf"),
+        ("qty", -1),
+        ("qty", 0),
+        ("unit_cost_uzs", "-5"),
+        ("unit_cost_uzs", "Infinity"),
+        ("unit_cost_uzs", 0),
+    ],
+)
+def test_bad_numbers(db, field, value):
+    item = {"product_id": 11, "qty": 1, "unit_cost_uzs": 100}
+    item[field] = value
+    with pytest.raises(ValueError):
+        purchase(db, items=[item])
+    assert db.execute("SELECT COUNT(*) FROM inventory_moves").fetchone()[0] == 0
+
+
+def test_tenant_and_duplicate_product_checks(db):
+    with pytest.raises(ValueError):
+        purchase(db, items=[{"product_id": 21, "qty": 1, "unit_cost_uzs": 10}])
+    with pytest.raises(ValueError):
+        purchase(db, items=[{"product_id": 11, "qty": 1, "unit_cost_uzs": 10}] * 2)
+    doc, key, payload = purchase(db)
+    with pytest.raises(ValueError):
+        save_purchase(db, tenant_id=2, entity_uuid=str(uuid4()), payload=payload)
+    with pytest.raises(ValueError):
+        pay_purchase(db, tenant_id=2, entity_uuid=str(uuid4()), payload=payment(key))
+
+
+def test_migration_preserves_existing_data_and_reruns(db):
+    from services.business_writes.inventory import receive_stock
+
+    with business_transaction(db):
+        receive_stock(
+            db, move_date="2026-09-25", product_id=11, qty=7, unit_cost_uzs=11
+        )
+    assert run_migrations(db) == []
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 7
+    assert db.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 0
+
+
+def test_sync_two_databases_no_double_stock(db):
+    import services.offline.master_data_adapters  # noqa: F401
+    import services.offline.purchase_adapter  # noqa: F401
+    from services.offline.pull_service import build_pull_response
+    from services.offline.models import RemoteChange
+    from services.offline.remote_applier import apply_remote_change
+
+    remote = sqlite3.connect(":memory:")
+    remote.row_factory = sqlite3.Row
+    db.backup(remote)
+    doc, key, payload = purchase(db)
+    pay_purchase(db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key))
+    changes = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    ).changes
+    business = [
+        c
+        for c in changes
+        if c["entity_type"]
+        in ("supplier", "inventory_move", "purchase", "purchase_payment")
+    ]
+    for iteration in range(2):
+        for change in business:
+            with business_transaction(remote):
+                apply_remote_change(
+                    remote,
+                    RemoteChange(
+                        change["entity_type"],
+                        change["entity_uuid"],
+                        "create",
+                        change["payload"],
+                        1,
+                        str(uuid4()),
+                        datetime.now(timezone.utc),
+                    ),
+                    tenant_id=1,
+                )
+    assert (
+        remote.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+    )
+    assert remote.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 1
+    assert (
+        remote.execute("SELECT SUM(amount_uzs) FROM cash_moves").fetchone()[0] == 50000
+    )
+    legacy = build_pull_response(
+        db, cursor=None, limit=500, device_uuid=str(uuid4()), tenant_id=1
+    ).changes
+    assert not any(
+        c["entity_type"] in ("supplier", "purchase", "purchase_payment") for c in legacy
+    )
+    assert len([c for c in legacy if c["entity_type"] == "inventory_move"]) == 2
+    remote.close()
+
+
+def test_pull_isolates_tenants(db):
+    from services.offline.pull_service import build_pull_response
+
+    purchase(db)
+    purchase(db, tenant=2)
+    a = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    )
+    b = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=2,
+    )
+    assert {c["entity_uuid"] for c in a.changes}.isdisjoint(
+        {c["entity_uuid"] for c in b.changes}
+    )
+
+
+@pytest.fixture
+def web(tmp_path, monkeypatch, db):
+    path = tmp_path / "web.db"
+    target = sqlite3.connect(path)
+    db.backup(target)
+    target.close()
+    monkeypatch.setenv("GOLD9999_DB_PATH", str(path))
+    import app as app_module
+    from services.db import configure_db
+
+    configure_db(str(path))
+    app = app_module.app
+    app.config.update(TESTING=True, SECRET_KEY="isolated-test-key")
+    conn = sqlite3.connect(path)
+    conn.execute(
+        "INSERT OR IGNORE INTO users(username,password_hash,role,tenant_id) VALUES('admin','test-only','admin',1)"
+    )
+    conn.execute(
+        "UPDATE users SET tenant_id=1,role='admin',is_active=1 WHERE username='admin'"
+    )
+    conn.commit()
+    user_id = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+    conn.close()
+    client = app.test_client()
+    with client.session_transaction() as s:
+        s.update(user_id=user_id, role="admin", full_name="Test Admin")
+    return app, client, path
+
+
+def token_from(client):
+    response = client.get("/kpi/new")
+    assert response.status_code == 200, response.text
+    return re.search(r'name="csrf_token" value="([^"]+)"', response.text)[1]
+
+
+def test_http_workflow_and_xss(web):
+    app, client, path = web
+    csrf = token_from(client)
+    response = client.post(
+        "/kpi/suppliers",
+        data=dict(
+            csrf_token=csrf,
+            entity_uuid=str(uuid4()),
+            name="<script>alert(1)</script>",
+            phone="+998",
+        ),
+        headers={"Accept": "application/json"},
+    )
+    assert response.status_code == 201
+    supplier = response.json["id"]
+    form = dict(
+        csrf_token=csrf,
+        entity_uuid=str(uuid4()),
+        supplier_id=supplier,
+        purchase_date="2026-09-26",
+        reference="Ref",
+        note="<img src=x onerror=alert(1)>",
+        items=json.dumps([dict(product_id=11, qty=2, unit_cost_uzs=45000)]),
+        paid="20000",
+        method="cash",
+    )
+    result = client.post("/kpi/new", data=form)
+    assert result.status_code == 302, result.text
+    detail = client.get(result.location)
+    assert detail.status_code == 200
+    assert (
+        "&lt;script&gt;" in detail.text
+        and "<script>alert(1)</script>" not in detail.text
+    )
+    assert client.post("/kpi/new", data=form).location == result.location
+    for url in (
+        "/kpi",
+        "/kpi?status=debt",
+        "/kpi?status=paid",
+        "/kpi?q=Ref",
+        "/kpi/stock",
+        "/kpi/legacy",
+        "/kpi/suppliers",
+    ):
+        assert client.get(url).status_code == 200, url
+    assert client.get("/kpi/1/kirim").status_code == 303
+    assert client.get("/kpi/1").status_code == 302
+    conn = sqlite3.connect(path)
+    assert conn.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 1
+    assert conn.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+    conn.close()
+
+
+def test_http_csrf_auth_and_cross_tenant(web):
+    app, client, path = web
+    csrf = token_from(client)
+    assert client.post("/kpi/suppliers", data=dict(name="No CSRF")).status_code == 400
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    doc, key, _ = purchase(conn, tenant=2)
+    conn.close()
+    assert client.get(f"/kpi/documents/{doc}").status_code == 404
+    assert (
+        client.post(f"/kpi/documents/{doc}/pay", data=dict(csrf_token=csrf)).status_code
+        == 404
+    )
+    with client.session_transaction() as s:
+        s["role"] = "agent"
+    assert client.get("/kpi").status_code == 302
+    with client.session_transaction() as s:
+        s.clear()
+    assert client.get("/kpi/new").status_code == 302
+
+
+def test_new_pull_cursor_does_not_skip_new_dependency_groups(db):
+    from services.offline.pull_service import build_pull_response
+
+    device = str(uuid4())
+    purchase(db)
+    first = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=device,
+        include_purchases=True,
+        tenant_id=1,
+    )
+    assert not first.has_more
+    empty = build_pull_response(
+        db,
+        cursor=first.next_cursor,
+        limit=500,
+        device_uuid=device,
+        include_purchases=True,
+        tenant_id=1,
+    )
+    assert not empty.changes
+    _, new_uuid, _ = purchase(db)
+    replay = build_pull_response(
+        db,
+        cursor=first.next_cursor,
+        limit=500,
+        device_uuid=device,
+        include_purchases=True,
+        tenant_id=1,
+    )
+    assert any(c["entity_uuid"] == new_uuid for c in replay.changes)
+    cursor = None
+    seen = []
+    for _ in range(100):
+        batch = build_pull_response(
+            db,
+            cursor=cursor,
+            limit=2,
+            device_uuid=device,
+            include_purchases=True,
+            tenant_id=1,
+        )
+        seen.extend(c["entity_uuid"] for c in batch.changes)
+        cursor = batch.next_cursor
+        if not batch.has_more:
+            break
+    assert len(seen) == len(set(seen)) == len(replay.changes)
+
+
+def test_remote_purchase_waits_for_stock_without_partial_document(db):
+    doc, key, payload = purchase(db)
+    payload["items"][0]["move_uuid"] = str(uuid4())
+    with pytest.raises(ValueError, match="sinxronlanmagan"):
+        save_purchase(
+            db, tenant_id=1, entity_uuid=str(uuid4()), payload=payload, replicate=False
+        )
+    assert db.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 1
+    assert db.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+
+
+def test_fractional_totals_equal_sum_of_displayed_rows(db):
+    doc, key, _ = purchase(
+        db,
+        items=[
+            {"product_id": 11, "qty": ".333", "unit_cost_uzs": "1.01"},
+            {"product_id": 12, "qty": ".333", "unit_cost_uzs": "1.01"},
+        ],
+    )
+    row = db.execute("SELECT total_uzs FROM purchases WHERE id=?", (doc,)).fetchone()
+    assert row[0] == 0.68
+    pay_purchase(db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key, 0.68))
+    with pytest.raises(ValueError):
+        pay_purchase(
+            db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(key, 0.01)
+        )
+
+
+def test_desktop_queue_has_stable_movement_ids(db, monkeypatch):
+    from services.offline.schema import ensure_offline_sync_schema
+
+    ensure_offline_sync_schema(db)
+    db.commit()
+    monkeypatch.setenv("GOLD9999_DATA_DIR", "/unused-test-desktop")
+    monkeypatch.setenv("OFFLINE_DEVICE_UUID", str(uuid4()))
+    doc, key, payload = purchase(db)
+    rows = db.execute(
+        "SELECT entity_type,entity_uuid FROM sync_queue ORDER BY id"
+    ).fetchall()
+    assert [r["entity_type"] for r in rows] == [
+        "supplier",
+        "inventory_move",
+        "inventory_move",
+        "purchase",
+    ]
+    assert rows[1]["entity_uuid"] == payload["items"][0]["move_uuid"]
+    assert rows[-1]["entity_uuid"] == key
+
+
+def test_release_backup_and_upgrade_from_v12(tmp_path):
+    from services.migrations import discover_migrations, ensure_schema_migrations
+    from tools.release_purchases import release
+
+    path = tmp_path / "production-like.db"
+    db = sqlite3.connect(path)
+    ensure_schema_migrations(db)
+    for migration in discover_migrations():
+        if migration.version >= 13:
+            break
+        migration.module.upgrade(db)
+        db.execute(
+            "INSERT INTO schema_migrations VALUES(?,?,?,?)",
+            (migration.version, migration.name, migration.checksum, "2026-09-26"),
+        )
+        db.commit()
+    db.execute("INSERT INTO categories(id,name,tenant_id) VALUES(1,'Old category',1)")
+    db.execute(
+        "INSERT INTO products(id,name,category_id,stock_qty,tenant_id) VALUES(1,'Old product',1,42,1)"
+    )
+    db.commit()
+    db.close()
+    backup = release(path, tmp_path / "backups")
+    old = sqlite3.connect(backup)
+    assert (
+        old.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name='purchases'"
+        ).fetchone()[0]
+        == 0
+    )
+    assert old.execute("SELECT stock_qty FROM products").fetchone()[0] == 42
+    old.close()
+    updated = sqlite3.connect(path)
+    assert updated.execute("SELECT stock_qty FROM products").fetchone()[0] == 42
+    assert updated.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 0
+    updated.close()
+
+
+def test_cash_ledger_hides_other_firms_supplier_payments(web):
+    app, client, path = web
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    _, own, _ = purchase(db, tenant=1)
+    _, other, _ = purchase(db, tenant=2)
+    pay_purchase(db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(own, 12500))
+    pay_purchase(
+        db, tenant_id=2, entity_uuid=str(uuid4()), payload=payment(other, 77777)
+    )
+    db.close()
+    response = client.get("/kassa?from=2026-09-01&to=2026-09-30")
+    assert response.status_code == 200
+    assert "12 500" in response.text
+    assert "77 777" not in response.text

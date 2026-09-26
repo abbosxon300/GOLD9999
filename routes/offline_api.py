@@ -206,10 +206,8 @@ def register_offline_api_routes(
     def offline_pull():
         db = get_db()
 
-        if not _offline_request_authorized(
-            app,
-            db,
-        ):
+        authorized, tenant_id, _ = _offline_request_tenant_identity(app, db)
+        if not authorized:
             return jsonify({
                 "success": False,
                 "message": "Unauthorized",
@@ -230,6 +228,8 @@ def register_offline_api_routes(
             response = build_pull_response(
                 db,
                 cursor=cursor,
+                tenant_id=tenant_id,
+                include_purchases=request.args.get("purchases") == "1",
                 limit=limit,
                 device_uuid=(
                     ensure_database_identity(db)

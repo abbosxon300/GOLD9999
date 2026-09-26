@@ -10,6 +10,7 @@ from services.offline.remote_applier import apply_remote_change
 from services.offline.sqlite_cursor import SQLiteSyncCursorStore
 
 import services.offline.master_data_adapters
+import services.offline.purchase_adapter  # noqa: F401
 import services.offline.sales_aggregate_adapter
 
 
