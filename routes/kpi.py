@@ -169,13 +169,6 @@ def register_kpi_routes(
             "items": [],
             "entity_uuid": str(uuid4()),
         }
-        if request.method == "GET":
-            supplier_id = parse_int(request.args.get("supplier"))
-            if supplier_id and q1(
-                "SELECT id FROM suppliers WHERE id=? AND tenant_id=?",
-                (supplier_id, tenant),
-            ):
-                initial["supplier_id"] = supplier_id
         error = None
         if request.method == "POST":
             check_csrf()
