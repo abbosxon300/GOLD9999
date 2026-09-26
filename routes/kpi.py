@@ -23,6 +23,7 @@ from services.business_writes.purchases import (
     prepare_purchase,
     save_purchase,
     pay_purchase,
+    pay_supplier,
     update_purchase,
     void_purchase,
     number,
@@ -121,7 +122,13 @@ def register_kpi_routes(
         elif status == "paid":
             clauses.append("p.total_uzs-COALESCE(pay.paid,0)<=0.005")
         source = """FROM purchases p JOIN suppliers s ON s.id=p.supplier_id
-            LEFT JOIN (SELECT purchase_id,SUM(amount_uzs) paid FROM purchase_payments GROUP BY purchase_id) pay ON pay.purchase_id=p.id
+            LEFT JOIN (
+                SELECT purchase_id,SUM(amount_uzs) paid FROM (
+                    SELECT purchase_id,amount_uzs FROM purchase_payments
+                    UNION ALL
+                    SELECT purchase_id,amount_uzs FROM supplier_payment_allocations
+                ) all_payments GROUP BY purchase_id
+            ) pay ON pay.purchase_id=p.id
             WHERE """ + " AND ".join(clauses)
         totals = q1(
             "SELECT COUNT(*) count,COALESCE(SUM(p.total_uzs),0) total,COALESCE(SUM(pay.paid),0) paid "
@@ -236,8 +243,19 @@ def register_kpi_routes(
             (purchase_id, tenant),
         )
         payments = q(
-            "SELECT * FROM purchase_payments WHERE purchase_id=? AND tenant_id=? ORDER BY payment_date,id",
-            (purchase_id, tenant),
+            """SELECT * FROM (
+                SELECT pp.id,pp.payment_date,pp.amount_uzs,pp.method,pp.note,
+                       'document' source
+                FROM purchase_payments pp
+                WHERE pp.purchase_id=? AND pp.tenant_id=?
+                UNION ALL
+                SELECT a.id,sp.payment_date,a.amount_uzs,sp.method,sp.note,
+                       'supplier' source
+                FROM supplier_payment_allocations a
+                JOIN supplier_payments sp ON sp.id=a.supplier_payment_id
+                WHERE a.purchase_id=? AND a.tenant_id=?
+            ) ORDER BY payment_date,id""",
+            (purchase_id, tenant, purchase_id, tenant),
         )
         paid = sum(p["amount_uzs"] for p in payments)
         return page(
@@ -272,8 +290,14 @@ def register_kpi_routes(
             (purchase_id, tenant),
         )
         paid_row = q1(
-            "SELECT COALESCE(SUM(amount_uzs),0) paid FROM purchase_payments WHERE purchase_id=? AND tenant_id=?",
-            (purchase_id, tenant),
+            """SELECT COALESCE(SUM(amount_uzs),0) paid FROM (
+                SELECT amount_uzs FROM purchase_payments
+                WHERE purchase_id=? AND tenant_id=?
+                UNION ALL
+                SELECT amount_uzs FROM supplier_payment_allocations
+                WHERE purchase_id=? AND tenant_id=?
+            )""",
+            (purchase_id, tenant, purchase_id, tenant),
         )
         paid = float(paid_row["paid"] or 0)
         initial = {
@@ -438,9 +462,15 @@ def register_kpi_routes(
                 FROM purchases WHERE COALESCE(is_void,0)=0 GROUP BY supplier_id
             ) d ON d.supplier_id=s.id
             LEFT JOIN (
-                SELECT p.supplier_id,SUM(pp.amount_uzs) paid
-                FROM purchase_payments pp JOIN purchases p ON p.id=pp.purchase_id
-                WHERE COALESCE(p.is_void,0)=0 GROUP BY p.supplier_id
+                SELECT supplier_id,SUM(amount_uzs) paid FROM (
+                    SELECT p.supplier_id,pp.amount_uzs
+                    FROM purchase_payments pp
+                    JOIN purchases p ON p.id=pp.purchase_id
+                    WHERE COALESCE(p.is_void,0)=0
+                    UNION ALL
+                    SELECT sp.supplier_id,sp.amount_uzs
+                    FROM supplier_payments sp
+                ) supplier_paid GROUP BY supplier_id
             ) pay ON pay.supplier_id=s.id
             WHERE s.tenant_id=? ORDER BY s.name,s.id""",
             (tenant,),
@@ -467,17 +497,31 @@ def register_kpi_routes(
             """SELECT p.*,COALESCE(pay.paid,0) paid,
             (SELECT COUNT(*) FROM purchase_items i WHERE i.purchase_id=p.id) item_count
             FROM purchases p
-            LEFT JOIN (SELECT purchase_id,SUM(amount_uzs) paid FROM purchase_payments GROUP BY purchase_id) pay ON pay.purchase_id=p.id
+            LEFT JOIN (
+                SELECT purchase_id,SUM(amount_uzs) paid FROM (
+                    SELECT purchase_id,amount_uzs FROM purchase_payments
+                    UNION ALL
+                    SELECT purchase_id,amount_uzs FROM supplier_payment_allocations
+                ) all_payments GROUP BY purchase_id
+            ) pay ON pay.purchase_id=p.id
             WHERE p.tenant_id=? AND p.supplier_id=? AND COALESCE(p.is_void,0)=0
             ORDER BY p.purchase_date DESC,p.id DESC""",
             (tenant, supplier_id),
         )
         payments = q(
-            """SELECT pp.*,p.id purchase_id,p.reference FROM purchase_payments pp
-            JOIN purchases p ON p.id=pp.purchase_id
-            WHERE pp.tenant_id=? AND p.supplier_id=? AND COALESCE(p.is_void,0)=0
-            ORDER BY pp.payment_date DESC,pp.id DESC""",
-            (tenant, supplier_id),
+            """SELECT * FROM (
+                SELECT pp.id,pp.payment_date,pp.amount_uzs,pp.method,pp.note,
+                       p.id purchase_id,p.reference,'document' source
+                FROM purchase_payments pp
+                JOIN purchases p ON p.id=pp.purchase_id
+                WHERE pp.tenant_id=? AND p.supplier_id=? AND COALESCE(p.is_void,0)=0
+                UNION ALL
+                SELECT sp.id,sp.payment_date,sp.amount_uzs,sp.method,sp.note,
+                       NULL purchase_id,'' reference,'supplier' source
+                FROM supplier_payments sp
+                WHERE sp.tenant_id=? AND sp.supplier_id=?
+            ) ORDER BY payment_date DESC,id DESC""",
+            (tenant, supplier_id, tenant, supplier_id),
         )
         total = round(sum(r["total_uzs"] for r in documents), 2)
         paid = round(sum(r["amount_uzs"] for r in payments), 2)
@@ -506,6 +550,7 @@ def register_kpi_routes(
                     "kind": "payment",
                     "purchase_id": row["purchase_id"],
                     "reference": row["reference"],
+                    "source": row["source"],
                     "debit": 0.0,
                     "credit": float(row["amount_uzs"] or 0),
                 }
@@ -527,9 +572,7 @@ def register_kpi_routes(
             total=total,
             paid=paid,
             debt=debt,
-            unpaid_documents=[
-                r for r in documents if r["total_uzs"] - r["paid"] > 0.005
-            ],
+            can_pay=debt > 0.005,
             payment_uuid=str(uuid4()),
         )
 
@@ -539,21 +582,19 @@ def register_kpi_routes(
     def purchase_supplier_pay(supplier_id):
         tenant = identity()
         check_csrf()
-        purchase_id = parse_int(request.form.get("purchase_id"))
-        doc = q1(
-            """SELECT id,entity_uuid FROM purchases
-            WHERE id=? AND supplier_id=? AND tenant_id=? AND COALESCE(is_void,0)=0""",
-            (purchase_id, supplier_id, tenant),
+        supplier = q1(
+            "SELECT id,entity_uuid FROM suppliers WHERE id=? AND tenant_id=?",
+            (supplier_id, tenant),
         )
-        if not doc:
+        if not supplier:
             abort(404)
         try:
-            pay_purchase(
+            pay_supplier(
                 get_db(),
                 tenant_id=tenant,
                 entity_uuid=request.form.get("entity_uuid"),
                 payload={
-                    "purchase_uuid": doc["entity_uuid"],
+                    "supplier_uuid": supplier["entity_uuid"],
                     "payment_date": request.form.get("payment_date"),
                     "amount_uzs": request.form.get("amount_uzs"),
                     "method": request.form.get("method"),
