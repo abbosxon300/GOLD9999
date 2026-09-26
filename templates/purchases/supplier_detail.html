@@ -6,12 +6,9 @@
 {% block subtitle %}{{ supplier.phone or 'Telefon kiritilmagan' }}{% endblock %}
 
 {% block header_actions %}
-<div class="pw-supplier-header-actions">
-  {% if unpaid_documents %}
-    <button type="button" class="pw-button" id="supplier-pay-open">To‘lov qilish</button>
-  {% endif %}
-  <a class="pw-button pw-primary" href="{{ url_for('purchase_new', supplier=supplier.id) }}">+ Yangi kirim</a>
-</div>
+{% if can_pay %}
+  <button type="button" class="pw-button pw-primary" id="supplier-pay-open">To‘lov qilish</button>
+{% endif %}
 {% endblock %}
 
 {% block workspace %}
@@ -71,8 +68,12 @@
                   {% endif %}
                 </td>
                 <td>
-                  <a href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">Kirim #{{ r.purchase_id }}</a>
-                  {% if r.reference %}<small>{{ r.reference }}</small>{% endif %}
+                  {% if r.purchase_id %}
+                    <a href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">Kirim #{{ r.purchase_id }}</a>
+                    {% if r.reference %}<small>{{ r.reference }}</small>{% endif %}
+                  {% else %}
+                    <span>Umumiy to‘lov</span>
+                  {% endif %}
                 </td>
                 <td class="num">{% if r.debit %}{{ money(r.debit) }}{% else %}—{% endif %}</td>
                 <td class="num">{% if r.credit %}{{ money(r.credit) }}{% else %}—{% endif %}</td>
@@ -140,7 +141,13 @@
             {% for p in payments %}
               <tr>
                 <td>{{ p.payment_date[8:10] }}.{{ p.payment_date[5:7] }}.{{ p.payment_date[:4] }}</td>
-                <td><a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a></td>
+                <td>
+                  {% if p.purchase_id %}
+                    <a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a>
+                  {% else %}
+                    <span>Umumiy to‘lov</span>
+                  {% endif %}
+                </td>
                 <td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td>
                 <td>{{ p.note or '—' }}</td>
                 <td class="num">{{ money(p.amount_uzs) }}</td>
@@ -155,8 +162,8 @@
   </div>
 </section>
 
-{% if unpaid_documents %}
-<dialog class="pw-dialog pw-supplier-pay-dialog" id="supplier-pay-dialog">
+{% if can_pay %}
+<dialog class="pw-dialog pw-supplier-pay-dialog" id="supplier-pay-dialog" data-debt="{{ debt }}">
   <form
     id="supplier-pay-form"
     method="post"
@@ -165,24 +172,13 @@
     <div class="pw-dialog-head">
       <div>
         <h2>To‘lov qilish</h2>
-        <p>{{ supplier.name }}</p>
+        <p>{{ supplier.name }} · qarz {{ money(debt) }} so‘m</p>
       </div>
       <button type="button" class="pw-icon-button" id="supplier-pay-close" aria-label="Yopish">×</button>
     </div>
 
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="entity_uuid" value="{{ payment_uuid }}">
-
-    <label>
-      Qaysi kirim?
-      <select name="purchase_id" id="supplier-pay-purchase">
-        {% for r in unpaid_documents %}
-          <option value="{{ r.id }}" data-debt="{{ r.total_uzs-r.paid }}">
-            Kirim #{{ r.id }} · qarz {{ money(r.total_uzs-r.paid) }} so‘m
-          </option>
-        {% endfor %}
-      </select>
-    </label>
 
     <div class="pw-supplier-pay-grid">
       <label>
@@ -191,7 +187,7 @@
       </label>
       <label>
         Summa, so‘m
-        <input type="number" name="amount_uzs" id="supplier-pay-amount" inputmode="decimal" min="0.01" step="0.01">
+        <input type="number" name="amount_uzs" id="supplier-pay-amount" inputmode="decimal" min="0.01" max="{{ debt }}" step="0.01">
       </label>
       <label>
         Kassa
@@ -217,5 +213,5 @@
 </dialog>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/supplier_detail.js') }}?v=20260927_supplier_v2" defer></script>
+<script src="{{ url_for('static', filename='js/supplier_detail.js') }}?v=20260927_supplier_fifo_v1" defer></script>
 {% endblock %}

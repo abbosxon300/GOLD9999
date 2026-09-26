@@ -42,11 +42,24 @@ def release(path, backup_dir):
             raise RuntimeError(
                 "Qoldiq o‘zgargan: reload qilmang, zaxira nusxani tekshiring"
             )
-        for table in ("suppliers", "purchases", "purchase_items", "purchase_payments"):
+        for table in (
+            "suppliers",
+            "purchases",
+            "purchase_items",
+            "purchase_payments",
+            "supplier_payments",
+            "supplier_payment_allocations",
+        ):
             db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
         violations = db.execute("PRAGMA foreign_key_check(purchase_items)").fetchall()
         violations += db.execute(
             "PRAGMA foreign_key_check(purchase_payments)"
+        ).fetchall()
+        violations += db.execute(
+            "PRAGMA foreign_key_check(supplier_payments)"
+        ).fetchall()
+        violations += db.execute(
+            "PRAGMA foreign_key_check(supplier_payment_allocations)"
         ).fetchall()
         if violations:
             raise RuntimeError("Yangi kirim jadvallarida bog‘lanish xatosi")

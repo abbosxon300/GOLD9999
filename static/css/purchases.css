@@ -142,10 +142,9 @@ body.dark-mode #purchase-form .pw-result-category{background:#22304a;color:#aebb
 }
 
 /* =========================================================
-   SUPPLIER CABINET V2
+   SUPPLIER CABINET FIFO V1
    Compact supplier account with tabs and payment modal.
    ========================================================= */
-.pw-supplier-header-actions{display:flex;align-items:center;gap:8px}
 .pw-supplier-back{margin:-7px 0 12px}
 .pw-supplier-back a{font-size:11px;font-weight:700;color:var(--pw-muted)}
 .pw-supplier-back a:hover{color:var(--pw-accent)}
@@ -250,8 +249,6 @@ body.dark-mode .pw-ledger-type.payment{background:#20372f;color:#75cfad}
   .pw-supplier-pay-grid label:last-child{grid-column:1/-1}
 }
 @media(max-width:640px){
-  .pw-supplier-header-actions{width:100%;flex-wrap:wrap}
-  .pw-supplier-header-actions .pw-button{flex:1}
   .pw-supplier-back{margin-top:-4px}
   .pw-supplier-summary{grid-template-columns:1fr 1fr}
   .pw-supplier-summary>div{padding:12px}

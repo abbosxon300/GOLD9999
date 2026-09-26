@@ -18,6 +18,7 @@ TABLES = {
     "supplier": "suppliers",
     "purchase": "purchases",
     "purchase_payment": "purchase_payments",
+    "supplier_payment": "supplier_payments",
 }
 
 
@@ -386,8 +387,17 @@ def update_purchase(db, *, tenant_id, entity_uuid, payload, expected_version, ta
     )
     payment_info = db.execute(
         """SELECT COALESCE(SUM(amount_uzs),0) paid, MIN(payment_date) first_date
-        FROM purchase_payments WHERE purchase_id=?""",
-        (purchase["id"],),
+        FROM (
+            SELECT amount_uzs,payment_date
+            FROM purchase_payments
+            WHERE purchase_id=?
+            UNION ALL
+            SELECT a.amount_uzs,sp.payment_date
+            FROM supplier_payment_allocations a
+            JOIN supplier_payments sp ON sp.id=a.supplier_payment_id
+            WHERE a.purchase_id=?
+        )""",
+        (purchase["id"], purchase["id"]),
     ).fetchone()
     paid = float(payment_info["paid"] or 0)
     if total + 0.005 < paid:
@@ -578,8 +588,10 @@ def void_purchase(
         raise ValueError("Kirim allaqachon bekor qilingan")
 
     payment_count = db.execute(
-        "SELECT COUNT(*) FROM purchase_payments WHERE purchase_id=?",
-        (purchase["id"],),
+        """SELECT
+            (SELECT COUNT(*) FROM purchase_payments WHERE purchase_id=?)
+          + (SELECT COUNT(*) FROM supplier_payment_allocations WHERE purchase_id=?)""",
+        (purchase["id"], purchase["id"]),
     ).fetchone()[0]
     if payment_count:
         raise ValueError(
@@ -649,8 +661,11 @@ def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
         if existing:
             return existing
         purchase = db.execute(
-            """SELECT p.*, COALESCE((SELECT SUM(amount_uzs) FROM purchase_payments pp WHERE pp.purchase_id=p.id),0) paid
-            FROM purchases p WHERE entity_uuid=? AND tenant_id=? AND COALESCE(p.is_void,0)=0""",
+            """SELECT p.*,
+            COALESCE((SELECT SUM(amount_uzs) FROM purchase_payments pp WHERE pp.purchase_id=p.id),0)
+          + COALESCE((SELECT SUM(amount_uzs) FROM supplier_payment_allocations a WHERE a.purchase_id=p.id),0) paid
+            FROM purchases p
+            WHERE entity_uuid=? AND tenant_id=? AND COALESCE(p.is_void,0)=0""",
             (payload["purchase_uuid"], tenant_id),
         ).fetchone()
         if not purchase:
@@ -690,3 +705,153 @@ def pay_purchase(db, *, tenant_id, entity_uuid, payload, replicate=True):
         if replicate:
             _queue(db, "purchase_payment", entity_uuid, payload)
         return cursor.lastrowid
+
+
+def pay_supplier(db, *, tenant_id, entity_uuid, payload, replicate=True):
+    """Create one supplier payment and allocate it to oldest debt first."""
+    entity_uuid = uid(entity_uuid)
+    if not isinstance(payload, dict):
+        raise ValueError("To‘lov ma’lumoti noto‘g‘ri")
+
+    base = dict(
+        supplier_uuid=uid(payload.get("supplier_uuid")),
+        payment_date=iso_date(payload.get("payment_date")),
+        amount_uzs=number(payload.get("amount_uzs"), "To‘lov"),
+        method=text_value(payload.get("method", ""), "To‘lov turi", 10, True),
+        note=text_value(payload.get("note", ""), "Izoh"),
+    )
+    if base["method"] not in ("cash", "click"):
+        raise ValueError("Naqd yoki Click hisobini tanlang")
+
+    requested_allocations = payload.get("allocations")
+    with business_transaction(db):
+        existing = db.execute(
+            "SELECT * FROM supplier_payments WHERE entity_uuid=?",
+            (entity_uuid,),
+        ).fetchone()
+        if existing:
+            if existing["tenant_id"] != tenant_id:
+                raise ValueError("Bu identifikator boshqa firmaga tegishli")
+            stored = json.loads(existing["payload_json"])
+            if any(stored.get(key) != value for key, value in base.items()):
+                raise ValueError("Bu identifikator boshqa to‘lovga tegishli")
+            if requested_allocations is not None and stored.get("allocations") != requested_allocations:
+                raise ValueError("To‘lov taqsimoti mos kelmadi")
+            return existing["id"]
+
+        supplier = db.execute(
+            "SELECT id,name FROM suppliers WHERE entity_uuid=? AND tenant_id=?",
+            (base["supplier_uuid"], tenant_id),
+        ).fetchone()
+        if not supplier:
+            raise ValueError("Yetkazib beruvchi topilmadi")
+
+        rows = db.execute(
+            """SELECT p.id,p.entity_uuid,p.purchase_date,p.total_uzs,
+            COALESCE((SELECT SUM(amount_uzs) FROM purchase_payments pp WHERE pp.purchase_id=p.id),0)
+          + COALESCE((SELECT SUM(amount_uzs) FROM supplier_payment_allocations a WHERE a.purchase_id=p.id),0) paid
+            FROM purchases p
+            WHERE p.supplier_id=? AND p.tenant_id=? AND COALESCE(p.is_void,0)=0
+              AND p.purchase_date<=?
+            ORDER BY p.purchase_date,p.id""",
+            (supplier["id"], tenant_id, base["payment_date"]),
+        ).fetchall()
+        by_uuid = {str(row["entity_uuid"]): row for row in rows}
+
+        allocations = []
+        if requested_allocations is not None:
+            if not isinstance(requested_allocations, list) or not requested_allocations:
+                raise ValueError("To‘lov taqsimoti noto‘g‘ri")
+            seen = set()
+            allocated_total = Decimal("0")
+            for item in requested_allocations:
+                if not isinstance(item, dict):
+                    raise ValueError("To‘lov taqsimoti noto‘g‘ri")
+                purchase_uuid = uid(item.get("purchase_uuid"))
+                if purchase_uuid in seen:
+                    raise ValueError("Bir kirim ikki marta taqsimlangan")
+                seen.add(purchase_uuid)
+                row = by_uuid.get(purchase_uuid)
+                if not row:
+                    raise ValueError("Taqsimlangan kirim topilmadi")
+                amount = number(item.get("amount_uzs"), "Taqsimlangan to‘lov")
+                remaining = round(float(row["total_uzs"]) - float(row["paid"]), 2)
+                if amount > remaining + 0.005:
+                    raise ValueError("Taqsimlangan to‘lov kirim qarzidan oshdi")
+                allocations.append(
+                    {"purchase_uuid": purchase_uuid, "amount_uzs": amount}
+                )
+                allocated_total += Decimal(str(amount))
+            if abs(allocated_total - Decimal(str(base["amount_uzs"]))) > Decimal("0.005"):
+                raise ValueError("To‘lov taqsimoti jami summaga mos emas")
+        else:
+            remaining_payment = Decimal(str(base["amount_uzs"]))
+            for row in rows:
+                debt = Decimal(str(round(float(row["total_uzs"]) - float(row["paid"]), 2)))
+                if debt <= Decimal("0"):
+                    continue
+                amount = min(debt, remaining_payment)
+                if amount > 0:
+                    allocations.append(
+                        {
+                            "purchase_uuid": str(row["entity_uuid"]),
+                            "amount_uzs": float(amount),
+                        }
+                    )
+                    remaining_payment -= amount
+                if remaining_payment <= Decimal("0.005"):
+                    remaining_payment = Decimal("0")
+                    break
+            if remaining_payment > Decimal("0.005"):
+                raise ValueError("To‘lov sanasigacha bo‘lgan qarzdan oshmasin")
+
+        final_payload = dict(base)
+        final_payload["allocations"] = allocations
+
+        table = "cash_moves" if base["method"] == "cash" else "click_moves"
+        movement = db.execute(
+            f"INSERT INTO {table}(move_date,direction,amount_uzs,note,entity_uuid,sync_version) VALUES(?,'OUT',?,?,?,1)",
+            (
+                base["payment_date"],
+                base["amount_uzs"],
+                f"Yetkazuvchi {supplier['name']} · {base['note']}".rstrip(" ·"),
+                entity_uuid,
+            ),
+        )
+        cash_id = movement.lastrowid if base["method"] == "cash" else None
+        click_id = movement.lastrowid if base["method"] == "click" else None
+        cursor = db.execute(
+            """INSERT INTO supplier_payments(
+                tenant_id,supplier_id,payment_date,amount_uzs,method,note,
+                cash_move_id,click_move_id,entity_uuid,payload_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (
+                tenant_id,
+                supplier["id"],
+                base["payment_date"],
+                base["amount_uzs"],
+                base["method"],
+                base["note"],
+                cash_id,
+                click_id,
+                entity_uuid,
+                encoded(final_payload),
+            ),
+        )
+        payment_id = cursor.lastrowid
+        for item in allocations:
+            purchase = by_uuid[item["purchase_uuid"]]
+            db.execute(
+                """INSERT INTO supplier_payment_allocations(
+                    tenant_id,supplier_payment_id,purchase_id,amount_uzs
+                ) VALUES(?,?,?,?)""",
+                (
+                    tenant_id,
+                    payment_id,
+                    purchase["id"],
+                    item["amount_uzs"],
+                ),
+            )
+        if replicate:
+            _queue(db, "supplier_payment", entity_uuid, final_payload)
+        return payment_id
