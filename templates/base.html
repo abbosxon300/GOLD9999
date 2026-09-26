@@ -86,7 +86,7 @@
 
       {% if session.get("role") == "admin" %}
       <a
-        href="{{ url_for('kpi') }}"
+        href="{{ url_for('purchase_new') }}"
         class="sidebar-link {% if request.path == '/kpi' or request.path.startswith('/kpi/new') or request.path.startswith('/kpi/documents') or request.path.startswith('/kpi/legacy') %}active{% endif %}"
         title="Kirim"
       >
@@ -405,7 +405,7 @@
   {% if session.get("role") == "admin" %}
   <a
     class="bn-item {% if request.path == '/kpi' or request.path.startswith('/kpi/new') or request.path.startswith('/kpi/documents') or request.path.startswith('/kpi/legacy') %}active{% endif %}"
-    href="{{ url_for('kpi') }}"
+    href="{{ url_for('purchase_new') }}"
   >
     <span class="bn-ico">
       <svg viewBox="0 0 24 24">
