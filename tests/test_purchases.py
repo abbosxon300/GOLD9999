@@ -458,7 +458,7 @@ def test_http_workflow_and_xss(web):
 
 
 
-def test_supplier_cabinet_v2_and_kirim_preselection(web):
+def test_supplier_cabinet_fifo_payment_without_document_selection(web):
     app, client, path = web
     csrf = token_from(client)
 
@@ -493,7 +493,9 @@ def test_supplier_cabinet_v2_and_kirim_preselection(web):
 
     cabinet = client.get(f"/kpi/suppliers/{supplier_id}")
     assert cabinet.status_code == 200
-    assert cabinet.text.count("+ Yangi kirim") == 1
+    assert "+ Yangi kirim" not in cabinet.text
+    assert "Qaysi kirim?" not in cabinet.text
+    assert 'name="purchase_id"' not in cabinet.text
     assert 'id="supplier-pay-open"' in cabinet.text
     assert 'id="supplier-pay-dialog"' in cabinet.text
     assert 'data-supplier-tab="turnover"' in cabinet.text
@@ -502,22 +504,50 @@ def test_supplier_cabinet_v2_and_kirim_preselection(web):
     assert "Aylanma" in cabinet.text
     assert "Balans" in cabinet.text
     assert "SUP-1" in cabinet.text
-    assert "20260927_supplier_v2" in cabinet.text
+    assert "20260927_supplier_fifo_v1" in cabinet.text
 
-    entry = client.get(f"/kpi/new?supplier={supplier_id}")
-    assert entry.status_code == 200
-    assert re.search(
-        rf'<option\s+value="{supplier_id}"\s+selected>',
-        entry.text,
+    payment_uuid = re.search(
+        r'name="entity_uuid" value="([^"]+)"',
+        cabinet.text,
+    )[1]
+    paid = client.post(
+        f"/kpi/suppliers/{supplier_id}/pay",
+        data={
+            "csrf_token": csrf,
+            "entity_uuid": payment_uuid,
+            "payment_date": "2026-09-27",
+            "amount_uzs": "50000",
+            "method": "cash",
+            "note": "Umumiy to‘lov",
+        },
     )
+    assert paid.status_code == 302
+
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+    assert db.execute(
+        "SELECT COUNT(*) FROM supplier_payments"
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT COUNT(*) FROM supplier_payment_allocations"
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT amount_uzs FROM supplier_payments"
+    ).fetchone()[0] == 50000
+    db.close()
+
+    after = client.get(f"/kpi/suppliers/{supplier_id}")
+    assert "Umumiy to‘lov" in after.text
+    assert "40 000" in after.text
 
     script = client.get("/static/js/supplier_detail.js")
     assert script.status_code == 200
     body = script.get_data(as_text=True)
     assert "querySelectorAll('[data-supplier-tab]')" in body
     assert "supplier-pay-dialog" in body
+    assert "supplier-pay-purchase" not in body
     assert "To‘lov summasini kiriting." in body
-    assert "To‘lov kirim qarzidan oshmasligi kerak." in body
+    assert "To‘lov yetkazib beruvchi qarzidan oshmasligi kerak." in body
 
 def test_http_csrf_auth_and_cross_tenant(web):
     app, client, path = web
