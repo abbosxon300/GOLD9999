@@ -200,6 +200,41 @@ def test_supplier_payment_fifo_one_cash_move_and_retry(db):
     db.rollback()
 
 
+def test_supplier_payment_blocks_underpaid_edit_and_void(db):
+    doc, key, payload = purchase(db)
+    supplier_id = db.execute(
+        "SELECT supplier_id FROM purchases WHERE id=?",
+        (doc,),
+    ).fetchone()[0]
+    pay_supplier(
+        db,
+        tenant_id=1,
+        entity_uuid=str(uuid4()),
+        payload=supplier_payment_payload(db, supplier_id, 100000),
+    )
+
+    too_small = copy.deepcopy(payload)
+    too_small["items"] = [
+        dict(too_small["items"][0], qty=1, unit_cost_uzs=10000)
+    ]
+    with pytest.raises(ValueError, match="to‘langan"):
+        update_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=key,
+            payload=too_small,
+            expected_version=1,
+        )
+
+    with pytest.raises(ValueError, match="To‘lov yozilgan"):
+        void_purchase(
+            db,
+            tenant_id=1,
+            entity_uuid=key,
+            expected_version=1,
+        )
+
+
 def test_payment_retry_overpay_and_cash_guard(db):
     doc, key, _ = purchase(db)
     token = str(uuid4())
@@ -337,10 +372,101 @@ def test_sync_two_databases_no_double_stock(db):
         db, cursor=None, limit=500, device_uuid=str(uuid4()), tenant_id=1
     ).changes
     assert not any(
-        c["entity_type"] in ("supplier", "purchase", "purchase_payment") for c in legacy
+        c["entity_type"] in ("supplier", "purchase", "purchase_payment", "supplier_payment") for c in legacy
     )
     assert not any(c["entity_type"] == "inventory_move" for c in legacy)
     remote.close()
+
+def test_sync_supplier_payment_keeps_exact_fifo_allocations(db):
+    import services.offline.purchase_adapter  # noqa: F401
+    from services.offline.pull_service import build_pull_response
+    from services.offline.models import RemoteChange
+    from services.offline.remote_applier import apply_remote_change
+
+    remote = sqlite3.connect(":memory:")
+    remote.row_factory = sqlite3.Row
+    db.backup(remote)
+
+    supplier_id = create_supplier(db, tenant_id=1, name="Sync FIFO")
+    purchase_uuids = []
+    for product_id, day, qty, cost in (
+        (11, "2026-09-25", 2, 50000),
+        (12, "2026-09-26", 2, 100000),
+    ):
+        key = str(uuid4())
+        payload = prepare_purchase(
+            db,
+            tenant_id=1,
+            supplier_id=supplier_id,
+            purchase_date=day,
+            reference=day,
+            note="",
+            items=[{"product_id": product_id, "qty": qty, "unit_cost_uzs": cost}],
+            entity_uuid=key,
+        )
+        save_purchase(db, tenant_id=1, entity_uuid=key, payload=payload)
+        purchase_uuids.append(key)
+
+    pay_supplier(
+        db,
+        tenant_id=1,
+        entity_uuid=str(uuid4()),
+        payload=supplier_payment_payload(db, supplier_id, 150000),
+    )
+
+    changes = build_pull_response(
+        db,
+        cursor=None,
+        limit=500,
+        device_uuid=str(uuid4()),
+        include_purchases=True,
+        tenant_id=1,
+    ).changes
+    business = [
+        c for c in changes
+        if c["entity_type"] in (
+            "supplier", "purchase", "purchase_payment", "supplier_payment"
+        )
+    ]
+    assert any(c["entity_type"] == "supplier_payment" for c in business)
+
+    for change in business:
+        with business_transaction(remote):
+            apply_remote_change(
+                remote,
+                RemoteChange(
+                    change["entity_type"],
+                    change["entity_uuid"],
+                    change["operation"],
+                    change["payload"],
+                    change["version"],
+                    str(uuid4()),
+                    datetime.now(timezone.utc),
+                ),
+                tenant_id=1,
+            )
+
+    source_alloc = [
+        (r["purchase_id"], r["amount_uzs"])
+        for r in db.execute(
+            "SELECT purchase_id,amount_uzs FROM supplier_payment_allocations ORDER BY id"
+        )
+    ]
+    remote_alloc = [
+        (r["purchase_id"], r["amount_uzs"])
+        for r in remote.execute(
+            "SELECT purchase_id,amount_uzs FROM supplier_payment_allocations ORDER BY id"
+        )
+    ]
+    assert remote_alloc == source_alloc
+    assert remote.execute(
+        "SELECT COUNT(*) FROM supplier_payments"
+    ).fetchone()[0] == 1
+    assert remote.execute(
+        "SELECT SUM(amount_uzs) FROM cash_moves WHERE direction='OUT'"
+    ).fetchone()[0] == 150000
+    remote.close()
+
 
 def test_pull_isolates_tenants(db):
     from services.offline.pull_service import build_pull_response
