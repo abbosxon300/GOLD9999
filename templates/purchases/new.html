@@ -50,7 +50,7 @@
     </aside>
   </div>
 </form>
-<dialog id="pw-supplier-dialog" class="pw-dialog"><form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}">
+<dialog id="pw-supplier-dialog" class="pw-dialog"><form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}" novalidate>
   <div class="pw-section-head"><h2>Yangi yetkazuvchi</h2><button type="button" id="pw-close-supplier" class="pw-icon-button" aria-label="Yopish">×</button></div>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ supplier_uuid }}">
   <label><span>Nomi <b>*</b></span><input name="name" required maxlength="160" placeholder="Korxona yoki shaxs nomi"></label>
