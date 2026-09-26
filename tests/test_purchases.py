@@ -873,20 +873,22 @@ def test_sidebar_module_states_and_warehouse_ui(web):
     assert warehouse.text.count('href="/kpi/new"') >= 2
 
 
-def test_kirim_uses_uzbek_validation_and_single_flow_workspace(web):
+def test_kirim_uses_uzbek_validation_and_simple_entry_card(web):
     app, client, path = web
     page = client.get("/kpi/new")
     assert page.status_code == 200
     assert 'id="purchase-form" method="post" autocomplete="off" novalidate' in page.text
     assert 'id="pw-supplier-select-error"' in page.text
     assert 'id="pw-date-error"' in page.text
-    assert 'rows="1"' in page.text
-    assert 'class="pw-entry-workspace"' in page.text
-    assert 'class="pw-panel pw-checkout"' in page.text
-    assert 'class="pw-checkout-grid' in page.text
-    assert 'class="pw-editor"' not in page.text
-    assert '<aside class="pw-summary' not in page.text
-    assert "20260927_kirim_workspace_v2" in page.text
+    assert 'class="pw-panel pw-simple-entry"' in page.text
+    assert 'class="pw-simple-meta"' in page.text
+    assert 'class="pw-simple-search pw-product-search"' in page.text
+    assert 'class="pw-simple-totalbar' in page.text
+    assert 'pw-entry-index' not in page.text
+    assert 'pw-checkout-head' not in page.text
+    assert 'pw-entry-workspace' not in page.text
+    assert 'HISOB-KITOB' not in page.text
+    assert '20260927_kirim_simple_v3' in page.text
 
     script = client.get("/static/js/purchases.js")
     assert script.status_code == 200
@@ -896,4 +898,4 @@ def test_kirim_uses_uzbek_validation_and_single_flow_workspace(web):
     assert "Yetkazib beruvchi nomini kiriting." in body
     assert "pw-result-main" in body
     assert "pw-result-meta" in body
-    assert "Kirim narxi" in body
+    assert "const addMore = $('pw-add-more')" in body
