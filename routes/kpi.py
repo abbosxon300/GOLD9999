@@ -334,6 +334,44 @@ def register_kpi_routes(
             entity_uuid=str(uuid4()),
         )
 
+    @app.route("/kpi/suppliers/<int:supplier_id>")
+    @login_required
+    @admin_required
+    def purchase_supplier_detail(supplier_id):
+        tenant = identity()
+        supplier = q1(
+            "SELECT id,name,phone FROM suppliers WHERE id=? AND tenant_id=?",
+            (supplier_id, tenant),
+        )
+        if not supplier:
+            abort(404)
+        documents = q(
+            """SELECT p.*,COALESCE(pay.paid,0) paid,
+            (SELECT COUNT(*) FROM purchase_items i WHERE i.purchase_id=p.id) item_count
+            FROM purchases p
+            LEFT JOIN (SELECT purchase_id,SUM(amount_uzs) paid FROM purchase_payments GROUP BY purchase_id) pay ON pay.purchase_id=p.id
+            WHERE p.tenant_id=? AND p.supplier_id=? ORDER BY p.purchase_date DESC,p.id DESC""",
+            (tenant, supplier_id),
+        )
+        payments = q(
+            """SELECT pp.*,p.id purchase_id,p.reference FROM purchase_payments pp
+            JOIN purchases p ON p.id=pp.purchase_id
+            WHERE pp.tenant_id=? AND p.supplier_id=? ORDER BY pp.payment_date DESC,pp.id DESC""",
+            (tenant, supplier_id),
+        )
+        total = round(sum(r["total_uzs"] for r in documents), 2)
+        paid = round(sum(r["amount_uzs"] for r in payments), 2)
+        return page(
+            "purchases/supplier_detail.html",
+            active="suppliers",
+            supplier=supplier,
+            documents=documents,
+            payments=payments,
+            total=total,
+            paid=paid,
+            debt=round(total-paid, 2),
+        )
+
     @app.route("/kpi/stock")
     @login_required
     @admin_required
