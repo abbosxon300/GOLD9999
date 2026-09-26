@@ -21,7 +21,7 @@ body[data-theme=dark] .pw,body.dark-mode .pw,html[data-theme=dark] .pw{--pw-bg:#
 @media(max-width:640px){.pw-supplier-pay{grid-template-columns:1fr}.pw-supplier-pay .pw-pay-note{grid-column:auto}}
 
 /* =========================================================
-   KIRIM MINIMAL ENTRY V4
+   KIRIM MINIMAL ENTRY V5
    Fast purchase entry: meta -> search -> items -> total/save.
    ========================================================= */
 .pw-entry-page .pw-header{align-items:center;margin:0 0 10px}
@@ -78,24 +78,31 @@ body[data-theme=dark] .pw,body.dark-mode .pw,html[data-theme=dark] .pw{--pw-bg:#
 #purchase-form .pw-entry-table td:first-child{min-width:220px}
 #purchase-form .pw-entry-table input{min-height:33px;border-radius:7px;background:#fbfcfe}
 #purchase-form .pw-entry-table input[data-field=unit_cost_uzs]{width:118px}
-#purchase-form .pw-simple-empty{padding:13px 16px;color:#98a3b3;font-size:10px;text-align:center}
+#purchase-form .pw-simple-empty{display:none}
+#purchase-form .pw-simple-list-meta[hidden]{display:none}
 
-#purchase-form .pw-simple-note{
-  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;
-  padding:8px 16px;border-top:1px solid var(--pw-line)
+#purchase-form .pw-simple-optional{
+  padding:6px 16px;border-top:1px solid var(--pw-line)
 }
+#purchase-form .pw-note-toggle{
+  padding:3px 0;border:0;background:transparent;color:var(--pw-accent);
+  font-size:10px;font-weight:700;cursor:pointer
+}
+#purchase-form .pw-note-toggle:hover{text-decoration:underline}
+#purchase-form .pw-simple-note{display:block;margin-top:5px}
+#purchase-form .pw-simple-note[hidden]{display:none}
 #purchase-form .pw-simple-note input{
-  min-height:33px;padding:6px 9px;border:0;border-left:1px solid var(--pw-line);
-  border-radius:0;background:transparent;font-size:11px
+  width:100%;min-height:33px;padding:6px 9px;border:1px solid var(--pw-line);
+  border-radius:7px;background:#fff;font-size:11px
 }
-#purchase-form .pw-simple-note input:focus{border-color:var(--pw-accent);box-shadow:none}
+#purchase-form .pw-simple-note input:focus{border-color:var(--pw-accent);box-shadow:0 0 0 3px #5568e915}
 
 #purchase-form .pw-simple-totalbar.is-minimal{
-  display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:10px 16px;border-top:1px solid var(--pw-line);background:#fbfcfe
 }
 #purchase-form .pw-simple-money{
-  min-width:150px;display:flex;align-items:baseline;justify-content:flex-end;gap:8px;padding:0;border:0;background:transparent
+  min-width:150px;display:flex;align-items:baseline;justify-content:flex-start;gap:8px;padding:0;border:0;background:transparent
 }
 #purchase-form .pw-simple-money>span{color:#7e8a9d;font-size:9px;font-weight:700}
 #purchase-form .pw-simple-money strong{color:#17243b;font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
@@ -129,8 +136,8 @@ body.dark-mode #purchase-form .pw-result-category{background:#22304a;color:#aebb
   #purchase-form #pw-results{left:12px;right:12px}
   #purchase-form .pw-result{grid-template-columns:1fr;gap:5px}
   #purchase-form .pw-result-meta{grid-template-columns:1fr 1fr;text-align:left}
-  #purchase-form .pw-simple-note{grid-template-columns:1fr;gap:4px;padding:8px 12px}
-  #purchase-form .pw-simple-note input{border-left:0;border-top:1px solid var(--pw-line)}
+  #purchase-form .pw-simple-optional{padding:6px 12px}
+  #purchase-form .pw-simple-note{margin-top:5px}
   #purchase-form .pw-simple-totalbar.is-minimal{align-items:stretch;flex-direction:column;padding:10px 12px}
   #purchase-form .pw-simple-money{min-width:0;justify-content:space-between}
   #purchase-form .pw-simple-actions{width:100%}
