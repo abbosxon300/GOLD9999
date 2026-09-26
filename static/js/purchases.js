@@ -35,7 +35,9 @@
   function saveDraft() {
     if (submitting) return;
     const draft = {};
-    ['supplier_id', 'purchase_date', 'reference', 'note', 'paid', 'method', 'entity_uuid'].forEach(k => draft[k] = form.elements[k].value);
+    ['supplier_id', 'purchase_date', 'reference', 'note', 'paid', 'method', 'entity_uuid', 'expected_version'].forEach(k => {
+      if (form.elements[k]) draft[k] = form.elements[k].value;
+    });
     draft.items = cart;
     try {
       localStorage.setItem(draftKey, JSON.stringify(draft));
@@ -109,19 +111,23 @@
   document.addEventListener('click',e=>{ if (!e.target.closest('.pw-product-search')) closeResults(); });
   $('pw-add-more').addEventListener('click',()=>{$('pw-search').focus();showResults();});
   $('pw-paid').addEventListener('input',totals);
-  $('pw-pay-all').addEventListener('click',()=>{$('pw-paid').value=String(total());totals();edited();});
+  const payAll = $('pw-pay-all');
+  if (payAll) payAll.addEventListener('click',()=>{$('pw-paid').value=String(total());totals();edited();});
   form.addEventListener('input',edited); form.addEventListener('change',edited);
   form.addEventListener('submit',e=>{
     const bad = cart.find(i => !Number.isFinite(num(i.qty)) || num(i.qty)<=0 || !Number.isFinite(num(i.unit_cost_uzs)) || num(i.unit_cost_uzs)<=0);
     const paid = num($('pw-paid').value || '0');
-    const message = !cart.length ? 'Kamida bitta mahsulot qo‘shing.' : bad ? 'Miqdor va kirim narxini musbat son bilan kiriting.' : !Number.isFinite(paid)||paid<0||paid>total() ? 'To‘lov 0 dan jami summagacha bo‘lishi kerak.' : '';
+    const paymentError = data.editMode
+      ? 'Jami summa oldin to‘langan summadan kam bo‘lishi mumkin emas.'
+      : 'To‘lov 0 dan jami summagacha bo‘lishi kerak.';
+    const message = !cart.length ? 'Kamida bitta mahsulot qo‘shing.' : bad ? 'Miqdor va kirim narxini musbat son bilan kiriting.' : !Number.isFinite(paid)||paid<0||paid>total() ? paymentError : '';
     if (message || submitting) { e.preventDefault(); $('pw-form-error').textContent=message; $('pw-form-error').hidden=!message; return; }
     totals(); saveDraft(); submitting=true; clearTimeout(draftTimer);
     // Only the success page removes the draft; a failed save keeps every entered value.
     try { sessionStorage.setItem(successKey,form.elements.entity_uuid.value); } catch (_) {}
     $('pw-save').disabled=true; $('pw-save').textContent='Saqlanmoqda…';
   });
-  window.addEventListener('pageshow',()=>{submitting=false;$('pw-save').disabled=false;$('pw-save').textContent='Kirimni saqlash';});
+  window.addEventListener('pageshow',()=>{submitting=false;$('pw-save').disabled=false;$('pw-save').textContent=data.saveLabel||'Kirimni saqlash';});
   window.addEventListener('beforeunload',e=>{if(changed&&!submitting){saveDraft();e.preventDefault();e.returnValue='';}});
   cart=normalizedItems(data.initial.items); renderCart();
   try {
@@ -131,7 +137,9 @@
       if(draft && Array.isArray(draft.items)) {
         $('pw-draft').hidden=false;
         $('pw-restore').addEventListener('click',()=>{
-          ['supplier_id','purchase_date','reference','note','paid','method','entity_uuid'].forEach(k=>{if(typeof draft[k]==='string')form.elements[k].value=draft[k];});
+          ['supplier_id','purchase_date','reference','note','paid','method','entity_uuid','expected_version'].forEach(k=>{
+            if(typeof draft[k]==='string' && form.elements[k]) form.elements[k].value=draft[k];
+          });
           cart=normalizedItems(draft.items);renderCart();$('pw-draft').hidden=true;edited();
         });
       }
