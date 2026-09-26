@@ -873,7 +873,7 @@ def test_sidebar_module_states_and_warehouse_ui(web):
     assert warehouse.text.count('href="/kpi/new"') >= 2
 
 
-def test_kirim_uses_uzbek_inline_validation_and_compact_editor(web):
+def test_kirim_uses_uzbek_validation_and_single_flow_workspace(web):
     app, client, path = web
     page = client.get("/kpi/new")
     assert page.status_code == 200
@@ -881,6 +881,12 @@ def test_kirim_uses_uzbek_inline_validation_and_compact_editor(web):
     assert 'id="pw-supplier-select-error"' in page.text
     assert 'id="pw-date-error"' in page.text
     assert 'rows="1"' in page.text
+    assert 'class="pw-entry-workspace"' in page.text
+    assert 'class="pw-panel pw-checkout"' in page.text
+    assert 'class="pw-checkout-grid' in page.text
+    assert 'class="pw-editor"' not in page.text
+    assert '<aside class="pw-summary' not in page.text
+    assert "20260927_kirim_workspace_v2" in page.text
 
     script = client.get("/static/js/purchases.js")
     assert script.status_code == 200
@@ -888,3 +894,6 @@ def test_kirim_uses_uzbek_inline_validation_and_compact_editor(web):
     assert "Yetkazib beruvchini tanlang." in body
     assert "Kirim sanasini kiriting." in body
     assert "Yetkazib beruvchi nomini kiriting." in body
+    assert "pw-result-main" in body
+    assert "pw-result-meta" in body
+    assert "Kirim narxi" in body
