@@ -351,6 +351,7 @@ def test_http_workflow_and_xss(web):
     conn = sqlite3.connect(path)
     assert conn.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 1
     assert conn.execute("SELECT stock_qty FROM products WHERE id=11").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM purchase_payments").fetchone()[0] == 0
     conn.close()
 
 
@@ -873,7 +874,7 @@ def test_sidebar_module_states_and_warehouse_ui(web):
     assert warehouse.text.count('href="/kpi/new"') >= 2
 
 
-def test_kirim_uses_uzbek_validation_and_simple_entry_card(web):
+def test_kirim_uses_uzbek_validation_and_minimal_entry(web):
     app, client, path = web
     page = client.get("/kpi/new")
     assert page.status_code == 200
@@ -881,14 +882,16 @@ def test_kirim_uses_uzbek_validation_and_simple_entry_card(web):
     assert 'id="pw-supplier-select-error"' in page.text
     assert 'id="pw-date-error"' in page.text
     assert 'class="pw-panel pw-simple-entry"' in page.text
-    assert 'class="pw-simple-meta"' in page.text
-    assert 'class="pw-simple-search pw-product-search"' in page.text
-    assert 'class="pw-simple-totalbar' in page.text
-    assert 'pw-entry-index' not in page.text
-    assert 'pw-checkout-head' not in page.text
-    assert 'pw-entry-workspace' not in page.text
-    assert 'HISOB-KITOB' not in page.text
-    assert '20260927_kirim_simple_v3' in page.text
+    assert 'id="pw-table-wrap" hidden' in page.text
+    assert 'class="pw-simple-totalbar is-minimal"' in page.text
+    assert 'name="paid" id="pw-paid"' in page.text
+    assert 'name="method"' not in page.text
+    assert 'id="pw-pay-all"' not in page.text
+    assert 'id="pw-debt"' not in page.text
+    assert '>To‘lov<' not in page.text
+    assert '>Kassa<' not in page.text
+    assert '>Qarz<' not in page.text
+    assert '20260927_kirim_minimal_v4' in page.text
 
     script = client.get("/static/js/purchases.js")
     assert script.status_code == 200
@@ -898,4 +901,4 @@ def test_kirim_uses_uzbek_validation_and_simple_entry_card(web):
     assert "Yetkazib beruvchi nomini kiriting." in body
     assert "pw-result-main" in body
     assert "pw-result-meta" in body
-    assert "const addMore = $('pw-add-more')" in body
+    assert "pw-table-wrap" in body
