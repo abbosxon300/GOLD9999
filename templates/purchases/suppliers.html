@@ -1,8 +1,20 @@
 {% extends 'purchases/layout.html' %}
-{% set title = 'Yetkazuvchilar' %}
-{% block heading %}Yetkazuvchilar{% endblock %}
-{% block subtitle %}Kimdan qancha tovar olindi va qancha qarz qoldi{% endblock %}
+{% set title = 'Yetkazib beruvchilar' %}
+{% block eyebrow %}YETKAZIB BERUVCHILAR{% endblock %}
+{% block heading %}Yetkazib beruvchilar{% endblock %}
+{% block subtitle %}Ta’minotchilar aylanmasi, to‘lovlari va qarzdorligi{% endblock %}
 {% block workspace %}
-<section class="pw-panel pw-pad"><div class="pw-section-head"><h2>Yetkazuvchi qo‘shish</h2><span class="pw-muted">{{ rows|length }} ta yetkazuvchi</span></div><form class="pw-supplier-add" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ entity_uuid }}"><label><span>Nomi <b>*</b></span><input name="name" required maxlength="160" placeholder="Korxona yoki shaxs nomi"></label><label>Telefon<input name="phone" maxlength="40" type="tel" placeholder="+998 …"></label><button class="pw-button pw-primary" type="submit">+ Qo‘shish</button></form></section>
-<section class="pw-panel pw-space-top">{% if rows %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Yetkazuvchi</th><th>Telefon</th><th>Kirimlar</th><th class="num">Jami kirim</th><th class="num">To‘langan</th><th class="num">Qarz</th><th></th></tr></thead><tbody>{% for s in rows %}<tr><td><strong>{{ s.name }}</strong></td><td>{{ s.phone or '—' }}</td><td>{{ s.count }} ta</td><td class="num">{{ money(s.total) }}</td><td class="num">{{ money(s.paid) }}</td><td class="num"><strong class="{% if s.total>s.paid %}pw-debt-text{% endif %}">{{ money(s.total-s.paid) }}</strong></td><td><a href="{{ url_for('kpi',supplier=s.id) }}">Kirimlar ↗</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>Yetkazuvchilar hali qo‘shilmagan</h3><p>Yuqoridagi formadan birinchi yetkazuvchini qo‘shing.</p></div>{% endif %}</section>
+{% set ns = namespace(total=0, paid=0, debt_count=0) %}
+{% for s in rows %}{% set ns.total = ns.total + s.total %}{% set ns.paid = ns.paid + s.paid %}{% if s.total-s.paid > 0.005 %}{% set ns.debt_count = ns.debt_count + 1 %}{% endif %}{% endfor %}
+<div class="pw-metrics">
+  <div class="pw-metric"><span>Yetkazib beruvchilar</span><strong>{{ rows|length }} <small>ta</small></strong><em>Faol hisoblar</em></div>
+  <div class="pw-metric"><span>Jami kirim</span><strong>{{ money(ns.total) }} <small>so‘m</small></strong><em>Barcha kirim hujjatlari</em></div>
+  <div class="pw-metric"><span>Jami to‘langan</span><strong>{{ money(ns.paid) }} <small>so‘m</small></strong><em>Yetkazuvchilarga to‘lovlar</em></div>
+  <div class="pw-metric pw-debt"><span>Jami qarz</span><strong>{{ money(ns.total-ns.paid) }} <small>so‘m</small></strong><em>{{ ns.debt_count }} ta yetkazuvchida qarz</em></div>
+</div>
+<section class="pw-panel pw-pad"><div class="pw-section-head"><h2>Yangi yetkazib beruvchi</h2><span class="pw-muted">Hisob ochish</span></div><form class="pw-supplier-add" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ entity_uuid }}"><label><span>Nomi <b>*</b></span><input name="name" required maxlength="160" placeholder="Korxona yoki shaxs nomi"></label><label>Telefon<input name="phone" maxlength="40" type="tel" placeholder="+998 …"></label><button class="pw-button pw-primary" type="submit">+ Qo‘shish</button></form></section>
+<section class="pw-panel pw-space-top">
+  <div class="pw-section-head"><h2>Yetkazib beruvchilar ro‘yxati</h2><span class="pw-muted">Kabinetni ochish uchun nomini bosing</span></div>
+  {% if rows %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Yetkazib beruvchi</th><th>Telefon</th><th>Kirimlar</th><th class="num">Jami kirim</th><th class="num">To‘langan</th><th class="num">Qarz</th><th></th></tr></thead><tbody>{% for s in rows %}<tr><td><a class="pw-doc-link" href="{{ url_for('purchase_supplier_detail',supplier_id=s.id) }}">{{ s.name }}</a></td><td>{{ s.phone or '—' }}</td><td>{{ s.count }} ta</td><td class="num">{{ money(s.total) }}</td><td class="num">{{ money(s.paid) }}</td><td class="num"><strong class="{% if s.total>s.paid %}pw-debt-text{% endif %}">{{ money(s.total-s.paid) }}</strong></td><td><a class="pw-arrow" aria-label="{{ s.name }} kabinetini ochish" href="{{ url_for('purchase_supplier_detail',supplier_id=s.id) }}">↗</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>Yetkazib beruvchilar hali qo‘shilmagan</h3><p>Yuqoridagi formadan birinchi yetkazib beruvchini qo‘shing.</p></div>{% endif %}
+</section>
 {% endblock %}
