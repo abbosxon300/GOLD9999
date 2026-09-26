@@ -4,7 +4,7 @@ import json
 import secrets
 import sqlite3
 from datetime import datetime
-from uuid import uuid4, uuid5, UUID
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from flask import (
@@ -170,7 +170,6 @@ def register_kpi_routes(
             try:
                 items = json.loads(request.form.get("items", "[]"))
                 initial["items"] = items
-                paid = number(request.form.get("paid", "0") or "0", "To‘lov", zero=True)
                 db = get_db()
                 with business_transaction(db):
                     payload = prepare_purchase(
@@ -189,23 +188,6 @@ def register_kpi_routes(
                         entity_uuid=request.form.get("entity_uuid"),
                         payload=payload,
                     )
-                    if paid:
-                        pay_purchase(
-                            db,
-                            tenant_id=tenant,
-                            entity_uuid=str(
-                                uuid5(
-                                    UUID(request.form["entity_uuid"]), "initial-payment"
-                                )
-                            ),
-                            payload={
-                                "purchase_uuid": request.form["entity_uuid"],
-                                "payment_date": payload["purchase_date"],
-                                "amount_uzs": paid,
-                                "method": request.form.get("method", "cash"),
-                                "note": "Boshlang‘ich to‘lov",
-                            },
-                        )
                 flash(
                     "Kirim saqlandi. Ombor va yetkazuvchi hisobi yangilandi.", "success"
                 )
