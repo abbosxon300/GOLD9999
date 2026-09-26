@@ -27,7 +27,7 @@
         <div class="pw-empty" id="pw-cart-empty"><span class="pw-empty-icon" aria-hidden="true">+</span><h3>Mahsulotlarni qo‘shing</h3><p>Yuqoridan qidiring. Turli kategoriyadagi mahsulotlar bitta kirimga qo‘shiladi.</p></div>
         <div class="pw-cart-footer"><span>{{ 'O‘zgarish ombor qoldig‘iga farq bo‘yicha qo‘llanadi' if is_edit else 'Oxirgi kirim narxi avtomatik taklif qilinadi' }}</span><button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button></div>
       </section>
-      <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="2" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
+      <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="1" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
     </div>
     <aside class="pw-summary pw-panel pw-pad">
       <span class="pw-eyebrow">HISOB-KITOB</span><h2>{{ 'Yangilangan kirim' if is_edit else 'Kirim yakuni' }}</h2>
