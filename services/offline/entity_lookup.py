@@ -9,6 +9,7 @@ ENTITY_TABLES = {
     "supplier": "suppliers",
     "purchase": "purchases",
     "purchase_payment": "purchase_payments",
+    "supplier_payment": "supplier_payments",
     "category": "categories",
     "product": "products",
     "inventory_move": "inventory_moves",
