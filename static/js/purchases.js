@@ -97,10 +97,33 @@
     selected = -1;
     if (!results.length) target.append(element('div', 'Mahsulot topilmadi. Mahsulotlar sozlamasida qo‘shilganini tekshiring.', 'pw-result-note'));
     results.forEach((p, index) => {
-      const button = element('button', undefined, 'pw-result'); button.type='button'; button.id=`pw-result-${index}`; button.setAttribute('role','option'); button.setAttribute('aria-selected','false');
-      const left = element('span'); left.append(element('strong',p.name),element('small',p.category));
-      const right = element('span'); right.append(element('strong',money(p.last_cost)),element('small',`Qoldiq: ${money(p.stock_qty)}`));
-      button.append(left,right); button.addEventListener('click',() => addProduct(p)); target.append(button);
+      const button = element('button', undefined, 'pw-result');
+      button.type='button';
+      button.id=`pw-result-${index}`;
+      button.setAttribute('role','option');
+      button.setAttribute('aria-selected','false');
+
+      const main = element('span', undefined, 'pw-result-main');
+      const name = element('span', undefined, 'pw-result-name');
+      name.append(element('strong', p.name));
+      main.append(name, element('span', p.category, 'pw-result-category'));
+
+      const meta = element('span', undefined, 'pw-result-meta');
+      const price = element('span', undefined, 'pw-result-price');
+      price.append(
+        element('small', 'Kirim narxi'),
+        element('strong', money(p.last_cost))
+      );
+      const stock = element('span', undefined, 'pw-result-stock');
+      stock.append(
+        element('small', 'Qoldiq'),
+        element('strong', money(p.stock_qty))
+      );
+      meta.append(price, stock);
+
+      button.append(main, meta);
+      button.addEventListener('click',() => addProduct(p));
+      target.append(button);
     });
     target.hidden=false; $('pw-search').setAttribute('aria-expanded','true');
   }
