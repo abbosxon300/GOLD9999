@@ -144,7 +144,8 @@
     }
   });
   document.addEventListener('click',e=>{ if (!e.target.closest('.pw-product-search')) closeResults(); });
-  $('pw-add-more').addEventListener('click',()=>{$('pw-search').focus();showResults();});
+  const addMore = $('pw-add-more');
+  if (addMore) addMore.addEventListener('click',()=>{$('pw-search').focus();showResults();});
   $('pw-paid').addEventListener('input',totals);
   const payAll = $('pw-pay-all');
   if (payAll) payAll.addEventListener('click',()=>{$('pw-paid').value=String(total());totals();edited();});
