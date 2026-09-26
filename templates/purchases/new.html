@@ -6,7 +6,7 @@
 {% block workspace %}
 {% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
 <div id="pw-draft" class="pw-draft" hidden><span>{{ 'Bu tahrirning saqlanmagan qoralamasi bor.' if is_edit else 'Bu brauzerda saqlanmagan qoralama bor.' }}</span><button type="button" id="pw-restore" class="pw-button">Tiklash</button><button type="button" id="pw-discard" class="pw-clear">O‘chirish</button></div>
-<form id="purchase-form" method="post" autocomplete="off">
+<form id="purchase-form" method="post" autocomplete="off" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="entity_uuid" value="{{ initial.entity_uuid }}">
   {% if is_edit %}<input type="hidden" name="expected_version" value="{{ expected_version }}">{% endif %}
@@ -15,8 +15,8 @@
     <div class="pw-main">
       <section class="pw-panel pw-pad"><div class="pw-section-head"><h2><span class="pw-step">1</span> Kirim ma’lumotlari</h2></div>
         <div class="pw-info-grid">
-          <label class="pw-supplier-label"><span>Yetkazuvchi <b>*</b></span><div class="pw-inline"><select required name="supplier_id" id="pw-supplier"><option value="">Yetkazuvchini tanlang</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>{{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}</option>{% endfor %}</select><button type="button" id="pw-open-supplier" class="pw-button" aria-label="Yetkazuvchi qo‘shish">+</button></div></label>
-          <label><span>Sana <b>*</b></span><input required type="date" name="purchase_date" value="{{ initial.purchase_date }}"></label>
+          <label class="pw-supplier-label"><span>Yetkazuvchi <b>*</b></span><div class="pw-inline"><select name="supplier_id" id="pw-supplier" aria-describedby="pw-supplier-select-error"><option value="">Yetkazuvchini tanlang</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>{{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}</option>{% endfor %}</select><button type="button" id="pw-open-supplier" class="pw-button" aria-label="Yetkazuvchi qo‘shish">+</button></div><small id="pw-supplier-select-error" class="pw-field-error" hidden></small></label>
+          <label><span>Sana <b>*</b></span><input type="date" name="purchase_date" id="pw-purchase-date" value="{{ initial.purchase_date }}" aria-describedby="pw-date-error"><small id="pw-date-error" class="pw-field-error" hidden></small></label>
           <label>Hujjat raqami<input name="reference" maxlength="80" value="{{ initial.get('reference','') }}" placeholder="Ixtiyoriy, masalan: 125"></label>
         </div>
       </section>
