@@ -11,12 +11,26 @@
  <div class="pw-metric"><span>To‘langan</span><strong>{{ money(paid) }} <small>so‘m</small></strong><em>Naqd va Click</em></div>
  <div class="pw-metric pw-debt"><span>Qoldiq qarz</span><strong>{{ money(debt) }} <small>so‘m</small></strong><em>Yetkazuvchiga to‘lanadi</em></div>
 </div>
-<section class="pw-panel">
+{% if unpaid_documents %}
+<section class="pw-panel pw-pad pw-space-top">
+ <div class="pw-section-head"><h2>To‘lov qilish</h2><span class="pw-muted">Qarzdor kirimni tanlang</span></div>
+ <form class="pw-supplier-pay" method="post" action="{{ url_for('purchase_supplier_pay',supplier_id=supplier.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ payment_uuid }}">
+  <label>Qaysi kirim?<select name="purchase_id" required>{% for r in unpaid_documents %}<option value="{{ r.id }}">Kirim #{{ r.id }} · qarz {{ money(r.total_uzs-r.paid) }} so‘m</option>{% endfor %}</select></label>
+  <label>To‘lov sanasi<input type="date" name="payment_date" required value="{{ today }}"></label>
+  <label>Summa, so‘m<input type="number" name="amount_uzs" inputmode="decimal" min="0.01" step="0.01" required></label>
+  <label>Kassa<select name="method"><option value="cash">Naqd</option><option value="click">Click</option></select></label>
+  <label class="pw-pay-note">Izoh<input name="note" maxlength="500" placeholder="Ixtiyoriy"></label>
+  <button class="pw-button pw-primary" type="submit">To‘lovni saqlash</button>
+ </form>
+</section>
+{% endif %}
+<section class="pw-panel pw-space-top">
  <div class="pw-section-head"><h2>Aylanma · yuklar</h2><span class="pw-muted">{{ documents|length }} hujjat</span></div>
  {% if documents %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Sana / hujjat</th><th>Mahsulot</th><th class="num">Kirim</th><th class="num">To‘langan</th><th class="num">Qarz</th><th></th></tr></thead><tbody>{% for r in documents %}<tr><td><a class="pw-doc-link" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">Kirim #{{ r.id }}</a><small>{{ r.purchase_date }}{% if r.reference %} · {{ r.reference }}{% endif %}</small></td><td>{{ r.item_count }} tur</td><td class="num">{{ money(r.total_uzs) }}</td><td class="num">{{ money(r.paid) }}</td><td class="num">{{ money(r.total_uzs-r.paid) }}</td><td><a class="pw-arrow" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">↗</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>Hali kirim yo‘q</h3><p>Bu yetkazib beruvchidan birinchi kirimni kiriting.</p></div>{% endif %}
 </section>
 <section class="pw-panel pw-space-top">
  <div class="pw-section-head"><h2>To‘lovlar</h2><span class="pw-muted">{{ payments|length }} operatsiya</span></div>
- {% if payments %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Sana</th><th>Hujjat</th><th>Usul</th><th>Izoh</th><th class="num">To‘lov</th></tr></thead><tbody>{% for p in payments %}<tr><td>{{ p.payment_date }}</td><td><a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a></td><td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td><td>{{ p.note or '—' }}</td><td class="num">{{ money(p.amount_uzs) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>To‘lovlar yo‘q</h3><p>To‘lov kirim hujjati ichidan amalga oshiriladi.</p></div>{% endif %}
+ {% if payments %}<div class="pw-table-wrap"><table class="pw-table"><thead><tr><th>Sana</th><th>Hujjat</th><th>Usul</th><th>Izoh</th><th class="num">To‘lov</th></tr></thead><tbody>{% for p in payments %}<tr><td>{{ p.payment_date }}</td><td><a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a></td><td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td><td>{{ p.note or '—' }}</td><td class="num">{{ money(p.amount_uzs) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="pw-empty"><h3>To‘lovlar yo‘q</h3><p>Yuqoridagi formadan yetkazib beruvchiga birinchi to‘lovni kiriting.</p></div>{% endif %}
 </section>
 {% endblock %}
