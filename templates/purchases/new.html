@@ -58,5 +58,5 @@
   <p id="pw-supplier-error" class="pw-inline-error" role="alert"></p><button class="pw-button pw-primary pw-wide" type="submit">Qo‘shish va tanlash</button>
 </form></dialog>
 <script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('O‘zgarishlarni saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
-<script src="{{ url_for('static', filename='js/purchases.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_compact_v1" defer></script>
 {% endblock %}
