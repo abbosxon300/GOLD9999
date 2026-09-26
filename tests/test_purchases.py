@@ -856,6 +856,15 @@ def test_release_backup_and_upgrade_from_v12(tmp_path):
     updated = sqlite3.connect(path)
     assert updated.execute("SELECT stock_qty FROM products").fetchone()[0] == 42
     assert updated.execute("SELECT COUNT(*) FROM purchases").fetchone()[0] == 0
+    assert updated.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='supplier_payments'"
+    ).fetchone()[0] == 1
+    assert updated.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='supplier_payment_allocations'"
+    ).fetchone()[0] == 1
+    assert updated.execute(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version=15"
+    ).fetchone()[0] == 1
     updated.close()
 
 
@@ -863,11 +872,25 @@ def test_cash_ledger_hides_other_firms_supplier_payments(web):
     app, client, path = web
     db = sqlite3.connect(path)
     db.row_factory = sqlite3.Row
-    _, own, _ = purchase(db, tenant=1)
-    _, other, _ = purchase(db, tenant=2)
-    pay_purchase(db, tenant_id=1, entity_uuid=str(uuid4()), payload=payment(own, 12500))
-    pay_purchase(
-        db, tenant_id=2, entity_uuid=str(uuid4()), payload=payment(other, 77777)
+    own_doc, _, _ = purchase(db, tenant=1)
+    other_doc, _, _ = purchase(db, tenant=2)
+    own_supplier = db.execute(
+        "SELECT supplier_id FROM purchases WHERE id=?", (own_doc,)
+    ).fetchone()[0]
+    other_supplier = db.execute(
+        "SELECT supplier_id FROM purchases WHERE id=?", (other_doc,)
+    ).fetchone()[0]
+    pay_supplier(
+        db,
+        tenant_id=1,
+        entity_uuid=str(uuid4()),
+        payload=supplier_payment_payload(db, own_supplier, 12500),
+    )
+    pay_supplier(
+        db,
+        tenant_id=2,
+        entity_uuid=str(uuid4()),
+        payload=supplier_payment_payload(db, other_supplier, 77777),
     )
     db.close()
     response = client.get("/kassa?from=2026-09-01&to=2026-09-30")
