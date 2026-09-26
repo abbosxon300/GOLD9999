@@ -56,24 +56,20 @@
   form.addEventListener('submit', event => {
     hideError();
 
-    const purchase = $('supplier-pay-purchase');
     const date = $('supplier-pay-date');
     const amount = $('supplier-pay-amount');
     const value = Number(String(amount?.value || '').replace(/\s/g, ''));
-    const option = purchase?.selectedOptions?.[0];
-    const debt = Number(option?.dataset?.debt || 0);
+    const debt = Number(dialog.dataset.debt || 0);
 
     let message = '';
-    if (!purchase?.value) message = 'Qarzdor kirimni tanlang.';
-    else if (!date?.value) message = 'To‘lov sanasini kiriting.';
+    if (!date?.value) message = 'To‘lov sanasini kiriting.';
     else if (!Number.isFinite(value) || value <= 0) message = 'To‘lov summasini kiriting.';
-    else if (value > debt + 0.005) message = 'To‘lov kirim qarzidan oshmasligi kerak.';
+    else if (value > debt + 0.005) message = 'To‘lov yetkazib beruvchi qarzidan oshmasligi kerak.';
 
     if (message) {
       event.preventDefault();
       showError(message);
-      if (!purchase?.value) purchase?.focus();
-      else if (!date?.value) date?.focus();
+      if (!date?.value) date?.focus();
       else amount?.focus();
     }
   });
