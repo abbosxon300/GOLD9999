@@ -1,18 +1,30 @@
-from services.business_writes import (
-    business_transaction,
-    receive_stock,
-)
+"""Purchase workspace: documents, suppliers and stock, scoped to the current firm."""
 
-from datetime import date
+import json
+import secrets
+import sqlite3
+from datetime import datetime
+from uuid import uuid4, uuid5, UUID
+from zoneinfo import ZoneInfo
 
 from flask import (
+    abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
-from datetime import datetime
+from services.business_writes import business_transaction
+from services.business_writes.purchases import (
+    create_supplier,
+    prepare_purchase,
+    save_purchase,
+    pay_purchase,
+    number,
+)
 
 
 def register_kpi_routes(
@@ -28,227 +40,368 @@ def register_kpi_routes(
     login_required,
     admin_required,
 ):
+    def identity():
+        row = q1(
+            """SELECT u.tenant_id FROM users u JOIN tenants t ON t.id=u.tenant_id
+            WHERE u.id=? AND u.is_active=1 AND u.role='admin' AND t.is_active=1""",
+            (session.get("user_id"),),
+        )
+        if not row:
+            abort(403)
+        return row["tenant_id"]
+
+    def token():
+        if not session.get("purchase_csrf"):
+            session["purchase_csrf"] = secrets.token_urlsafe(32)
+        return session["purchase_csrf"]
+
+    def check_csrf():
+        value = request.headers.get("X-CSRF-Token") or request.form.get(
+            "csrf_token", ""
+        )
+        if not value or not secrets.compare_digest(
+            value, session.get("purchase_csrf", "")
+        ):
+            abort(400, "Sahifani yangilang va qayta urinib ko‘ring")
+
+    def today():
+        return datetime.now(ZoneInfo("Asia/Tashkent")).date().isoformat()
+
+    def page(template, **context):
+        return render_template(
+            template, app_name=app_name, csrf_token=token(), today=today(), **context
+        )
+
+    def suppliers(tenant):
+        return q(
+            "SELECT id,name,phone FROM suppliers WHERE tenant_id=? ORDER BY name,id",
+            (tenant,),
+        )
+
     @app.route("/kpi")
     @login_required
     @admin_required
     def kpi():
-        init_db()
-        cats = q("""
-            SELECT id, name, sort_order
-            FROM categories
-            WHERE is_active=1
-            ORDER BY sort_order, name
-        """)
-        rows = q("""
-            SELECT
-              c.id AS category_id,
-              COALESCE(SUM(CASE WHEN m.move_type='IN' THEN m.qty ELSE 0 END),0) -
-              COALESCE(SUM(CASE WHEN m.move_type='OUT' THEN m.qty ELSE 0 END),0) AS stock_qty
-            FROM categories c
-            JOIN products p ON p.category_id=c.id AND p.is_active=1
-            LEFT JOIN inventory_moves m ON m.product_id=p.id
-            WHERE c.is_active=1
-            GROUP BY c.id
-            ORDER BY c.sort_order, c.name
-        """)
-        stock_map = {int(r["category_id"]): float(r["stock_qty"] or 0) for r in rows}
-        return render_template("kpi.html", cats=cats, stock_map=stock_map, app_name=app_name)
+        tenant = identity()
+        search = request.args.get("q", "").strip()[:160]
+        supplier = parse_int(request.args.get("supplier"))
+        start, end = request.args.get("from", ""), request.args.get("to", "")
+        status = request.args.get("status", "")
+        page_no = max(1, parse_int(request.args.get("page"), 1))
+        clauses, params = ["p.tenant_id=?"], [tenant]
+        if search:
+            clauses.append(
+                "(s.name LIKE ? OR p.reference LIKE ? OR CAST(p.id AS TEXT)=?)"
+            )
+            params += [f"%{search}%", f"%{search}%", search]
+        if supplier:
+            clauses.append("p.supplier_id=?")
+            params.append(supplier)
+        if start:
+            clauses.append("p.purchase_date>=?")
+            params.append(start)
+        if end:
+            clauses.append("p.purchase_date<=?")
+            params.append(end)
+        if status == "debt":
+            clauses.append("p.total_uzs-COALESCE(pay.paid,0)>0.005")
+        elif status == "paid":
+            clauses.append("p.total_uzs-COALESCE(pay.paid,0)<=0.005")
+        source = """FROM purchases p JOIN suppliers s ON s.id=p.supplier_id
+            LEFT JOIN (SELECT purchase_id,SUM(amount_uzs) paid FROM purchase_payments GROUP BY purchase_id) pay ON pay.purchase_id=p.id
+            WHERE """ + " AND ".join(clauses)
+        totals = q1(
+            "SELECT COUNT(*) count,COALESCE(SUM(p.total_uzs),0) total,COALESCE(SUM(pay.paid),0) paid "
+            + source,
+            tuple(params),
+        )
+        pages = max(1, (totals["count"] + 24) // 25)
+        page_no = min(page_no, pages)
+        rows = q(
+            """SELECT p.*,s.name supplier_name,COALESCE(pay.paid,0) paid,
+            (SELECT COUNT(*) FROM purchase_items i WHERE i.purchase_id=p.id) item_count """
+            + source
+            + " ORDER BY p.purchase_date DESC,p.id DESC LIMIT 25 OFFSET ?",
+            tuple(params + [(page_no - 1) * 25]),
+        )
+        links = dict(request.args)
+        links.pop("page", None)
+        return page(
+            "purchases/index.html",
+            active="documents",
+            rows=rows,
+            totals=totals,
+            suppliers=suppliers(tenant),
+            page_no=page_no,
+            pages=pages,
+            filters=links,
+            previous=url_for("kpi", **links, page=page_no - 1),
+            next=url_for("kpi", **links, page=page_no + 1),
+        )
+
+    @app.route("/kpi/new", methods=["GET", "POST"])
+    @login_required
+    @admin_required
+    def purchase_new():
+        tenant = identity()
+        initial = {
+            "purchase_date": today(),
+            "items": [],
+            "entity_uuid": str(uuid4()),
+            "paid": "0",
+        }
+        error = None
+        if request.method == "POST":
+            check_csrf()
+            initial.update(request.form.to_dict())
+            try:
+                items = json.loads(request.form.get("items", "[]"))
+                initial["items"] = items
+                paid = number(request.form.get("paid", "0") or "0", "To‘lov", zero=True)
+                db = get_db()
+                with business_transaction(db):
+                    payload = prepare_purchase(
+                        db,
+                        tenant_id=tenant,
+                        supplier_id=parse_int(request.form.get("supplier_id")),
+                        purchase_date=request.form.get("purchase_date"),
+                        reference=request.form.get("reference", ""),
+                        note=request.form.get("note", ""),
+                        items=items,
+                        entity_uuid=request.form.get("entity_uuid"),
+                    )
+                    purchase_id = save_purchase(
+                        db,
+                        tenant_id=tenant,
+                        entity_uuid=request.form.get("entity_uuid"),
+                        payload=payload,
+                    )
+                    if paid:
+                        pay_purchase(
+                            db,
+                            tenant_id=tenant,
+                            entity_uuid=str(
+                                uuid5(
+                                    UUID(request.form["entity_uuid"]), "initial-payment"
+                                )
+                            ),
+                            payload={
+                                "purchase_uuid": request.form["entity_uuid"],
+                                "payment_date": payload["purchase_date"],
+                                "amount_uzs": paid,
+                                "method": request.form.get("method", "cash"),
+                                "note": "Boshlang‘ich to‘lov",
+                            },
+                        )
+                flash(
+                    "Kirim saqlandi. Ombor va yetkazuvchi hisobi yangilandi.", "success"
+                )
+                return redirect(url_for("purchase_detail", purchase_id=purchase_id))
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+                error = str(exc)
+            except sqlite3.Error:
+                app.logger.exception("Purchase save failed")
+                error = (
+                    "Kirim saqlanmadi. Ma’lumotlarni tekshirib qayta urinib ko‘ring."
+                )
+        products = q(
+            """SELECT p.id,p.name,p.stock_qty,c.name category,
+            COALESCE((SELECT m.unit_cost_uzs FROM inventory_moves m WHERE m.product_id=p.id AND m.move_type='IN' ORDER BY m.id DESC LIMIT 1),0) last_cost,
+            COALESCE((SELECT group_concat(b.barcode,' ') FROM product_barcodes b WHERE b.product_id=p.id AND b.tenant_id=p.tenant_id),'') barcodes
+            FROM products p JOIN categories c ON c.id=p.category_id
+            WHERE p.tenant_id=? AND c.tenant_id=? AND p.is_active=1 AND c.is_active=1 ORDER BY p.name""",
+            (tenant, tenant),
+        )
+        if not isinstance(initial.get("items"), list):
+            initial["items"] = []
+        return page(
+            "purchases/new.html",
+            active="new",
+            suppliers=suppliers(tenant),
+            products=[dict(p) for p in products],
+            initial=initial,
+            error=error,
+            supplier_uuid=str(uuid4()),
+            draft_key=f"purchase-draft:{tenant}:{session.get('user_id')}",
+        ), (422 if error else 200)
+
+    @app.route("/kpi/documents/<int:purchase_id>")
+    @login_required
+    @admin_required
+    def purchase_detail(purchase_id):
+        tenant = identity()
+        row = q1(
+            """SELECT p.*,s.name supplier_name,s.phone FROM purchases p JOIN suppliers s ON s.id=p.supplier_id
+            WHERE p.id=? AND p.tenant_id=?""",
+            (purchase_id, tenant),
+        )
+        if not row:
+            abort(404)
+        items = q(
+            "SELECT i.*,p.name FROM purchase_items i JOIN products p ON p.id=i.product_id WHERE i.purchase_id=? AND i.tenant_id=? ORDER BY i.id",
+            (purchase_id, tenant),
+        )
+        payments = q(
+            "SELECT * FROM purchase_payments WHERE purchase_id=? AND tenant_id=? ORDER BY payment_date,id",
+            (purchase_id, tenant),
+        )
+        paid = sum(p["amount_uzs"] for p in payments)
+        return page(
+            "purchases/detail.html",
+            active="documents",
+            doc=row,
+            items=items,
+            payments=payments,
+            paid=paid,
+            debt=round(row["total_uzs"] - paid, 2),
+            payment_uuid=str(uuid4()),
+            draft_key=f"purchase-draft:{tenant}:{session.get('user_id')}",
+        )
+
+    @app.post("/kpi/documents/<int:purchase_id>/pay")
+    @login_required
+    @admin_required
+    def purchase_pay(purchase_id):
+        tenant = identity()
+        check_csrf()
+        doc = q1(
+            "SELECT entity_uuid FROM purchases WHERE id=? AND tenant_id=?",
+            (purchase_id, tenant),
+        )
+        if not doc:
+            abort(404)
+        try:
+            pay_purchase(
+                get_db(),
+                tenant_id=tenant,
+                entity_uuid=request.form.get("entity_uuid"),
+                payload={
+                    "purchase_uuid": doc["entity_uuid"],
+                    "payment_date": request.form.get("payment_date"),
+                    "amount_uzs": request.form.get("amount_uzs"),
+                    "method": request.form.get("method"),
+                    "note": request.form.get("note", ""),
+                },
+            )
+            flash("To‘lov saqlandi", "success")
+        except (ValueError, sqlite3.Error) as exc:
+            if isinstance(exc, sqlite3.Error):
+                app.logger.exception("Purchase payment failed")
+            flash(
+                str(exc) if isinstance(exc, ValueError) else "To‘lov saqlanmadi",
+                "danger",
+            )
+        return redirect(url_for("purchase_detail", purchase_id=purchase_id))
+
+    @app.route("/kpi/suppliers", methods=["GET", "POST"])
+    @login_required
+    @admin_required
+    def purchase_suppliers():
+        tenant = identity()
+        if request.method == "POST":
+            check_csrf()
+            try:
+                supplier_id = create_supplier(
+                    get_db(),
+                    tenant_id=tenant,
+                    name=request.form.get("name", ""),
+                    phone=request.form.get("phone", ""),
+                    entity_uuid=request.form.get("entity_uuid"),
+                )
+                if request.headers.get("Accept") == "application/json":
+                    row = q1(
+                        "SELECT id,name,phone FROM suppliers WHERE id=? AND tenant_id=?",
+                        (supplier_id, tenant),
+                    )
+                    return jsonify(**dict(row), next_uuid=str(uuid4())), 201
+                flash("Yetkazuvchi qo‘shildi", "success")
+            except ValueError as exc:
+                if request.headers.get("Accept") == "application/json":
+                    return jsonify(error=str(exc)), 422
+                flash(str(exc), "danger")
+            return redirect(url_for("purchase_suppliers"))
+        rows = q(
+            """SELECT s.*, COALESCE(d.total,0) total,COALESCE(pay.paid,0) paid,COALESCE(d.count,0) count
+            FROM suppliers s LEFT JOIN (SELECT supplier_id,SUM(total_uzs) total,COUNT(*) count FROM purchases GROUP BY supplier_id) d ON d.supplier_id=s.id
+            LEFT JOIN (SELECT p.supplier_id,SUM(pp.amount_uzs) paid FROM purchase_payments pp JOIN purchases p ON p.id=pp.purchase_id GROUP BY p.supplier_id) pay ON pay.supplier_id=s.id
+            WHERE s.tenant_id=? ORDER BY s.name,s.id""",
+            (tenant,),
+        )
+        return page(
+            "purchases/suppliers.html",
+            active="suppliers",
+            rows=rows,
+            entity_uuid=str(uuid4()),
+        )
+
+    @app.route("/kpi/stock")
+    @login_required
+    @admin_required
+    def purchase_stock():
+        tenant = identity()
+        search = request.args.get("q", "").strip()[:160]
+        category = parse_int(request.args.get("category"))
+        rows = q(
+            """SELECT p.id,p.name,p.stock_qty,p.sell_price_default_uzs,c.name category,
+            COALESCE((SELECT SUM(m.qty*m.unit_cost_uzs)/NULLIF(SUM(m.qty),0) FROM inventory_moves m WHERE m.product_id=p.id AND m.move_type='IN'),0) avg_cost
+            FROM products p JOIN categories c ON c.id=p.category_id WHERE p.tenant_id=? AND c.tenant_id=? AND p.is_active=1
+            AND (?=0 OR p.category_id=?) AND (p.name LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.id AND b.tenant_id=? AND b.barcode=?))
+            ORDER BY c.sort_order,c.name,p.name""",
+            (tenant, tenant, category, category, f"%{search}%", tenant, search),
+        )
+        cats = q(
+            "SELECT id,name FROM categories WHERE tenant_id=? AND is_active=1 ORDER BY sort_order,name",
+            (tenant,),
+        )
+        return page(
+            "purchases/stock.html",
+            active="stock",
+            rows=rows,
+            cats=cats,
+            search=search,
+            category=category,
+        )
+
+    @app.route("/kpi/legacy")
+    @login_required
+    @admin_required
+    def purchase_legacy():
+        tenant = identity()
+        page_no = max(1, parse_int(request.args.get("page"), 1))
+        sql = """FROM inventory_moves m JOIN products p ON p.id=m.product_id WHERE p.tenant_id=? AND m.move_type='IN'
+                 AND NOT EXISTS(SELECT 1 FROM purchase_items i WHERE i.inventory_move_id=m.id)"""
+        count = q1("SELECT COUNT(*) count " + sql, (tenant,))["count"]
+        pages = max(1, (count + 49) // 50)
+        page_no = min(page_no, pages)
+        rows = q(
+            "SELECT m.*,p.name "
+            + sql
+            + " ORDER BY m.move_date DESC,m.id DESC LIMIT 50 OFFSET ?",
+            (tenant, (page_no - 1) * 50),
+        )
+        return page(
+            "purchases/legacy.html",
+            active="documents",
+            rows=rows,
+            page_no=page_no,
+            pages=pages,
+        )
 
     @app.route("/kpi/<int:category_id>")
     @login_required
     @admin_required
-    def kpi_category(category_id: int):
-        init_db()
-        cat = q1("SELECT * FROM categories WHERE id=? AND is_active=1", (category_id,))
-        if not cat:
-            flash("Kategoriya topilmadi", "danger")
-            return redirect(url_for("kpi"))
-
-        prod_rows = q("""
-            SELECT
-              p.id AS product_id,
-              p.name AS product_name,
-              COALESCE(SUM(CASE WHEN m.move_type='IN' THEN m.qty ELSE 0 END),0) -
-              COALESCE(SUM(CASE WHEN m.move_type='OUT' THEN m.qty ELSE 0 END),0) AS stock_qty
-            FROM products p
-            LEFT JOIN inventory_moves m ON m.product_id=p.id
-            WHERE p.category_id=? AND p.is_active=1
-            GROUP BY p.id
-            ORDER BY p.name
-        """, (category_id,))
-        return render_template("kpi_detail.html", cat=cat, prod_rows=prod_rows, app_name=app_name)
+    def kpi_category(category_id):
+        identity()
+        return redirect(url_for("purchase_stock", category=category_id))
 
     @app.route("/kpi/<int:category_id>/kirim", methods=["GET", "POST"])
     @login_required
     @admin_required
-    def kpi_kirim(category_id: int):
-        init_db()
-
-        cat = q1(
-            """
-            SELECT *
-            FROM categories
-            WHERE id=?
-              AND is_active=1
-            """,
-            (
-                category_id,
-            ),
-        )
-
-        if not cat:
-            flash(
-                "Kategoriya topilmadi",
-                "danger",
-            )
-
-            return redirect(
-                url_for("kpi")
-            )
-
-        products = q(
-            """
-            SELECT
-                id,
-                name,
-                COALESCE(stock_qty, 0)
-                    AS stock_qty,
-                COALESCE(
-                    sell_price_default_uzs,
-                    0
-                ) AS sell_price_default_uzs
-            FROM products
-            WHERE is_active=1
-              AND category_id=?
-            ORDER BY name
-            """,
-            (
-                category_id,
-            ),
-        )
-
+    def kpi_kirim(category_id):
+        identity()
         if request.method == "POST":
-            product_id = parse_int(
-                request.form.get("product_id")
+            flash(
+                "Kirim formasi yangilandi. Mahsulotlarni yangi hujjatda kiriting.",
+                "warning",
             )
-
-            qty = (
-                parse_float(
-                    request.form.get("qty")
-                )
-                or 0.0
-            )
-
-            unit_cost_uzs = (
-                parse_float(
-                    request.form.get("cost_uzs")
-                )
-                or parse_float(
-                    request.form.get(
-                        "unit_cost_uzs"
-                    )
-                )
-                or 0.0
-            )
-
-            move_date = (
-                request.form.get("move_date")
-                or ""
-            ).strip() or datetime.now().strftime(
-                "%Y-%m-%d"
-            )
-
-            note = (
-                request.form.get("note")
-                or ""
-            ).strip()
-
-            if product_id <= 0 or qty <= 0:
-                flash(
-                    "Mahsulot va miqdorni "
-                    "to‘g‘ri kiriting",
-                    "danger",
-                )
-
-                return redirect(
-                    url_for(
-                        "kpi_kirim",
-                        category_id=category_id,
-                    )
-                )
-
-            if unit_cost_uzs <= 0:
-                flash(
-                    "Tannarx musbat son "
-                    "bo‘lishi kerak",
-                    "danger",
-                )
-
-                return redirect(
-                    url_for(
-                        "kpi_kirim",
-                        category_id=category_id,
-                    )
-                )
-
-            db = get_db()
-
-            try:
-                with business_transaction(db) as tx:
-                    receive_stock(
-                        tx,
-                        move_date=move_date,
-                        product_id=product_id,
-                        qty=qty,
-                        unit_cost_uzs=unit_cost_uzs,
-                        note=note or "KPI kirim",
-                        category_id=category_id,
-                    )
-
-                flash(
-                    "Kirim qo‘shildi ✅",
-                    "success",
-                )
-
-            except Exception as exc:
-                flash(
-                    str(exc),
-                    "danger",
-                )
-
-            return redirect(
-                url_for("kpi")
-            )
-
-        recent_moves = q(
-            """
-            SELECT
-                m.id,
-                m.move_date,
-                m.qty,
-                m.unit_cost_uzs,
-                m.note,
-                p.name AS product_name
-            FROM inventory_moves m
-            JOIN products p
-              ON p.id=m.product_id
-            WHERE m.move_type='IN'
-              AND p.category_id=?
-            ORDER BY m.id DESC
-            LIMIT 10
-            """,
-            (
-                category_id,
-            ),
-        )
-
-        return render_template(
-            "kpi_kirim.html",
-            category=cat,
-            products=products,
-            recent_moves=recent_moves,
-            today=datetime.now().strftime(
-                "%Y-%m-%d"
-            ),
-            app_name=app_name,
-        )
+        return redirect(url_for("purchase_new", category=category_id), code=303)

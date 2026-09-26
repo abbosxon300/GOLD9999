@@ -1,0 +1,54 @@
+{% extends 'purchases/layout.html' %}
+{% set title = 'Yangi kirim' %}
+{% block heading %}Yangi kirim{% endblock %}
+{% block subtitle %}Yetkazuvchi va mahsulotlarni bitta hujjatda kiriting{% endblock %}
+{% block workspace %}
+{% if error %}<div class="pw-alert" role="alert">{{ error }}</div>{% endif %}
+<div id="pw-draft" class="pw-draft" hidden><span>Bu brauzerda saqlanmagan qoralama bor.</span><button type="button" id="pw-restore" class="pw-button">Tiklash</button><button type="button" id="pw-discard" class="pw-clear">O‘chirish</button></div>
+<form id="purchase-form" method="post" autocomplete="off">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="entity_uuid" value="{{ initial.entity_uuid }}">
+  <input type="hidden" name="items" id="pw-items">
+  <div class="pw-editor">
+    <div class="pw-main">
+      <section class="pw-panel pw-pad"><div class="pw-section-head"><h2><span class="pw-step">1</span> Kirim ma’lumotlari</h2></div>
+        <div class="pw-info-grid">
+          <label class="pw-supplier-label"><span>Yetkazuvchi <b>*</b></span><div class="pw-inline"><select required name="supplier_id" id="pw-supplier"><option value="">Yetkazuvchini tanlang</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if initial.get('supplier_id')|string == s.id|string %}selected{% endif %}>{{ s.name }}{% if s.phone %} · {{ s.phone }}{% endif %}</option>{% endfor %}</select><button type="button" id="pw-open-supplier" class="pw-button" aria-label="Yetkazuvchi qo‘shish">+</button></div></label>
+          <label><span>Sana <b>*</b></span><input required type="date" name="purchase_date" value="{{ initial.purchase_date }}"></label>
+          <label>Hujjat raqami<input name="reference" maxlength="80" value="{{ initial.get('reference','') }}" placeholder="Ixtiyoriy, masalan: 125"></label>
+        </div>
+      </section>
+      <section class="pw-panel">
+        <div class="pw-section-head pw-pad-head"><h2><span class="pw-step">2</span> Mahsulotlar</h2><span id="pw-item-count" class="pw-muted">0 tur</span></div>
+        <div class="pw-product-search"><label for="pw-search">Mahsulot nomi yoki shtrix kodi</label><div class="pw-search-box"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="pw-search" type="search" placeholder="Qidiring yoki shtrix kodni skanerlang…" role="combobox" aria-expanded="false" aria-controls="pw-results" aria-autocomplete="list"><kbd>Enter</kbd></div><div id="pw-results" role="listbox" hidden></div></div>
+        <div class="pw-table-wrap"><table class="pw-table pw-entry-table"><thead><tr><th>Mahsulot</th><th>Miqdor</th><th>Kirim narxi, so‘m</th><th class="num">Jami, so‘m</th><th></th></tr></thead><tbody id="pw-cart"></tbody></table></div>
+        <div class="pw-empty" id="pw-cart-empty"><span class="pw-empty-icon" aria-hidden="true">+</span><h3>Mahsulotlarni qo‘shing</h3><p>Yuqoridan qidiring. Turli kategoriyadagi mahsulotlar bitta kirimga qo‘shiladi.</p></div>
+        <div class="pw-cart-footer"><span>Oxirgi kirim narxi avtomatik taklif qilinadi</span><button type="button" id="pw-add-more" class="pw-clear">+ Mahsulot qo‘shish</button></div>
+      </section>
+      <label class="pw-panel pw-note">Izoh<textarea name="note" maxlength="500" rows="2" placeholder="Yetkazib berish yoki kirim bo‘yicha izoh…">{{ initial.get('note','') }}</textarea></label>
+    </div>
+    <aside class="pw-summary pw-panel pw-pad">
+      <span class="pw-eyebrow">HISOB-KITOB</span><h2>Kirim yakuni</h2>
+      <div class="pw-summary-total"><span>Jami summa</span><strong id="pw-total">0</strong><small>so‘m</small></div>
+      <label>Hozir to‘lanadi, so‘m<input name="paid" id="pw-paid" inputmode="decimal" value="{{ initial.get('paid','0') }}" placeholder="0"></label>
+      <button class="pw-clear pw-pay-all" type="button" id="pw-pay-all">To‘liq to‘lash</button>
+      <label>Qaysi kassadan?<select name="method"><option value="cash" {% if initial.get('method')=='cash' %}selected{% endif %}>Naqd kassa</option><option value="click" {% if initial.get('method')=='click' %}selected{% endif %}>Click kassa</option></select></label>
+      <p class="pw-help">To‘lov kiritilsa, tanlangan kassadan chiqim yoziladi.</p>
+      <div class="pw-balance"><span>Qolgan qarz</span><strong><span id="pw-debt">0</span> <small>so‘m</small></strong></div>
+      <p id="pw-form-error" class="pw-inline-error" role="alert" hidden></p>
+      <button type="submit" id="pw-save" class="pw-button pw-primary pw-wide">Kirimni saqlash</button>
+      <a class="pw-button pw-wide pw-secondary" href="{{ url_for('kpi') }}">Kirimlar ro‘yxati</a>
+      <small class="pw-draft-status" id="pw-draft-status" aria-live="polite"></small>
+    </aside>
+  </div>
+</form>
+<dialog id="pw-supplier-dialog" class="pw-dialog"><form id="pw-supplier-form" method="post" action="{{ url_for('purchase_suppliers') }}">
+  <div class="pw-section-head"><h2>Yangi yetkazuvchi</h2><button type="button" id="pw-close-supplier" class="pw-icon-button" aria-label="Yopish">×</button></div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="entity_uuid" value="{{ supplier_uuid }}">
+  <label><span>Nomi <b>*</b></span><input name="name" required maxlength="160" placeholder="Korxona yoki shaxs nomi"></label>
+  <label>Telefon<input name="phone" type="tel" maxlength="40" placeholder="+998 …"></label>
+  <p id="pw-supplier-error" class="pw-inline-error" role="alert"></p><button class="pw-button pw-primary pw-wide" type="submit">Qo‘shish va tanlash</button>
+</form></dialog>
+<script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/purchases.js') }}" defer></script>
+{% endblock %}

@@ -423,6 +423,8 @@ def record_inventory_move(
     note: Any = "",
     source_type: Any = None,
     source_id: Any = None,
+    entity_uuid: str | None = None,
+    replicate: bool = True,
 ) -> InventoryMoveResult:
     normalized_date = _normalize_move_date(
         move_date
@@ -490,7 +492,7 @@ def record_inventory_move(
             normalized_note,
             normalized_source_type,
             normalized_source_id,
-            str(uuid.uuid4()),
+            str(uuid.UUID(entity_uuid)) if entity_uuid else str(uuid.uuid4()),
             1,
         ),
     )
@@ -509,7 +511,7 @@ def record_inventory_move(
     # qilinmaydi. sales_aggregate server tomonida
     # consume_stock() orqali aynan shu harakatni yaratadi.
     if (
-        _desktop_sync_enabled()
+        replicate and _desktop_sync_enabled()
         and normalized_source_type != "sale_item"
     ):
         row = connection.execute(
@@ -626,6 +628,8 @@ def receive_stock(
     category_id: Any = None,
     source_type: Any = None,
     source_id: Any = None,
+    entity_uuid: str | None = None,
+    replicate: bool = True,
 ) -> InventoryMoveResult:
     normalized_product_id = _normalize_positive_id(
         product_id,
@@ -654,6 +658,8 @@ def receive_stock(
         note=note,
         source_type=source_type,
         source_id=source_id,
+        entity_uuid=entity_uuid,
+        replicate=replicate,
     )
 
     cursor = connection.execute(

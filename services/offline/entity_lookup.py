@@ -6,6 +6,9 @@ from dataclasses import dataclass
 
 
 ENTITY_TABLES = {
+    "supplier": "suppliers",
+    "purchase": "purchases",
+    "purchase_payment": "purchase_payments",
     "category": "categories",
     "product": "products",
     "inventory_move": "inventory_moves",
