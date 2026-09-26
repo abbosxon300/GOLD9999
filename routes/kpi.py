@@ -229,7 +229,6 @@ def register_kpi_routes(
             error=error,
             supplier_uuid=str(uuid4()),
             draft_key=f"purchase-draft:{tenant}:{session.get('user_id')}",
-            edit_draft_key=f"purchase-edit:{purchase_id}:{tenant}:{session.get('user_id')}",
         ), (422 if error else 200)
 
     @app.route("/kpi/documents/<int:purchase_id>")
