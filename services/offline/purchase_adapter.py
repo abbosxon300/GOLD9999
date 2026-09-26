@@ -7,6 +7,7 @@ from services.business_writes.purchases import (
     create_supplier,
     encoded,
     pay_purchase,
+    pay_supplier,
     save_purchase,
     update_purchase,
     void_purchase,
@@ -175,6 +176,14 @@ def apply_purchase_change(context):
                 entity_uuid=context.entity_uuid,
                 name=payload.get("name"),
                 phone=payload.get("phone", ""),
+                replicate=False,
+            )
+        elif context.entity_type == "supplier_payment":
+            local_id = pay_supplier(
+                db,
+                tenant_id=tenant_id,
+                entity_uuid=context.entity_uuid,
+                payload=payload,
                 replicate=False,
             )
         else:
