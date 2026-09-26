@@ -69,7 +69,7 @@
       <div id="pw-results" role="listbox" hidden></div>
     </div>
 
-    <div class="pw-simple-list-meta">
+    <div class="pw-simple-list-meta" id="pw-list-meta" hidden>
       <span id="pw-item-count">0 tur</span>
     </div>
 
@@ -88,12 +88,25 @@
       </table>
     </div>
 
-    <div class="pw-simple-empty" id="pw-cart-empty">Mahsulot tanlang</div>
+    <div class="pw-simple-empty" id="pw-cart-empty" hidden></div>
 
-    <label class="pw-simple-note">
-      <span>Izoh</span>
-      <input name="note" maxlength="500" value="{{ initial.get('note','') }}" placeholder="Ixtiyoriy izoh">
-    </label>
+    <div class="pw-simple-optional">
+      <button
+        type="button"
+        id="pw-note-toggle"
+        class="pw-note-toggle"
+        aria-expanded="{{ 'true' if initial.get('note') else 'false' }}"
+        aria-controls="pw-note-field">
+        {{ '− Izoh' if initial.get('note') else '+ Izoh' }}
+      </button>
+
+      <label
+        class="pw-simple-note"
+        id="pw-note-field"
+        {% if not initial.get('note') %}hidden{% endif %}>
+        <input name="note" maxlength="500" value="{{ initial.get('note','') }}" placeholder="Ixtiyoriy izoh">
+      </label>
+    </div>
 
     <input type="hidden" name="paid" id="pw-paid" value="{{ initial.get('paid','0') if is_edit else '0' }}">
 
@@ -134,5 +147,5 @@
 </dialog>
 
 <script id="pw-data" type="application/json">{{ {'products':products,'initial':initial,'draftKey':draft_key,'hasError':error is not none,'editMode':is_edit,'saveLabel':('Saqlash' if is_edit else 'Kirimni saqlash')}|tojson }}</script>
-<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_minimal_v4" defer></script>
+<script src="{{ url_for('static', filename='js/purchases.js') }}?v=20260927_kirim_minimal_v5" defer></script>
 {% endblock %}

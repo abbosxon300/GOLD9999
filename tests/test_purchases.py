@@ -883,15 +883,19 @@ def test_kirim_uses_uzbek_validation_and_minimal_entry(web):
     assert 'id="pw-date-error"' in page.text
     assert 'class="pw-panel pw-simple-entry"' in page.text
     assert 'id="pw-table-wrap" hidden' in page.text
+    assert 'id="pw-list-meta" hidden' in page.text
+    assert 'id="pw-note-toggle"' in page.text
+    assert 'id="pw-note-field"' in page.text
+    assert re.search(r'id="pw-note-field"\s+hidden', page.text)
+    assert "Mahsulot tanlang" not in page.text
     assert 'class="pw-simple-totalbar is-minimal"' in page.text
-    assert 'name="paid" id="pw-paid"' in page.text
     assert 'name="method"' not in page.text
     assert 'id="pw-pay-all"' not in page.text
     assert 'id="pw-debt"' not in page.text
     assert '>To‘lov<' not in page.text
     assert '>Kassa<' not in page.text
     assert '>Qarz<' not in page.text
-    assert '20260927_kirim_minimal_v4' in page.text
+    assert '20260927_kirim_minimal_v5' in page.text
 
     script = client.get("/static/js/purchases.js")
     assert script.status_code == 200
@@ -902,3 +906,6 @@ def test_kirim_uses_uzbek_validation_and_minimal_entry(web):
     assert "pw-result-main" in body
     assert "pw-result-meta" in body
     assert "pw-table-wrap" in body
+    assert "pw-list-meta" in body
+    assert "pw-note-toggle" in body
+    assert "setNoteOpen" in body

@@ -43,10 +43,31 @@
     if (debt) debt.textContent = money(amount - paid);
     $('pw-item-count').textContent = `${cart.length} tur`;
     $('pw-items').value = JSON.stringify(cart);
-    $('pw-cart-empty').hidden = cart.length > 0;
+    const empty = $('pw-cart-empty');
+    if (empty) empty.hidden = true;
     const tableWrap = $('pw-table-wrap');
     if (tableWrap) tableWrap.hidden = cart.length === 0;
+    const listMeta = $('pw-list-meta');
+    if (listMeta) listMeta.hidden = cart.length === 0;
   }
+  const noteToggle = $('pw-note-toggle');
+  const noteField = $('pw-note-field');
+  const noteInput = form.elements.note;
+  function setNoteOpen(open) {
+    if (!noteToggle || !noteField) return;
+    noteField.hidden = !open;
+    noteToggle.setAttribute('aria-expanded', String(open));
+    noteToggle.textContent = open ? '− Izoh' : '+ Izoh';
+  }
+  if (noteToggle && noteField) {
+    setNoteOpen(Boolean(noteInput && noteInput.value.trim()));
+    noteToggle.addEventListener('click', () => {
+      const open = noteField.hidden;
+      setNoteOpen(open);
+      if (open && noteInput) noteInput.focus();
+    });
+  }
+
   function saveDraft() {
     if (submitting) return;
     const draft = {};
@@ -215,6 +236,7 @@
           ['supplier_id','purchase_date','reference','note','paid','method','entity_uuid','expected_version'].forEach(k=>{
             if(typeof draft[k]==='string' && form.elements[k]) form.elements[k].value=draft[k];
           });
+          setNoteOpen(Boolean(noteInput && noteInput.value.trim()));
           cart=normalizedItems(draft.items);renderCart();$('pw-draft').hidden=true;edited();
         });
       }
