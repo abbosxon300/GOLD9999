@@ -1,5 +1,6 @@
 {% extends 'purchases/layout.html' %}
 {% set title = supplier.name %}
+{% set page_class = ' pw-supplier-page' %}
 
 {% block eyebrow %}YETKAZIB BERUVCHI{% endblock %}
 {% block heading %}{{ supplier.name }}{% endblock %}
@@ -7,59 +8,127 @@
 
 {% block header_actions %}
 {% if can_pay %}
-  <button type="button" class="pw-button pw-primary" id="supplier-pay-open">To‘lov qilish</button>
+  <button
+    type="button"
+    class="pw-button pw-primary pw-supplier-pay-open"
+    id="supplier-pay-open">
+    To‘lov qilish
+  </button>
 {% endif %}
 {% endblock %}
 
 {% block workspace %}
+
 <div class="pw-supplier-back">
   <a href="{{ url_for('purchase_suppliers') }}">← Yetkazib beruvchilar</a>
 </div>
 
-<section class="pw-panel pw-supplier-summary">
-  <div>
+<section class="pw-supplier-summary" aria-label="Yetkazib beruvchi hisobi">
+  <article>
     <span>Jami kirim</span>
     <strong>{{ money(total) }} <small>so‘m</small></strong>
-  </div>
-  <div>
+  </article>
+
+  <article>
     <span>To‘langan</span>
     <strong>{{ money(paid) }} <small>so‘m</small></strong>
-  </div>
-  <div class="is-debt">
+  </article>
+
+  <article class="is-debt">
     <span>Qarz</span>
     <strong>{{ money(debt) }} <small>so‘m</small></strong>
-  </div>
-  <div>
+  </article>
+
+  <article>
     <span>Hujjatlar</span>
     <strong>{{ documents|length }} <small>ta</small></strong>
-  </div>
+  </article>
 </section>
 
-<section class="pw-panel pw-supplier-ledger">
-  <div class="pw-supplier-tabs" role="tablist" aria-label="Yetkazib beruvchi hisobi">
-    <button type="button" class="active" role="tab" aria-selected="true" data-supplier-tab="turnover">Aylanma</button>
-    <button type="button" role="tab" aria-selected="false" data-supplier-tab="purchases">Kirimlar <span>{{ documents|length }}</span></button>
-    <button type="button" role="tab" aria-selected="false" data-supplier-tab="payments">To‘lovlar <span>{{ payments|length }}</span></button>
+
+<section class="pw-panel pw-supplier-register">
+
+  <div
+    class="pw-supplier-tabs"
+    role="tablist"
+    aria-label="Yetkazib beruvchi hisobi">
+
+    <button
+      type="button"
+      class="active"
+      role="tab"
+      aria-selected="true"
+      data-supplier-tab="turnover">
+      Aylanma
+    </button>
+
+    <button
+      type="button"
+      role="tab"
+      aria-selected="false"
+      data-supplier-tab="purchases">
+      Yuklar
+      <span>{{ documents|length }}</span>
+    </button>
+
+    <button
+      type="button"
+      role="tab"
+      aria-selected="false"
+      data-supplier-tab="payments">
+      To‘lovlar
+      <span>{{ payments|length }}</span>
+    </button>
   </div>
 
-  <div class="pw-supplier-tab-panel" data-supplier-panel="turnover">
+
+  <div
+    class="pw-supplier-tab-panel"
+    data-supplier-panel="turnover">
+
+    <div class="pw-supplier-panel-head">
+      <div>
+        <h2>Aylanma hisoboti</h2>
+        <p>Kirim, to‘lov va joriy balans ketma-ketligi</p>
+      </div>
+    </div>
+
     {% if ledger %}
       <div class="pw-table-wrap">
-        <table class="pw-table pw-supplier-table">
+        <table class="pw-table pw-supplier-table pw-turnover-table">
           <thead>
             <tr>
               <th>Sana</th>
-              <th>Operatsiya</th>
               <th>Hujjat</th>
+              <th>Operatsiya</th>
               <th class="num">Kirim</th>
               <th class="num">To‘lov</th>
               <th class="num">Balans</th>
             </tr>
           </thead>
+
           <tbody>
             {% for r in ledger %}
               <tr>
-                <td>{{ r.date[8:10] }}.{{ r.date[5:7] }}.{{ r.date[:4] }}</td>
+                <td class="pw-date-cell">
+                  {{ r.date[8:10] }}.{{ r.date[5:7] }}.{{ r.date[:4] }}
+                </td>
+
+                <td>
+                  {% if r.purchase_id %}
+                    <a
+                      class="pw-doc-link"
+                      href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">
+                      Kirim #{{ r.purchase_id }}
+                    </a>
+                    {% if r.reference %}
+                      <small>{{ r.reference }}</small>
+                    {% endif %}
+                  {% else %}
+                    <span class="pw-muted-value">Umumiy to‘lov</span>
+                  {% endif %}
+                </td>
+
                 <td>
                   {% if r.kind == 'purchase' %}
                     <span class="pw-ledger-type purchase">Kirim</span>
@@ -67,17 +136,18 @@
                     <span class="pw-ledger-type payment">To‘lov</span>
                   {% endif %}
                 </td>
-                <td>
-                  {% if r.purchase_id %}
-                    <a href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">Kirim #{{ r.purchase_id }}</a>
-                    {% if r.reference %}<small>{{ r.reference }}</small>{% endif %}
-                  {% else %}
-                    <span>Umumiy to‘lov</span>
-                  {% endif %}
+
+                <td class="num pw-debit">
+                  {% if r.debit %}{{ money(r.debit) }}{% else %}—{% endif %}
                 </td>
-                <td class="num">{% if r.debit %}{{ money(r.debit) }}{% else %}—{% endif %}</td>
-                <td class="num">{% if r.credit %}{{ money(r.credit) }}{% else %}—{% endif %}</td>
-                <td class="num pw-ledger-balance">{{ money(r.balance) }}</td>
+
+                <td class="num pw-credit">
+                  {% if r.credit %}{{ money(r.credit) }}{% else %}—{% endif %}
+                </td>
+
+                <td class="num pw-ledger-balance">
+                  {{ money(r.balance) }}
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -88,93 +158,196 @@
     {% endif %}
   </div>
 
-  <div class="pw-supplier-tab-panel" data-supplier-panel="purchases" hidden>
-    {% if documents %}
-      <div class="pw-table-wrap">
-        <table class="pw-table pw-supplier-table">
-          <thead>
-            <tr>
-              <th>Sana / hujjat</th>
-              <th>Mahsulot</th>
-              <th class="num">Jami</th>
-              <th class="num">To‘langan</th>
-              <th class="num">Qarz</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in documents %}
-              <tr>
-                <td>
-                  <a class="pw-doc-link" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">Kirim #{{ r.id }}</a>
-                  <small>{{ r.purchase_date[8:10] }}.{{ r.purchase_date[5:7] }}.{{ r.purchase_date[:4] }}{% if r.reference %} · {{ r.reference }}{% endif %}</small>
-                </td>
-                <td>{{ r.item_count }} tur</td>
-                <td class="num">{{ money(r.total_uzs) }}</td>
-                <td class="num">{{ money(r.paid) }}</td>
-                <td class="num">{{ money(r.total_uzs-r.paid) }}</td>
-                <td><a class="pw-arrow" href="{{ url_for('purchase_detail',purchase_id=r.id) }}">↗</a></td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="pw-supplier-empty">Hali kirim yo‘q</div>
-    {% endif %}
-  </div>
 
-  <div class="pw-supplier-tab-panel" data-supplier-panel="payments" hidden>
-    {% if payments %}
+  <div
+    class="pw-supplier-tab-panel"
+    data-supplier-panel="purchases"
+    hidden>
+
+    <div class="pw-supplier-panel-head">
+      <div>
+        <h2>Yuklar</h2>
+        <p>Har bir kirimdagi mahsulot, miqdor va narxlar</p>
+      </div>
+
+      <strong>{{ money(total) }} so‘m</strong>
+    </div>
+
+    {% if loads %}
       <div class="pw-table-wrap">
-        <table class="pw-table pw-supplier-table">
+        <table class="pw-table pw-supplier-table pw-loads-table">
           <thead>
             <tr>
               <th>Sana</th>
               <th>Hujjat</th>
-              <th>Usul</th>
+              <th>Mahsulot</th>
+              <th class="num">Miqdor</th>
+              <th class="num">Kirim narxi</th>
+              <th class="num">Jami</th>
+              <th class="pw-action-head"></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for r in loads %}
+              <tr>
+                <td class="pw-date-cell">
+                  {{ r.purchase_date[8:10] }}.{{ r.purchase_date[5:7] }}.{{ r.purchase_date[:4] }}
+                </td>
+
+                <td>
+                  <a
+                    class="pw-doc-link"
+                    href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">
+                    Kirim #{{ r.purchase_id }}
+                  </a>
+
+                  {% if r.reference %}
+                    <small>{{ r.reference }}</small>
+                  {% endif %}
+                </td>
+
+                <td class="pw-product-name">
+                  <strong>{{ r.product_name }}</strong>
+                  {% if r.purchase_note %}
+                    <small>{{ r.purchase_note }}</small>
+                  {% endif %}
+                </td>
+
+                <td class="num">{{ quantity(r.qty) }}</td>
+                <td class="num">{{ money(r.unit_cost_uzs) }}</td>
+                <td class="num pw-row-total">{{ money(r.total_uzs) }}</td>
+
+                <td class="pw-row-action">
+                  <a
+                    class="pw-open-doc"
+                    aria-label="Kirim {{ r.purchase_id }} ni ochish"
+                    title="Hujjatni ochish"
+                    href="{{ url_for('purchase_detail', purchase_id=r.purchase_id) }}">
+                    ↗
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+
+          <tfoot>
+            <tr>
+              <td colspan="5">Jami kirim</td>
+              <td class="num">{{ money(total) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    {% else %}
+      <div class="pw-supplier-empty">Hali yuk yo‘q</div>
+    {% endif %}
+  </div>
+
+
+  <div
+    class="pw-supplier-tab-panel"
+    data-supplier-panel="payments"
+    hidden>
+
+    <div class="pw-supplier-panel-head">
+      <div>
+        <h2>To‘lovlar</h2>
+        <p>Yetkazib beruvchiga qilingan barcha to‘lovlar</p>
+      </div>
+
+      <strong>{{ money(paid) }} so‘m</strong>
+    </div>
+
+    {% if payments %}
+      <div class="pw-table-wrap">
+        <table class="pw-table pw-supplier-table pw-payments-table">
+          <thead>
+            <tr>
+              <th>Sana</th>
+              <th>Hujjat</th>
+              <th>Kassa</th>
               <th>Izoh</th>
               <th class="num">To‘lov</th>
             </tr>
           </thead>
+
           <tbody>
             {% for p in payments %}
               <tr>
-                <td>{{ p.payment_date[8:10] }}.{{ p.payment_date[5:7] }}.{{ p.payment_date[:4] }}</td>
+                <td class="pw-date-cell">
+                  {{ p.payment_date[8:10] }}.{{ p.payment_date[5:7] }}.{{ p.payment_date[:4] }}
+                </td>
+
                 <td>
                   {% if p.purchase_id %}
-                    <a href="{{ url_for('purchase_detail',purchase_id=p.purchase_id) }}">Kirim #{{ p.purchase_id }}</a>
+                    <a
+                      class="pw-doc-link"
+                      href="{{ url_for('purchase_detail', purchase_id=p.purchase_id) }}">
+                      Kirim #{{ p.purchase_id }}
+                    </a>
                   {% else %}
-                    <span>Umumiy to‘lov</span>
+                    <span class="pw-muted-value">Umumiy to‘lov</span>
                   {% endif %}
                 </td>
-                <td>{{ 'Naqd' if p.method=='cash' else 'Click' }}</td>
+
+                <td>
+                  <span class="pw-payment-method">
+                    {{ 'Naqd' if p.method == 'cash' else 'Click' }}
+                  </span>
+                </td>
+
                 <td>{{ p.note or '—' }}</td>
-                <td class="num">{{ money(p.amount_uzs) }}</td>
+
+                <td class="num pw-credit">
+                  {{ money(p.amount_uzs) }}
+                </td>
               </tr>
             {% endfor %}
           </tbody>
+
+          <tfoot>
+            <tr>
+              <td colspan="4">Jami to‘lov</td>
+              <td class="num">{{ money(paid) }}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     {% else %}
       <div class="pw-supplier-empty">Hali to‘lov yo‘q</div>
     {% endif %}
   </div>
+
 </section>
 
+
 {% if can_pay %}
-<dialog class="pw-dialog pw-supplier-pay-dialog" id="supplier-pay-dialog" data-debt="{{ debt }}">
+<dialog
+  class="pw-dialog pw-supplier-pay-dialog"
+  id="supplier-pay-dialog"
+  data-debt="{{ debt }}">
+
   <form
     id="supplier-pay-form"
     method="post"
-    action="{{ url_for('purchase_supplier_pay',supplier_id=supplier.id) }}"
+    action="{{ url_for('purchase_supplier_pay', supplier_id=supplier.id) }}"
     novalidate>
+
     <div class="pw-dialog-head">
       <div>
         <h2>To‘lov qilish</h2>
         <p>{{ supplier.name }} · qarz {{ money(debt) }} so‘m</p>
       </div>
-      <button type="button" class="pw-icon-button" id="supplier-pay-close" aria-label="Yopish">×</button>
+
+      <button
+        type="button"
+        class="pw-icon-button"
+        id="supplier-pay-close"
+        aria-label="Yopish">
+        ×
+      </button>
     </div>
 
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -183,12 +356,25 @@
     <div class="pw-supplier-pay-grid">
       <label>
         To‘lov sanasi
-        <input type="date" name="payment_date" id="supplier-pay-date" value="{{ today }}">
+        <input
+          type="date"
+          name="payment_date"
+          id="supplier-pay-date"
+          value="{{ today }}">
       </label>
+
       <label>
         Summa, so‘m
-        <input type="number" name="amount_uzs" id="supplier-pay-amount" inputmode="decimal" min="0.01" max="{{ debt }}" step="0.01">
+        <input
+          type="number"
+          name="amount_uzs"
+          id="supplier-pay-amount"
+          inputmode="decimal"
+          min="0.01"
+          max="{{ debt }}"
+          step="0.01">
       </label>
+
       <label>
         Kassa
         <select name="method">
@@ -203,15 +389,34 @@
       <input name="note" maxlength="500" placeholder="Ixtiyoriy">
     </label>
 
-    <p class="pw-inline-error" id="supplier-pay-error" role="alert" hidden></p>
+    <p
+      class="pw-inline-error"
+      id="supplier-pay-error"
+      role="alert"
+      hidden>
+    </p>
 
     <div class="pw-dialog-actions">
-      <button type="button" class="pw-button" id="supplier-pay-cancel">Bekor qilish</button>
-      <button type="submit" class="pw-button pw-primary">To‘lovni saqlash</button>
+      <button
+        type="button"
+        class="pw-button"
+        id="supplier-pay-cancel">
+        Bekor qilish
+      </button>
+
+      <button
+        type="submit"
+        class="pw-button pw-primary">
+        To‘lovni saqlash
+      </button>
     </div>
   </form>
 </dialog>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/supplier_detail.js') }}?v=20260927_supplier_fifo_v1" defer></script>
+<script
+  src="{{ url_for('static', filename='js/supplier_detail.js') }}?v=20260927_supplier_fifo_v1"
+  defer>
+</script>
+
 {% endblock %}

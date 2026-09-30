@@ -645,7 +645,11 @@ def test_supplier_cabinet_fifo_payment_without_document_selection(web):
     assert 'data-supplier-tab="purchases"' in cabinet.text
     assert 'data-supplier-tab="payments"' in cabinet.text
     assert "Aylanma" in cabinet.text
+    assert "Yuklar" in cabinet.text
     assert "Balans" in cabinet.text
+    assert "Product 11" in cabinet.text
+    assert "Product 12" in cabinet.text
+    assert "45 000" in cabinet.text
     assert "SUP-1" in cabinet.text
     assert "20260927_supplier_fifo_v1" in cabinet.text
 

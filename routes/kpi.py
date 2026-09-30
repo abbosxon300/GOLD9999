@@ -516,6 +516,33 @@ def register_kpi_routes(
             ) ORDER BY payment_date DESC,id DESC""",
             (tenant, supplier_id, tenant, supplier_id),
         )
+        loads = q(
+            """SELECT
+                p.id purchase_id,
+                p.purchase_date,
+                p.reference,
+                p.note purchase_note,
+                i.id item_id,
+                i.qty,
+                i.unit_cost_uzs,
+                i.total_uzs,
+                pr.id product_id,
+                pr.name product_name
+            FROM purchases p
+            JOIN purchase_items i
+              ON i.purchase_id=p.id
+            JOIN products pr
+              ON pr.id=i.product_id
+             AND pr.tenant_id=p.tenant_id
+            WHERE p.tenant_id=?
+              AND p.supplier_id=?
+              AND COALESCE(p.is_void,0)=0
+            ORDER BY
+                p.purchase_date DESC,
+                p.id DESC,
+                i.id""",
+            (tenant, supplier_id),
+        )
         total = round(sum(r["total_uzs"] for r in documents), 2)
         paid = round(sum(r["amount_uzs"] for r in payments), 2)
         debt = round(total - paid, 2)
@@ -560,6 +587,7 @@ def register_kpi_routes(
             active="suppliers",
             supplier=supplier,
             documents=documents,
+            loads=loads,
             payments=payments,
             ledger=ledger,
             total=total,
