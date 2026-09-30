@@ -611,9 +611,9 @@ def register_kpi_routes(
         tenant = identity()
         search = request.args.get("q", "").strip()[:160]
         category = parse_int(request.args.get("category"))
-        stock_status = request.args.get("stock", "all")
+        stock_status = request.args.get("stock", "in")
         if stock_status not in ("all", "in", "out"):
-            stock_status = "all"
+            stock_status = "in"
 
         all_rows = q(
             """SELECT p.id,p.name,p.stock_qty,p.sell_price_default_uzs,

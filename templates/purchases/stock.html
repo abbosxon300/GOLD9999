@@ -118,7 +118,18 @@
             {% for p in rows %}
               <tr>
                 <td data-label="Mahsulot">
-                  <strong>{{ p.name }}</strong>
+                  <div class="wh-product-cell">
+                    {% if p.barcodes %}
+                      <span class="wh-barcodes" aria-label="Shtrix-kodlar">
+                        {% for code in p.barcodes.split() %}
+                          <span class="wh-barcode">{{ code }}</span>
+                        {% endfor %}
+                      </span>
+                    {% else %}
+                      <span class="wh-barcode wh-barcode-empty">Shtrix yo‘q</span>
+                    {% endif %}
+                    <strong>{{ p.name }}</strong>
+                  </div>
                 </td>
                 <td data-label="Kategoriya">
                   <span class="wh-category">{{ p.category }}</span>
