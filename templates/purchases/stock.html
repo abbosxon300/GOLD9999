@@ -112,24 +112,14 @@
               <th class="num">Kirim narxi</th>
               <th class="num">Sotuv narxi</th>
               <th class="num">Qoldiq tannarxi</th>
+              <th class="wh-barcode-head">Shtrix-kod</th>
             </tr>
           </thead>
           <tbody>
             {% for p in rows %}
               <tr>
                 <td data-label="Mahsulot">
-                  <div class="wh-product-cell">
-                    {% if p.barcodes %}
-                      <span class="wh-barcodes" aria-label="Shtrix-kodlar">
-                        {% for code in p.barcodes.split() %}
-                          <span class="wh-barcode">{{ code }}</span>
-                        {% endfor %}
-                      </span>
-                    {% else %}
-                      <span class="wh-barcode wh-barcode-empty">Shtrix yo‘q</span>
-                    {% endif %}
-                    <strong>{{ p.name }}</strong>
-                  </div>
+                  <strong>{{ p.name }}</strong>
                 </td>
                 <td data-label="Kategoriya">
                   <span class="wh-category">{{ p.category }}</span>
@@ -147,6 +137,16 @@
                 </td>
                 <td class="num wh-value" data-label="Qoldiq tannarxi">
                   {{ money((p.stock_qty or 0) * (p.avg_cost or 0)) }}
+                </td>
+                <td class="wh-barcode-cell" data-label="Shtrix-kod">
+                  <a
+                    class="wh-barcode-action"
+                    href="{{ url_for(
+                      'settings_product_barcodes',
+                      product_id=p.id
+                    ) }}">
+                    ▥ Shtrix-kodlar
+                  </a>
                 </td>
               </tr>
             {% endfor %}
