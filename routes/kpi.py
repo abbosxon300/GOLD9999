@@ -329,6 +329,13 @@ def register_kpi_routes(
                     expected_version=request.form.get("expected_version"),
                 )
                 flash("Kirim yangilandi. Ombor va yetkazuvchi hisobi qayta hisoblandi.", "success")
+                if request.args.get("return_supplier_id") == str(doc["supplier_id"]):
+                    return redirect(
+                        url_for(
+                            "purchase_supplier_detail",
+                            supplier_id=doc["supplier_id"],
+                        )
+                    )
                 return redirect(url_for("purchase_detail", purchase_id=purchase_id))
             except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
                 error = str(exc)
@@ -362,7 +369,7 @@ def register_kpi_routes(
         tenant = identity()
         check_csrf()
         doc = q1(
-            """SELECT entity_uuid,sync_version FROM purchases
+            """SELECT entity_uuid,sync_version,supplier_id FROM purchases
             WHERE id=? AND tenant_id=? AND COALESCE(is_void,0)=0""",
             (purchase_id, tenant),
         )
@@ -376,6 +383,13 @@ def register_kpi_routes(
                 expected_version=request.form.get("expected_version"),
             )
             flash("Kirim bekor qilindi. Ombor va yetkazuvchi hisobi qayta hisoblandi.", "success")
+            if request.form.get("return_supplier_id") == str(doc["supplier_id"]):
+                return redirect(
+                    url_for(
+                        "purchase_supplier_detail",
+                        supplier_id=doc["supplier_id"],
+                    )
+                )
             return redirect(url_for("kpi"))
         except (ValueError, sqlite3.Error) as exc:
             if isinstance(exc, sqlite3.Error):
@@ -384,6 +398,13 @@ def register_kpi_routes(
                 str(exc) if isinstance(exc, ValueError) else "Kirim bekor qilinmadi",
                 "danger",
             )
+            if request.form.get("return_supplier_id") == str(doc["supplier_id"]):
+                return redirect(
+                    url_for(
+                        "purchase_supplier_detail",
+                        supplier_id=doc["supplier_id"],
+                    )
+                )
             return redirect(url_for("purchase_detail", purchase_id=purchase_id))
 
     @app.post("/kpi/documents/<int:purchase_id>/pay")
@@ -522,6 +543,23 @@ def register_kpi_routes(
                 p.purchase_date,
                 p.reference,
                 p.note purchase_note,
+                p.sync_version,
+                CASE
+                  WHEN EXISTS (
+                    SELECT 1
+                    FROM purchase_payments pp
+                    WHERE pp.purchase_id=p.id
+                      AND pp.tenant_id=p.tenant_id
+                  )
+                  OR EXISTS (
+                    SELECT 1
+                    FROM supplier_payment_allocations spa
+                    WHERE spa.purchase_id=p.id
+                      AND spa.tenant_id=p.tenant_id
+                  )
+                  THEN 0
+                  ELSE 1
+                END can_delete,
                 i.id item_id,
                 i.qty,
                 i.unit_cost_uzs,

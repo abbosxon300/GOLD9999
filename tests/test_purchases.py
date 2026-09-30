@@ -649,6 +649,10 @@ def test_supplier_cabinet_fifo_payment_without_document_selection(web):
     assert "TO‘LOVLAR" in cabinet.text
     assert "Tan narx" in cabinet.text
     assert "Oy bo‘yicha jami" in cabinet.text
+    assert "Amallar" in cabinet.text
+    assert "return_supplier_id=" in cabinet.text
+    assert 'class="pw-action-btn pw-action-edit"' in cabinet.text
+    assert 'class="pw-action-btn pw-action-delete"' in cabinet.text
     assert "Product 11" in cabinet.text
     assert "Product 12" not in cabinet.text
     assert "45 000" in cabinet.text
