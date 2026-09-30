@@ -582,17 +582,81 @@ def register_kpi_routes(
             row["balance"] = running
         ledger.reverse()
 
+        month_raw = request.args.get("month", "").strip()
+        try:
+            month_dt = (
+                datetime.strptime(month_raw, "%Y-%m")
+                if month_raw
+                else datetime.now(ZoneInfo("Asia/Tashkent"))
+            )
+        except ValueError:
+            month_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+
+        view_month = f"{month_dt.year:04d}-{month_dt.month:02d}"
+
+        prev_year = month_dt.year - (1 if month_dt.month == 1 else 0)
+        prev_month_no = 12 if month_dt.month == 1 else month_dt.month - 1
+        next_year = month_dt.year + (1 if month_dt.month == 12 else 0)
+        next_month_no = 1 if month_dt.month == 12 else month_dt.month + 1
+
+        prev_month = f"{prev_year:04d}-{prev_month_no:02d}"
+        next_month = f"{next_year:04d}-{next_month_no:02d}"
+
+        month_names = (
+            "YANVAR",
+            "FEVRAL",
+            "MART",
+            "APREL",
+            "MAY",
+            "IYUN",
+            "IYUL",
+            "AVGUST",
+            "SENTABR",
+            "OKTABR",
+            "NOYABR",
+            "DEKABR",
+        )
+        month_label = f"{month_names[month_dt.month - 1]} {month_dt.year}"
+
+        loads_view = [
+            row for row in loads
+            if row["purchase_date"][:7] == view_month
+        ]
+        payments_view = [
+            row for row in payments
+            if row["payment_date"][:7] == view_month
+        ]
+        ledger_view = [
+            row for row in ledger
+            if row["date"][:7] == view_month
+        ]
+
+        loads_total = round(
+            sum(float(row["total_uzs"] or 0) for row in loads_view),
+            2,
+        )
+        payments_total = round(
+            sum(float(row["amount_uzs"] or 0) for row in payments_view),
+            2,
+        )
+
         return page(
             "purchases/supplier_detail.html",
             active="suppliers",
             supplier=supplier,
             documents=documents,
-            loads=loads,
-            payments=payments,
-            ledger=ledger,
+            loads=loads_view,
+            payments=payments_view,
+            ledger=ledger_view,
             total=total,
             paid=paid,
             debt=debt,
+            loads_total=loads_total,
+            payments_total=payments_total,
+            view_month=view_month,
+            month_label=month_label,
+            prev_month=prev_month,
+            next_month=next_month,
             can_pay=debt > 0.005,
             payment_uuid=str(uuid4()),
         )

@@ -644,9 +644,11 @@ def test_supplier_cabinet_fifo_payment_without_document_selection(web):
     assert 'data-supplier-tab="turnover"' in cabinet.text
     assert 'data-supplier-tab="purchases"' in cabinet.text
     assert 'data-supplier-tab="payments"' in cabinet.text
-    assert "Aylanma" in cabinet.text
-    assert "Yuklar" in cabinet.text
-    assert "Balans" in cabinet.text
+    assert "AYLANMA" in cabinet.text
+    assert "YUKLAR" in cabinet.text
+    assert "TO‘LOVLAR" in cabinet.text
+    assert "Tan narx" in cabinet.text
+    assert "Oy bo‘yicha jami" in cabinet.text
     assert "Product 11" in cabinet.text
     assert "Product 12" not in cabinet.text
     assert "45 000" in cabinet.text
